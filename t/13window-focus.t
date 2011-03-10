@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 7;
+use Test::More tests => 9;
 use Test::Refcount;
 use Test::Exception;
 use IO::Async::Test;
@@ -15,6 +15,8 @@ my ( $term, $rootwin ) = mk_term_and_window;
 # Already 2 references; Tickit object keeps a permanent one, and we have one
 # here. This is fine.
 is_refcount( $rootwin, 2, '$rootwin has refcount 2 initially' );
+
+ok( !$term->{cursorvis}, 'Cursor not yet visible initially' );
 
 my $win = $rootwin->make_sub( 3, 10, 4, 20 );
 
@@ -30,6 +32,8 @@ is_deeply( [ $term->methodlog ],
              GOTO(3,10),
            ],
            '$term written to' );
+
+ok( $term->{cursorvis}, 'Cursor is visible after window focus' );
 
 $win->reposition( 5, 15 );
 

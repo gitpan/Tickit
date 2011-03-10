@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009,2010 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
 
 package Tickit::RootWindow;
 
@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Window );
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Carp;
 use Scalar::Util qw( weaken refaddr );
@@ -92,8 +92,14 @@ sub _enqueue_flush
       my $queue = $self->{redraw_queue};
       undef $self->{redraw_queue};
 
+      $term->mode_cursorvis( 0 );
+
       $_->() for @$queue;
-      $self->{focused_window}->_gain_focus if $self->{focused_window};
+
+      if( my $focused_window = $self->{focused_window} ) {
+         $term->mode_cursorvis( 1 );
+         $focused_window->_gain_focus;
+      }
 
       delete $self->{flush_queued}
    } );

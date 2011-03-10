@@ -28,6 +28,11 @@ sub mk_term_and_window
 
    my $win = $tickit->rootwin;
 
+   $tickit->start;
+
+   # Clear the method log from ->start
+   $term->methodlog;
+
    return ( $term, $win );
 }
 

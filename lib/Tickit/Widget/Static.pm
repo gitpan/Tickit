@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Text::CharWidth qw( mbswidth );
 
@@ -19,7 +19,24 @@ C<Tickit::Widget::Static> - a widget displaying static text
 
 =head1 SYNOPSIS
 
- TODO
+ use Tickit;
+ use Tickit::Widget::Static;
+ use IO::Async::Loop;
+ 
+ my $loop = IO::Async::Loop->new;
+ 
+ my $tickit = Tickit->new;
+ $loop->add( $tickit );
+ 
+ my $hello = Tickit::Widget::Static->new(
+    text   => "Hello, world",
+    align  => "centre",
+    valign => "middle",
+ );
+ 
+ $tickit->set_root_widget( $hello );
+ 
+ $tickit->run;
 
 =head1 DESCRIPTION
 
@@ -48,6 +65,10 @@ The text to display
 
 Optional. Defaults to C<0.0> if unspecified.
 
+=item valign => FLOAT|STRING
+
+Optional. Defaults to C<0.0> if unspecified.
+
 =back
 
 For more details see the accessors below.
@@ -63,6 +84,7 @@ sub new
 
    $self->set_text( $args{text} );
    $self->set_align( $args{align} || 0 );
+   $self->set_valign( $args{valign} || 0 );
 
    return $self;
 }
@@ -135,11 +157,50 @@ sub set_align
    my ( $align ) = @_;
 
    # Convert symbolics
-   $align = 0 if $align eq "left";
-   $align = 1 if $align eq "right";
+   $align = 0.0 if $align eq "left";
    $align = 0.5 if $align eq "centre";
+   $align = 1.0 if $align eq "right";
 
    $self->{align} = $align;
+
+   $self->redraw;
+}
+
+=head2 $valign = $widget->valign
+
+=cut
+
+sub valign
+{
+   my $self = shift;
+   return $self->{valign};
+}
+
+=head2 $widget->set_valign( $valign )
+
+Accessor for vertical alignment value.
+
+Gives a value in the range from C<0.0> to C<1.0> to align the text display
+within the window. If the window is taller than one line, it will be aligned
+according to this value; with C<0.0> at the top, C<1.0> at the bottom, and
+other values inbetween.
+
+The symbolic values C<top>, C<middle> and C<bottom> can be supplied instead of
+C<0.0>, C<0.5> and C<1.0> respectively.
+
+=cut
+
+sub set_valign
+{
+   my $self = shift;
+   my ( $valign ) = @_;
+
+   # Convert symbolics
+   $valign = 0.0 if $valign eq "top";
+   $valign = 0.5 if $valign eq "middle";
+   $valign = 1.0 if $valign eq "bottom";
+
+   $self->{valign} = $valign;
 
    $self->redraw;
 }
@@ -167,7 +228,9 @@ sub render
       $text = substr( $text, 0, $cols ); # TODO - Unicode awareness
    }
 
-   $window->goto( 0, 0 );
+   my $top = ( $window->lines - $self->lines ) * $self->{valign};
+
+   $window->goto( $top, 0 );
    $window->erasech( $left, 1 ) if $left;
    $window->print( $text );
    $window->erasech( $right ) if $right;

@@ -13,6 +13,7 @@ my $build = Module::Build->new(
       'Term::Terminfo' => 0,
       'Term::Size' => 0,
       'Term::TermKey::Async' => 0,
+      'Text::CharWidth' => 0,
    },
    build_requires => {
       'Test::Exception' => 0,

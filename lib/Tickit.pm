@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( IO::Async::Notifier );
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Tickit::Term;
 use Tickit::RootWindow;
@@ -20,7 +20,20 @@ C<Tickit> - Terminal Interface Construction KIT
 
 =head1 SYNOPSIS
 
- TODO
+ use Tickit;
+ use IO::Async::Loop;
+
+ my $loop = IO::Async::Loop->new;
+
+ my $tickit = Tickit->new;
+ $loop->add( $tickit );
+
+ # Create some widgets
+ # ...
+
+ $tickit->set_root_widget( $rootwidget );
+
+ $tickit->run;
 
 =head1 DESCRIPTION
 
@@ -84,6 +97,11 @@ sub new
 
    $self->{rootwin} = Tickit::RootWindow->new( $self );
 
+   $self->bind_key( 'C-c' => $self->_capture_weakself( sub {
+      my $self = shift;
+      $self->get_loop->loop_stop;
+   } ) );
+
    return $self;
 }
 
@@ -146,6 +164,14 @@ previous callback for the same key. The code block is invoked as
 
 If C<$code> is missing or C<undef>, any existing callback is removed.
 
+As a convenience for the common application use case, the C<Ctrl-C> key is
+bound to a callback that calls the C<loop_stop> method on the underlying
+C<IO::Async::Loop> object the C<Tickit> is a member of. This usually has the
+effect of cleanly stopping the application.
+
+To remove this binding, simply bind another callback, or remove the binding
+entirely by setting C<undef>.
+
 =cut
 
 sub bind_key
@@ -173,6 +199,19 @@ sub rootwin
    return $self->{rootwin};
 }
 
+=head2 $tickit->set_root_widget( $widget )
+
+Sets the root widget for the application's display. This must be a subclass of
+L<Tickit::Widget>.
+
+=cut
+
+sub set_root_widget
+{
+   my $self = shift;
+   ( $self->{root_widget} ) = @_;
+}
+
 =head2 $tickit->start
 
 Set up the screen and generally prepare to start running
@@ -185,7 +224,12 @@ sub start
 
    my $term = $self->term;
    $term->mode_altscreen( 1 );
+   $term->mode_cursorvis( 0 );
    $term->clear;
+
+   if( my $widget = $self->{root_widget} ) {
+      $widget->set_window( $self->rootwin );
+   }
 }
 
 =head2 $tickit->stop
@@ -198,9 +242,30 @@ sub stop
 {
    my $self = shift;
 
+   if( my $widget = $self->{root_widget} ) {
+      $widget->set_window( undef );
+   }
+
    my $term = $self->term;
    $term->mode_altscreen( 0 );
+   $term->mode_cursorvis( 1 );
    $term->on_write_ready; # TODO - consider a synchronous flush or similar
+}
+
+=head2 $tickit->run
+
+A shortcut to the common usage pattern, combining the C<start> method with
+C<loop_forever> on the containing C<IO::Async::Loop> object.
+
+=cut
+
+sub run
+{
+   my $self = shift;
+
+   $self->start;
+   $self->get_loop->loop_forever;
+   $self->stop;
 }
 
 =head1 AUTHOR

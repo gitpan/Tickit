@@ -236,4 +236,15 @@ sub setpen
    $self->_push_methodlog( setpen => \%attrs );
 }
 
+sub mode_altscreen
+{
+   # ignore
+}
+
+sub mode_cursorvis
+{
+   my $self = shift;
+   ( $self->{cursorvis} ) = @_;
+}
+
 0x55AA;

@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -20,14 +20,16 @@ use constant REDRAW_CHILDREN => 0x02;
 
 C<Tickit::Widget> - abstract base class for on-screen widgets
 
-=head1 SYNOPSIS
-
- TODO
-
 =head1 DESCRIPTION
 
 This class acts as an abstract base class for on-screen widget objects. It
 provides the lower-level machinery required by most or all widget types.
+
+Objects cannot be directly constructed in this class. Instead, a subclass of
+this class which provides a suitable implementation of the C<render> and other
+provided methods is derived. Instances in that class are then constructed.
+
+See the C<EXAMPLES> section below.
 
 =cut
 
@@ -85,9 +87,8 @@ sub new
 
 =head2 $widget->set_window( $window )
 
-Sets the drawing window for the widget. This method associates the widget with
-a window, for it to use as its drawing area. Setting C<undef> removes the
-window.
+Sets the L<Tickit::Window> for the widget to draw on. Setting C<undef> removes
+the window.
 
 If a window is associated to the widget, that window's pen is set to the
 current widget pen. The widget is then drawn to the window by calling the
@@ -133,10 +134,22 @@ sub set_window
 
 sub window_gained
 {
+   my $self = shift;
+
+   weaken $self;
+   if( $self->can( "on_key" ) ) {
+      $self->window->set_on_key( sub {
+         shift;
+         $self->on_key( @_ );
+      } );
+   }
 }
 
 sub window_lost
 {
+   my $self = shift;
+
+   $self->window->set_on_key( undef );
 }
 
 =head2 $window = $widget->window
@@ -156,7 +169,7 @@ sub window
 
 Sets the parent widget; pass C<undef> to remove the parent.
 
-C<$parent>, if defined, must be a subclass of C<Tickit::ContainerWidget>.
+C<$parent>, if defined, must be a subclass of L<Tickit::ContainerWidget>.
 
 =cut
 
@@ -341,7 +354,7 @@ subclass which implements the following methods.
 =head2 $widget->render
 
 Called to redraw the widget's content to its window. Methods can be called on
-the contained L<Widget::Window> object obtained from C<< $widget->window >>.
+the contained L<Tickit::Window> object obtained from C<< $widget->window >>.
 
 =head2 $widget->reshape
 
@@ -363,6 +376,110 @@ Optional. Called by C<set_window> when a window has been set for this widget.
 
 Optional. Called by C<set_window> when C<undef> has been set as the window for
 this widget. The old window object is passed in.
+
+=head2 $handled = $widget->on_key( $type, $str, $key )
+
+Optional. If provided, this method will be set as the C<on_key> callback for
+any window set on the widget. By providing this method a subclass can
+implement widgets that respond to user input.
+
+=cut
+
+=head1 EXAMPLES
+
+=head2 A Trivial "Hello, World" Widget
+
+The following is about the smallest possible C<Tickit::Widget> implementation,
+containing the bare minimum of functionallity. It displays the fixed string
+"Hello, world" at the top left corner of its window.
+
+ package HelloWorldWidget;
+ use base 'Tickit::Widget';
+ 
+ sub lines {  1 }
+ sub cols  { 12 }
+ 
+ sub render
+ {
+    my $self = shift;
+    my $win = $self->window;
+ 
+    $win->clear;
+    $win->goto( 0, 0 );
+    $win->print( "Hello, world" );
+ }
+ 
+ 1;
+
+The C<lines> and C<cols> methods tell the container of the widget what its
+minimum size requirements are, and the C<render> method actually draws it to
+the window.
+
+A slight improvement on this would be to obtain the size of the window, and
+position the text in the centre rather than the top left corner.
+
+ sub render
+ {
+    my $self = shift;
+    my $win = $self->window;
+ 
+    $win->clear;
+    $win->goto( ( $win->lines - 1 ) / 2, ( $win->cols - 12 ) / 2 );
+    $win->print( "Hello, world" );
+ }
+
+=head2 Reacting To User Input
+
+If a widget subclass provides an C<on_key> method, then this will receive
+keypress events if the widget's window has the focus. This example uses it to
+change the pen foreground colour.
+
+ package ColourWidget;
+ use base 'Tickit::Widget';
+ 
+ my $text = "Press 0 to 7 to change the colour of this text";
+ 
+ sub lines { 1 }
+ sub cols  { length $text }
+ 
+ sub render
+ {
+    my $self = shift;
+    my $win = $self->window;
+ 
+    $win->clear;
+    $win->goto( ( $win->lines - $self->lines ) / 2, ( $win->cols - $self->cols ) / 2 );
+    $win->print( $text );
+ 
+    $win->focus( 0, 0 );
+ }
+ 
+ sub on_key
+ {
+    my $self = shift;
+    my ( $type, $str ) = @_;
+ 
+    if( $type eq "text" and $str =~ m/[0-7]/ ) {
+       $self->chpen( fg => $str );
+       $self->redraw;
+       return 1;
+    }
+
+    return 0;
+ }
+ 
+ 1;
+
+The C<render> method sets the focus at the window's top left corner to ensure
+that the window always has focus, so the widget will receive keypress events.
+(A real widget implementation would likely pick a more sensible place to put
+the cursor).
+
+The C<on_key> method then gets invoked for keypresses. It returns a true value
+to indicate the keys it handles, returning false for the others, to allow
+parent widgets or the main C<Tickit> object to handle them instead.
+
+=cut
 
 =head1 AUTHOR
 

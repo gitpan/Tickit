@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Carp;
 
@@ -444,7 +444,7 @@ sub deletech
    return 1;
 }
 
-=head2 $win->scroll( $downward, $rightward )
+=head2 $success = $win->scroll( $downward, $rightward )
 
 Attempt to scroll the contents of the window in the given direction. Most
 terminals cannot scroll arbitrary regions. If the terminal does not support

@@ -1,4 +1,12 @@
 Revision history for Changes
 
+0.02    CHANGES
+         * Bind Ctrl-C to $loop->loop_stop by default
+         * Neater root widget and run API
+         * Added SYNOPSIS examples to most widget types; added examples/
+           directory
+         * Window 'on_key' event handling
+         * Keep cursor hidden unless it's on a focused window
+
 0.01    First version, released on an unsuspecting world.
 

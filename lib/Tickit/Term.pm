@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use base qw( IO::Async::Stream );
 IO::Async::Stream->VERSION( 0.34 );
@@ -130,6 +130,9 @@ sub new
    ) );
 
    $self->{pen} = {};
+
+   # Almost certainly we'll start in a mode where the cursor is still visible
+   $self->{mode_cursorvis} = 1;
 
    $self->_recache_size;
 
@@ -500,6 +503,23 @@ sub mode_altscreen
    my ( $on ) = @_;
 
    $self->write( $on ? "${CSI}?1049h" : "${CSI}?1049l" );
+}
+
+=head2 $term->mode_cursorvis( $on )
+
+Set or clear the cursor visible mode
+
+=cut
+
+sub mode_cursorvis
+{
+   my $self = shift;
+   my ( $on ) = @_;
+
+   return if $self->{mode_cursorvis} == $on;
+   $self->{mode_cursorvis} = $on;
+
+   $self->write( $on ? "${CSI}?25h" : "${CSI}?25l" );
 }
 
 =head1 AUTHOR

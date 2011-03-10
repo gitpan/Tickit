@@ -1,5 +1,9 @@
 Build.PL
 Changes
+examples/ColourWidget.pm
+examples/HelloWorldWidget-1.pm
+examples/HelloWorldWidget-2.pm
+examples/testonewidget.pl
 lib/Tickit.pm
 lib/Tickit/ContainerWidget.pm
 lib/Tickit/RootWindow.pm
@@ -26,6 +30,7 @@ t/14window-input.t
 t/20widget.t
 t/21widget-window.t
 t/22widget-parent.t
+t/23widget-input.t
 t/30widget-static.t
 t/40widget-hbox.t
 t/40widget-vbox.t

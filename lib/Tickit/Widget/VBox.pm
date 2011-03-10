@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::VBox;
 
@@ -9,13 +9,42 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget::LinearBox );
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use List::Util qw( sum max );
 
 =head1 NAME
 
 C<Tickit::Widget::VBox> - distribute child widgets in a vertical column
+
+=head1 SYNOPSIS
+
+ use Tickit;
+ use Tickit::Widget::VBox;
+ use Tickit::Widget::Static;
+ use IO::Async::Loop;
+ 
+ my $loop = IO::Async::Loop->new;
+ 
+ my $tickit = Tickit->new;
+ $loop->add( $tickit );
+ 
+ my $vbox = Tickit::Widget::VBox->new;
+
+ foreach my $position (qw( top middle bottom )) {
+    $vbox->add(
+       Tickit::Widget::Static->new(
+          text   => $position,
+          align  => "centre",
+          valign => $position,
+       ),
+       expand => 1
+    );
+ }
+ 
+ $tickit->set_root_widget( $vbox );
+ 
+ $tickit->run;
 
 =head1 DESCRIPTION
 

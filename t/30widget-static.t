@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 18;
+use Test::More tests => 23;
 use Test::Refcount;
 use IO::Async::Test;
 
@@ -19,8 +19,9 @@ my $widget = Tickit::Widget::Static->new(
 
 ok( defined $widget, 'defined $widget' );
 
-is( $widget->text,  "Your message here", '$widget->text' );
-is( $widget->align, 0,                   '$widget->align' );
+is( $widget->text,   "Your message here", '$widget->text' );
+is( $widget->align,  0,                   '$widget->align' );
+is( $widget->valign, 0,                   '$widget->valign' );
 
 is( $widget->lines, 1, '$widget->lines' );
 is( $widget->cols, 17, '$widget->cols' );
@@ -38,7 +39,16 @@ $widget->set_align( 'centre' );
 
 is( $widget->align, 0.5, '$widget->set_align converts symbolic names' );
 
+$widget->set_valign( 0.3 );
+
+is( $widget->valign, 0.3, '$widget->set_valign modifies vertical alignment' );
+
+$widget->set_valign( 'middle' );
+
+is( $widget->valign, 0.5, '$widget->set_valign converts symbolic names' );
+
 $widget->set_align( 0.0 );
+$widget->set_valign( 0.0 );
 $widget->set_window( $win );
 
 wait_for { $term->is_changed };
@@ -98,6 +108,32 @@ is_deeply( [ $term->get_display ],
            [ PAD((" " x 65) . "Changed message"),
              BLANKS(24) ],
            '$term display in correct location' );
+
+# Terminal is 25 columns wide. Text is 1 line tall. Therefore, middle-
+# valigned it would start on the 13th line
+
+$widget->set_valign( 0.5 );
+
+wait_for { $term->is_changed };
+
+is_deeply( [ $term->methodlog ],
+           [ SETPEN,
+             CLEAR,
+             GOTO(12,0),
+             SETBG(undef),
+             ERASECH(65,1),
+             SETPEN,
+             PRINT("Changed message"), ],
+           '$term written in correct location' );
+
+is_deeply( [ $term->get_display ],
+           [ BLANKS(12),
+             PAD((" " x 65) . "Changed message"),
+             BLANKS(12) ],
+           '$term display in correct location' );
+
+$widget->set_valign( 0.0 );
+$term->methodlog; # clear the log
 
 $term->resize( 30, 100 );
 
