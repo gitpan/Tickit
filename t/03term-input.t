@@ -10,6 +10,9 @@ use IO::Async::Loop;
 
 use Tickit::Term;
 
+# TODO: Either Tickit or IO::Async itself should do this
+$SIG{PIPE} = "IGNORE";
+
 my $loop = IO::Async::Loop->new();
 testing_loop( $loop );
 

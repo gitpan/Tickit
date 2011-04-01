@@ -1,6 +1,11 @@
 Revision history for Changes
 
-0.02    CHANGES
+0.03    CHANGES:
+         * Added Tickit::Widget::Entry
+         * Tickit::Pen as first-class object
+         * Support more pen attributes - reverse video, alternate font
+
+0.02    CHANGES:
          * Bind Ctrl-C to $loop->loop_stop by default
          * Neater root widget and run API
          * Added SYNOPSIS examples to most widget types; added examples/

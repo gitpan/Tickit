@@ -1,14 +1,18 @@
 Build.PL
 Changes
 examples/ColourWidget.pm
+examples/demo-entry.pl
+examples/demo-pen.pl
 examples/HelloWorldWidget-1.pm
 examples/HelloWorldWidget-2.pm
 examples/testonewidget.pl
 lib/Tickit.pm
 lib/Tickit/ContainerWidget.pm
+lib/Tickit/Pen.pm
 lib/Tickit/RootWindow.pm
 lib/Tickit/Term.pm
 lib/Tickit/Widget.pm
+lib/Tickit/Widget/Entry.pm
 lib/Tickit/Widget/HBox.pm
 lib/Tickit/Widget/LinearBox.pm
 lib/Tickit/Widget/Static.pm
@@ -21,6 +25,8 @@ t/00use.t
 t/01term-output.t
 t/02term-outpen.t
 t/03term-input.t
+t/04term-utf8.t
+t/08pen.t
 t/09tickit.t
 t/10rootwin.t
 t/11window.t
@@ -32,6 +38,8 @@ t/21widget-window.t
 t/22widget-parent.t
 t/23widget-input.t
 t/30widget-static.t
+t/31widget-entry-model.t
+t/32widget-entry-input.t
 t/40widget-hbox.t
 t/40widget-vbox.t
 t/99pod.t

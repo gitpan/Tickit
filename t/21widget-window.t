@@ -41,7 +41,7 @@ is_deeply( [ $term->methodlog ],
              PRINT("Hello"), ],
            '$term written to' );
 
-$widget->chpen( fg => 2 );
+$widget->chpenattr( fg => 2 );
 
 wait_for { $term->is_changed };
 

@@ -8,9 +8,11 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Carp;
+
+use Tickit::Pen;
 
 =head1 NAME
 
@@ -235,72 +237,91 @@ sub abs_left
    return $self->parent->abs_left + $self->{left};
 }
 
-=head2 $val = $win->getpen( $attr )
+=head2 $pen = $win->pen
 
-=head2 %attrs = $win->getpen
+Returns the current L<Tickit::Pen> object associated with this window
+
+=cut
+
+sub pen
+{
+   my $self = shift;
+   return $self->{pen};
+}
+
+=head2 $win->set_pen( $pen )
+
+Replace the current L<Tickit::Pen> object for this window with a new one. The
+object reference will be stored, allowing it to be shared with other objects.
+If C<undef> is set, then a new, blank pen will be constructed.
+
+=cut
+
+sub set_pen
+{
+   my $self = shift;
+   ( $self->{pen} ) = @_;
+   defined $self->{pen} or $self->{pen} = Tickit::Pen->new;
+}
+
+=head2 $val = $win->getpenattr( $attr )
+
+Returns a single attribue from the current pen
+
+=cut
+
+sub getpenattr
+{
+   my $self = shift;
+   my ( $attr ) = @_;
+
+   return $self->{pen}->getattr( $attr );
+}
+
+=head2 %attrs = $win->getpenattrs
 
 Retrieve the current pen settings for the window.
 
 =cut
 
-sub getpen
+sub getpenattrs
 {
    my $self = shift;
 
-   return $self->{pen}{$_[0]} if @_;
-   return %{ $self->{pen} };
+   return $self->{pen}->getattrs;
 }
 
-=head2 $val = $win->get_effective_pen( $attr )
+=head2 $val = $win->get_effective_penattr( $attr )
 
-=head2 %attrs = $win->get_effective_pen
+Returns the effective value of a pen attribute. This will be the value of this
+window's attribute if set, or the effective value of the attribute from its
+parent.
+
+=cut
+
+sub get_effective_penattr
+{
+   my $self = shift;
+   my ( $attr ) = @_;
+
+   return $self->{pen}->getattr( $attr ) // $self->parent->get_effective_penattr( $attr );
+}
+
+=head2 %attrs = $win->get_effective_penattrs
 
 Retrieve the effective pen settings for the window. This will be the settings
 of the window and all its parents down to the root window, merged together.
 
 =cut
 
-sub get_effective_pen
+sub get_effective_penattrs
 {
    my $self = shift;
 
-   return $self->{pen}{$_[0]} || $self->parent->get_effective_pen( $_[0] ) if @_;
-
-   my %epen = $self->parent->get_effective_pen;
-   $epen{$_} = $self->{pen}{$_} for keys %{ $self->{pen} };
+   my %epen = ( $self->parent->get_effective_penattrs,
+                $self->{pen}->getattrs );
 
    return %epen;
-}
-
-=head2 $win->chpen( $attr, $val )
-
-Change a pen attribute. Setting C<undef> implies default value. To delete the
-attribute altogether see instead C<delpen>.
-
-=cut
-
-sub chpen
-{
-   my $self = shift;
-   my ( $attr, $val ) = @_;
-
-   $self->{pen}{$attr} = $val;
-}
-
-=head2 $win->delpen( $attr )
-
-Delete a pen attribute. Removes the value from the window's pen attributes,
-implying this window uses its parent value. To set default, see instead
-C<chpen> with C<undef> value.
-
-=cut
-
-sub delpen
-{
-   my $self = shift;
-   my ( $attr ) = @_;
-
-   delete $self->{pen}{$attr};
 }
 
 =head2 $sub = $win->make_sub( $top, $left, $lines, $cols )
@@ -317,7 +338,7 @@ sub make_sub
 
    my $sub = bless {
       parent => $self,
-      pen    => {},
+      pen    => Tickit::Pen->new,
    }, __PACKAGE__; # not ref $self in case of RootWindow
 
    $sub->change_geometry( $top, $left, $lines, $cols );
@@ -357,7 +378,7 @@ sub print
 
    return unless length $text;
 
-   $self->term->setpen( $self->get_effective_pen );
+   $self->term->setpen( $self->get_effective_penattrs );
    $self->term->print( $text );
 }
 
@@ -375,7 +396,7 @@ sub penprint
 
    return unless length $text;
 
-   $self->term->setpen( $self->get_effective_pen, %attrs );
+   $self->term->setpen( $self->get_effective_penattrs, %attrs );
    $self->term->print( $text );
 }
 
@@ -390,7 +411,7 @@ sub erasech
    my $self = shift;
    my ( $count, $moveend ) = @_;
 
-   $self->term->setpen( bg => $self->get_effective_pen( 'bg' ) );
+   $self->term->chpen( bg => $self->get_effective_penattr( 'bg' ) );
    $self->term->erasech( $count, $moveend );
 }
 
@@ -414,7 +435,7 @@ sub insertch
 
    return 0 unless $self->left + $self->cols == $self->term->cols;
 
-   $self->term->setpen( bg => $self->get_effective_pen( 'bg' ) );
+   $self->term->chpen( bg => $self->get_effective_penattr( 'bg' ) );
    $self->term->insertch( $count );
    return 1;
 }
@@ -439,7 +460,7 @@ sub deletech
 
    return 0 unless $self->left + $self->cols == $self->term->cols;
 
-   $self->term->setpen( bg => $self->get_effective_pen( 'bg' ) );
+   $self->term->chpen( bg => $self->get_effective_penattr( 'bg' ) );
    $self->term->deletech( $count );
    return 1;
 }
@@ -498,7 +519,6 @@ sub _gain_focus
 {
    my $self = shift;
 
-   $self->term->setpen( $self->get_effective_pen );
    $self->goto( $self->{focus_line}, $self->{focus_col} );
 }
 
@@ -508,6 +528,19 @@ sub _lose_focus
 
    undef $self->{focus_line};
    undef $self->{focus_col};
+}
+
+=head2 $win->restore
+
+Restore the state of the terminal to its idle state. Places the cursor back
+at the focus position, and restores the pen.
+
+=cut
+
+sub restore
+{
+   my $self = shift;
+   $self->root->restore;
 }
 
 =head2 $win->clear
@@ -539,7 +572,7 @@ sub _flush_line
       my ( $code, $penattrs ) = @$update;
 
       $term->goto( $self->abs_top + $line, $self->abs_left + $col ) if !$athome or $col > 0;
-      $term->setpen( map { $_ => $penattrs->{$_} } qw( fg bg b u i ) );
+      $term->setpen( %$penattrs );
       $code->( $term );
    }
 }

@@ -8,10 +8,12 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Carp;
 use Scalar::Util qw( weaken );
+
+use Tickit::Pen;
 
 use constant REDRAW_SELF     => 0x01;
 use constant REDRAW_CHILDREN => 0x02;
@@ -42,23 +44,8 @@ See the C<EXAMPLES> section below.
 Constructs a new C<Tickit::Widget> object. Must be called on a subclass that
 implements the required methods; see the B<SUBCLASS METHODS> section below.
 
-Takes the following named arguments at construction time:
-
-=over 8
-
-=item fg => COL
-
-=item bg => COL
-
-=item b => BOOL
-
-=item i => BOOL
-
-=item u => BOOL
-
-Default pen attributes. See also L<Tickit::Term>'s C<chpen> method.
-
-=back
+Any pen attributes present in C<%args> will be used to set the default values
+on the widget's pen object.
 
 =cut
 
@@ -72,11 +59,10 @@ sub new
          croak "$class cannot ->$method - do you subclass and implement it?";
    }
 
-   my %penattrs;
-   exists $args{$_} and $penattrs{$_} = $args{$_} for qw( fg bg b u i );
+   my $pen = Tickit::Pen->new_from_attrs( \%args );
 
    return bless {
-      penattrs     => \%penattrs,
+      pen          => $pen,
       needs_redraw => 0,
    }, $class;
 }
@@ -110,14 +96,14 @@ sub set_window
    return if $window and $self->window and $self->window == $window;
 
    if( $self->{window} and !$window ) {
+      $self->{window}->set_pen( undef );
       $self->window_lost( $self->{window} );
    }
 
    $self->{window} = $window;
 
    if( $window ) {
-      my $penattrs = $self->{penattrs};
-      $window->chpen( $_ => $penattrs->{$_} ) for keys %$penattrs;
+      $window->set_pen( $self->{pen} );
 
       $self->reshape;
       $self->_do_redraw( 1 ) if !$self->parent;
@@ -263,8 +249,8 @@ sub _do_clear
    my $window = $self->window or return;
 
    if( my $parentwin = $window->parent ) {
-      my $bg       = $window->get_effective_pen( 'bg' );
-      my $parentbg = $parentwin->get_effective_pen( 'bg' );
+      my $bg       = $window->get_effective_penattr( 'bg' );
+      my $parentbg = $parentwin->get_effective_penattr( 'bg' );
 
       return 0 if !defined $bg and !defined $parentbg;
       return 0 if  defined $bg and  defined $parentbg and $bg == $parentbg;
@@ -290,16 +276,16 @@ sub _do_redraw
    }
 }
 
-=head2 %attrs = $widget->getpen
+=head2 %attrs = $widget->getpenattrs
 
 Returns a hash of the currently-applied pen attributes
 
 =cut
 
-sub getpen
+sub getpenattrs
 {
    my $self = shift;
-   return %{ $self->{penattrs} };
+   return $self->{pen}->getattrs;
 }
 
 =head2 $value = $widget->getpenattr( $name )
@@ -312,10 +298,10 @@ sub getpenattr
 {
    my $self = shift;
    my ( $name ) = @_;
-   return $self->{penattrs}{$name};
+   return $self->{pen}->getattr( $name );
 }
 
-=head2 $widget->chpen( $name, $value )
+=head2 $widget->chpenattr( $name, $value )
 
 Changes the value of the given pen attribute. Set the value C<undef> to remove
 it.
@@ -323,9 +309,11 @@ it.
 If the widget has a window associated with it, the window will be redrawn to
 reflect the pen change.
 
+For details of the supported pen attributes, see L<Tickit::Pen>.
+
 =cut
 
-sub chpen
+sub chpenattr
 {
    my $self = shift;
    my ( $name, $value ) = @_;
@@ -335,10 +323,9 @@ sub chpen
    return if !defined $curvalue and !defined $value;
    return if  defined $curvalue and  defined $value and $value == $curvalue;
 
-   $self->{penattrs}{$name} = $value;
+   $self->{pen}->chattr( $name, $value );
 
    if( $self->window ) {
-      $self->window->chpen( $name, $value );
       $self->redraw;
    }
 }
@@ -460,7 +447,7 @@ change the pen foreground colour.
     my ( $type, $str ) = @_;
  
     if( $type eq "text" and $str =~ m/[0-7]/ ) {
-       $self->chpen( fg => $str );
+       $self->chpenattr( fg => $str );
        $self->redraw;
        return 1;
     }

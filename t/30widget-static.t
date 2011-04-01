@@ -13,43 +13,43 @@ use Tickit::Widget::Static;
 
 my ( $term, $win ) = mk_term_and_window;
 
-my $widget = Tickit::Widget::Static->new(
+my $static = Tickit::Widget::Static->new(
    text => "Your message here",
 );
 
-ok( defined $widget, 'defined $widget' );
+ok( defined $static, 'defined $static' );
 
-is( $widget->text,   "Your message here", '$widget->text' );
-is( $widget->align,  0,                   '$widget->align' );
-is( $widget->valign, 0,                   '$widget->valign' );
+is( $static->text,   "Your message here", '$static->text' );
+is( $static->align,  0,                   '$static->align' );
+is( $static->valign, 0,                   '$static->valign' );
 
-is( $widget->lines, 1, '$widget->lines' );
-is( $widget->cols, 17, '$widget->cols' );
+is( $static->lines, 1, '$static->lines' );
+is( $static->cols, 17, '$static->cols' );
 
-$widget->set_text( "Another message" );
+$static->set_text( "Another message" );
 
-is( $widget->text, "Another message", '$widget->set_text modifies text' );
-is( $widget->cols, 15, '$widget->cols after changed text' );
+is( $static->text, "Another message", '$static->set_text modifies text' );
+is( $static->cols, 15, '$static->cols after changed text' );
 
-$widget->set_align( 0.2 );
+$static->set_align( 0.2 );
 
-is( $widget->align, 0.2, '$widget->set_align modifies alignment' );
+is( $static->align, 0.2, '$static->set_align modifies alignment' );
 
-$widget->set_align( 'centre' );
+$static->set_align( 'centre' );
 
-is( $widget->align, 0.5, '$widget->set_align converts symbolic names' );
+is( $static->align, 0.5, '$static->set_align converts symbolic names' );
 
-$widget->set_valign( 0.3 );
+$static->set_valign( 0.3 );
 
-is( $widget->valign, 0.3, '$widget->set_valign modifies vertical alignment' );
+is( $static->valign, 0.3, '$static->set_valign modifies vertical alignment' );
 
-$widget->set_valign( 'middle' );
+$static->set_valign( 'middle' );
 
-is( $widget->valign, 0.5, '$widget->set_valign converts symbolic names' );
+is( $static->valign, 0.5, '$static->set_valign converts symbolic names' );
 
-$widget->set_align( 0.0 );
-$widget->set_valign( 0.0 );
-$widget->set_window( $win );
+$static->set_align( 0.0 );
+$static->set_valign( 0.0 );
+$static->set_window( $win );
 
 wait_for { $term->is_changed };
 
@@ -68,7 +68,7 @@ is_deeply( [ $term->get_display ],
              BLANKS(24) ],
            '$term display' );
 
-$widget->set_text( "Changed message" );
+$static->set_text( "Changed message" );
 
 wait_for { $term->is_changed };
 
@@ -90,7 +90,7 @@ is_deeply( [ $term->get_display ],
 # Terminal is 80 columns wide. Text is 15 characters long. Therefore, right-
 # aligned it would start in the 65th column
 
-$widget->set_align( 1.0 );
+$static->set_align( 1.0 );
 
 wait_for { $term->is_changed };
 
@@ -112,7 +112,7 @@ is_deeply( [ $term->get_display ],
 # Terminal is 25 columns wide. Text is 1 line tall. Therefore, middle-
 # valigned it would start on the 13th line
 
-$widget->set_valign( 0.5 );
+$static->set_valign( 0.5 );
 
 wait_for { $term->is_changed };
 
@@ -132,7 +132,7 @@ is_deeply( [ $term->get_display ],
              BLANKS(12) ],
            '$term display in correct location' );
 
-$widget->set_valign( 0.0 );
+$static->set_valign( 0.0 );
 $term->methodlog; # clear the log
 
 $term->resize( 30, 100 );
@@ -155,7 +155,7 @@ is_deeply( [ $term->get_display ],
              BLANKS(29) ],
            '$term display in correct location' );
 
-$widget->chpen( bg => 4 );
+$static->chpenattr( bg => 4 );
 
 wait_for { $term->is_changed };
 
@@ -168,4 +168,4 @@ is_deeply( [ $term->methodlog ],
              SETPEN(bg => 4),
              PRINT("Changed message"),
            ],
-           '$term redrawn after setpen bg' );
+           '$term redrawn after chpen bg' );

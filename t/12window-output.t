@@ -28,19 +28,19 @@ is_deeply( [ $term->get_display ],
              BLANKS(19) ],
            '$term display' );
  
-$win->chpen( b => 1 );
+$win->pen->chattr( b => 1 );
 
-is_deeply( { $win->getpen },
+is_deeply( { $win->getpenattrs },
            { b => 1 },
            '$win has b => 1' );
 
-is( $win->getpen( 'b' ), 1, '$win has pen b 1' );
+is( $win->getpenattr( 'b' ), 1, '$win has pen b 1' );
 
-is_deeply( { $win->get_effective_pen },
-           { DEFAULTPEN, b => 1 },
-           '$win->get_effective_pen has all attrs' );
+is_deeply( { $win->get_effective_penattrs },
+           { b => 1 },
+           '$win->get_effective_penattrs has all attrs' );
 
-is( $win->get_effective_pen( 'b' ), 1, '$win has effective_pen b 1' );
+is( $win->get_effective_penattr( 'b' ), 1, '$win has effective pen b 1' );
 
 $win->goto( 2, 3 );
 $win->print( "Hello" );
@@ -60,7 +60,7 @@ is_deeply( [ $term->methodlog ],
            ],
            '$term written with modified pen' );
 
-$win->chpen( bg => 4 );
+$win->pen->chattr( bg => 4 );
 $win->clear;
 
 is_deeply( [ $term->methodlog ],
@@ -88,21 +88,21 @@ ok( !$win->deletech( 5 ), '$win cannot deletech' );
 
 my $subwin = $win->make_sub( 2, 2, 1, 10 );
 
-$subwin->chpen( fg => 3 );
+$subwin->pen->chattr( fg => 3 );
 
-is_deeply( { $subwin->getpen },
+is_deeply( { $subwin->getpenattrs },
            { fg => 3 },
            '$subwin has fg => 3' );
 
-is( $subwin->getpen( 'b' ),  undef, '$win has pen b undef' );
-is( $subwin->getpen( 'fg' ), 3,     '$win has pen fg 1' );
+is( $subwin->getpenattr( 'b' ),  undef, '$win has pen b undef' );
+is( $subwin->getpenattr( 'fg' ), 3,     '$win has pen fg 1' );
 
-is_deeply( { $subwin->get_effective_pen },
-           { DEFAULTPEN, b => 1, bg => 4, fg => 3 },
-           '$subwin->get_effective_pen has all attrs' );
+is_deeply( { $subwin->get_effective_penattrs },
+           { b => 1, bg => 4, fg => 3 },
+           '$subwin->get_effective_penattrs has all attrs' );
 
-is( $subwin->get_effective_pen( 'b' ),  1, '$win has effective_pen b 1' );
-is( $subwin->get_effective_pen( 'fg' ), 3, '$win has effective_pen fg 1' );
+is( $subwin->get_effective_penattr( 'b' ),  1, '$win has effective pen b 1' );
+is( $subwin->get_effective_penattr( 'fg' ), 3, '$win has effective pen fg 1' );
 
 $subwin->goto( 0, 0 );
 $subwin->print( "Foo" );

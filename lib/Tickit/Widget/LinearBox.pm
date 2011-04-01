@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use List::Util qw( sum );
 
@@ -126,8 +126,6 @@ sub redistribute_child_windows
    # children. It keeps track of rounding errors in $err, to ensure that
    # rounding-down-to-int() errors don't leave us some spare amount
 
-   # BIG TODO: Handle the case where $spare < 0
-
    my $current = 0;
 
    $self->foreach_child( sub {
@@ -146,6 +144,19 @@ sub redistribute_child_windows
       $current += $amount + $self->{spacing};
    } );
 }
+
+=head1 TODO
+
+=over 4
+
+=item * Undersize handling
+
+This widget doesn't correctly handle the case where its window is too small to
+fit all the children even at minimum size. Consider how it might do this.
+Give them smaller windows or drop them entirely. Use priority-based ordering
+to pick a victim.
+
+=back
 
 =head1 AUTHOR
 

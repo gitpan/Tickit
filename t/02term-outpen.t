@@ -2,13 +2,16 @@
 
 use strict;
 
-use Test::More tests => 7;
+use Test::More tests => 10;
 use Test::HexString;
 use IO::Async::Test;
 
 use IO::Async::Loop;
 
 use Tickit::Term;
+
+# TODO: Either Tickit or IO::Async itself should do this
+$SIG{PIPE} = "IGNORE";
 
 my $loop = IO::Async::Loop->new();
 testing_loop( $loop );
@@ -30,23 +33,33 @@ sub stream_is
    is_hexstr( substr( $stream, 0, length $expect, "" ), $expect, $name );
 }
 
-$term->setpen( b => 1 );
-stream_is( "\e[1m", '$term->setpen( b => 1 )' );
+# Reset the pen
+$term->setpen;
+stream_is( "\e[m", '$term->setpen()' );
 
-$term->setpen( b => 1 );
-stream_is( "", '$term->setpen( b => 1 ) again is no-op' );
+$term->chpen( b => 1 );
+stream_is( "\e[1m", '$term->chpen( b => 1 )' );
 
-$term->setpen( b => 0 );
-stream_is( "\e[m", '$term->setpen( b => 0 ) resets SGR' );
+$term->chpen( b => 1 );
+stream_is( "", '$term->chpen( b => 1 ) again is no-op' );
 
-$term->setpen( b => 1, u => 1 );
-stream_is( "\e[1;4m", '$term->setpen( b => 1, u => 1 )' );
+$term->chpen( b => undef );
+stream_is( "\e[m", '$term->chpen( b => undef ) resets SGR' );
 
-$term->setpen( b => 0 );
-stream_is( "\e[22m", '$term->setpen( b => 0 )' );
+$term->chpen( b => 1, u => 1 );
+stream_is( "\e[1;4m", '$term->chpen( b => 1, u => 1 )' );
 
-$term->setpen( b => 0 );
-stream_is( "", '$term->setpen( b => 0 ) again is no-op' );
+$term->chpen( b => undef );
+stream_is( "\e[22m", '$term->chpen( b => undef )' );
 
-$term->setpen( u => 0 );
-stream_is( "\e[m", '$term->setpen( u => 0 )' );
+$term->chpen( b => undef );
+stream_is( "", '$term->chpen( b => undef ) again is no-op' );
+
+$term->chpen( u => undef );
+stream_is( "\e[m", '$term->chpen( u => undef )' );
+
+$term->setpen( fg => 1, bg => 5 );
+stream_is( "\e[31;45m", '$term->setpen( fg => 1, bg => 5 )' );
+
+$term->setpen( u => 1 );
+stream_is( "\e[39;49;4m", '$term->setpen( u => 1 )' );

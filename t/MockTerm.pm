@@ -18,10 +18,14 @@ our @EXPORT = qw(
    CLEAR
    GOTO
    ERASECH
+   INSERTCH
+   DELETECH
    PRINT
    SETPEN
    SETBG
 );
+
+use Tickit::Pen;
 
 my $LINES = 25;
 my $COLS  = 80;
@@ -30,14 +34,16 @@ sub PAD { sprintf "% -*s", $COLS, shift }
 sub BLANK { PAD("") }
 sub BLANKS { (BLANK) x shift }
 
-use constant DEFAULTPEN => map { $_ => undef } qw( fg bg b u i );
+use constant DEFAULTPEN => map { $_ => undef } @Tickit::Pen::ALL_ATTRS;
 
-sub CLEAR   { [ clear => ] }
-sub GOTO    { [ goto => $_[0], $_[1] ] }
-sub ERASECH { [ erasech => $_[0], $_[1] || 0 ] }
-sub PRINT   { [ print => $_[0] ] }
-sub SETPEN  { [ setpen => { DEFAULTPEN, @_ } ] }
-sub SETBG   { [ setpen => { bg => $_[0] } ] }
+sub CLEAR    { [ clear => ] }
+sub GOTO     { [ goto => $_[0], $_[1] ] }
+sub ERASECH  { [ erasech => $_[0], $_[1] || 0 ] }
+sub INSERTCH { [ insertch => $_[0] ] }
+sub DELETECH { [ deletech => $_[0] ] }
+sub PRINT    { [ print => $_[0] ] }
+sub SETPEN   { [ chpen => { DEFAULTPEN, @_ } ] }
+sub SETBG    { [ chpen => { bg => $_[0] } ] }
 
 my $ON_RESIZE;
 my $ON_KEY;
@@ -79,6 +85,13 @@ sub get_display
    return map { $self->{lines}[$_] } 0 .. $#{ $self->{lines} };
 }
 
+sub get_position
+{
+   my $self = shift;
+
+   return ( $self->{line}, $self->{col} );
+}
+
 sub _push_methodlog
 {
    my $self = shift;
@@ -103,7 +116,7 @@ sub showlog
    my $self = shift;
 
    foreach my $l ( @{ $self->{methodlog} } ) {
-      if( $l->[0] eq "setpen" ) {
+      if( $l->[0] eq "chpen" ) {
          my $pen = $l->[1];
          printf "# SETPEN(%s)\n", join( ", ", map { defined $pen->{$_} ? "$_ => $pen->{$_}" : () } sort keys %$pen );
       }
@@ -228,12 +241,19 @@ sub scroll
 }
 
 # For testing purposes we'll store this in a hash instead
-sub setpen
+sub chpen
 {
    my $self = shift;
    my %attrs = @_;
 
-   $self->_push_methodlog( setpen => \%attrs );
+   $self->_push_methodlog( chpen => \%attrs );
+}
+
+sub setpen
+{
+   my $self = shift;
+   my %attrs = @_;
+   $self->chpen( map { $_ => $attrs{$_} } @Tickit::Pen::ALL_ATTRS );
 }
 
 sub mode_altscreen

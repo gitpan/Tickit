@@ -9,10 +9,12 @@ use strict;
 use warnings;
 use base qw( Tickit::Window );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Carp;
 use Scalar::Util qw( weaken refaddr );
+
+use Tickit::Pen;
 
 =head1 NAME
 
@@ -42,7 +44,7 @@ sub new
       cols    => $term->cols,
       lines   => $term->lines,
       updates => [],
-      pen     => { map { $_ => undef } qw( fg bg b u i ) },
+      pen     => Tickit::Pen->new,
    }, $class;
 
    weaken( $self->{tickit} );
@@ -50,10 +52,17 @@ sub new
    return $self;
 }
 
-sub get_effective_pen
+sub get_effective_penattrs
 {
    my $self = shift;
-   return $self->getpen( @_ );
+   return $self->getpenattrs;
+}
+
+sub get_effective_penattr
+{
+   my $self = shift;
+   my ( $attr ) = @_;
+   return $self->getpenattr( $attr );
 }
 
 sub change_geometry
@@ -96,10 +105,7 @@ sub _enqueue_flush
 
       $_->() for @$queue;
 
-      if( my $focused_window = $self->{focused_window} ) {
-         $term->mode_cursorvis( 1 );
-         $focused_window->_gain_focus;
-      }
+      $self->restore;
 
       delete $self->{flush_queued}
    } );
@@ -152,13 +158,23 @@ sub _requeue_focus
    $self->_enqueue_flush;
 }
 
+sub restore
+{
+   my $self = shift;
+
+   if( my $focused_window = $self->{focused_window} ) {
+      $self->{term}->mode_cursorvis( 1 );
+      $focused_window->_gain_focus;
+   }
+}
+
 sub clear
 {
    my $self = shift;
 
    my $term = $self->{term};
 
-   $term->setpen( $self->getpen );
+   $term->setpen( $self->getpenattrs );
    $term->clear;
 }
 

@@ -10,6 +10,9 @@ use IO::Async::Loop;
 
 use Tickit::Term;
 
+# TODO: Either Tickit or IO::Async itself should do this
+$SIG{PIPE} = "IGNORE";
+
 my $loop = IO::Async::Loop->new();
 testing_loop( $loop );
 
@@ -71,15 +74,15 @@ $term->scroll( 3, 9, -3 );
 $stream = "";
 stream_is( "\e[4;10r\e[4H\eM\eM\eM\e[r", '$term->scroll( 3, 9, -3 )' );
 
-$term->setpen( b => 1 );
+$term->chpen( b => 1 );
 
 $stream = "";
-stream_is( "\e[1m", '$term->setpen( b => 1 )' );
+stream_is( "\e[1m", '$term->chpen( b => 1 )' );
 
-$term->setpen( b => 0 );
+$term->chpen( b => 0 );
 
 $stream = "";
-stream_is( "\e[m", '$term->setpen( b => 0 )' );
+stream_is( "\e[m", '$term->chpen( b => 0 )' );
 
 $term->clear;
 

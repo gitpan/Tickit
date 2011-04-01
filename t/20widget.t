@@ -11,12 +11,12 @@ ok( defined $widget, 'defined $widget' );
 
 is_oneref( $widget, '$widget has refcount 1 initially' );
 
-is_deeply( { $widget->getpen }, {}, '$widget pen initially empty' );
+is_deeply( { $widget->getpenattrs }, {}, '$widget pen initially empty' );
 is( $widget->getpenattr('b'), undef, '$widget pen does not define b' );
 
-$widget->chpen( b => 1 );
+$widget->chpenattr( b => 1 );
 
-is_deeply( { $widget->getpen }, { b => 1 }, '$widget pen now has b=1' );
+is_deeply( { $widget->getpenattrs }, { b => 1 }, '$widget pen now has b=1' );
 is( $widget->getpenattr('b'), 1, '$widget pen defines b as 1' );
 
 {
@@ -24,7 +24,7 @@ is( $widget->getpenattr('b'), 1, '$widget pen defines b as 1' );
       i => 1,
    );
 
-   is_deeply( { $widget->getpen }, { i => 1 }, 'Widget constructor sets initial pen' );
+   is_deeply( { $widget->getpenattrs }, { i => 1 }, 'Widget constructor sets initial pen' );
 }
 
 is_oneref( $widget, '$widget has refcount 1 at EOF' );

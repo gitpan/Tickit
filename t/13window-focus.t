@@ -28,8 +28,7 @@ $win->focus( 0, 0 );
 wait_for { $term->is_changed };
 
 is_deeply( [ $term->methodlog ], 
-           [ SETPEN,
-             GOTO(3,10),
+           [ GOTO(3,10),
            ],
            '$term written to' );
 
@@ -40,8 +39,7 @@ $win->reposition( 5, 15 );
 wait_for { $term->is_changed };
 
 is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             GOTO(5,15),
+           [ GOTO(5,15),
            ],
            '$term focus moved after window reposition' );
 

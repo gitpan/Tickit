@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( IO::Async::Notifier );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Tickit::Term;
 use Tickit::RootWindow;
@@ -221,6 +221,8 @@ Set up the screen and generally prepare to start running
 sub start
 {
    my $self = shift;
+
+   $SIG{INT} = $SIG{TERM} = sub { $self->get_loop->loop_stop };
 
    my $term = $self->term;
    $term->mode_altscreen( 1 );

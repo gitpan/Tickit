@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 34;
+use Test::More tests => 36;
 use Test::Identity;
 use Test::Refcount;
 use IO::Async::Test;
@@ -47,17 +47,19 @@ is( $win->cols,  80, '$win->cols is 80' );
 
 identical( $win->term, $term, '$win->term returns $term' );
 
-is_deeply( { $win->getpen },
-           { DEFAULTPEN },
-           '$win has default attrs' );
+isa_ok( $win->pen, "Tickit::Pen", '$win->pen isa Tickit::Pen' );
 
-is( $win->getpen( 'fg' ), undef, '$win has pen fg undef' );
+is_deeply( { $win->getpenattrs },
+           {},
+           '$win has no attrs set' );
 
-is_deeply( { $win->get_effective_pen },
-           { DEFAULTPEN },
-           '$win->get_effective_pen has default attrs' );
+is( $win->getpenattr( 'fg' ), undef, '$win has pen fg undef' );
 
-is( $win->get_effective_pen( 'fg' ), undef, '$win has effective_pen fg undef' );
+is_deeply( { $win->get_effective_penattrs },
+           {},
+           '$win->get_effective_penattrs has no attrs set' );
+
+is( $win->get_effective_penattr( 'fg' ), undef, '$win has effective pen fg undef' );
 
 $win->goto( 2, 3 );
 $win->print( "Hello" );
@@ -75,19 +77,31 @@ is_deeply( [ $term->get_display ],
              BLANKS(22) ],
            '$term display' );
 
-$win->chpen( fg => 3 );
+$win->pen->chattr( fg => 3 );
 
-is_deeply( { $win->getpen },
-           { DEFAULTPEN, fg => 3 },
-           '$win->getpen has fg => 3' );
+is_deeply( { $win->getpenattrs },
+           { fg => 3 },
+           '$win->getpenattrs has fg => 3' );
 
-is( $win->getpen( 'fg' ), 3, '$win has pen fg 3' );
+is( $win->getpenattr( 'fg' ), 3, '$win has pen fg 3' );
 
-is_deeply( { $win->get_effective_pen },
-           { DEFAULTPEN, fg => 3 },
-           '$win->get_effective_pen has fg => 3' );
+is_deeply( { $win->get_effective_penattrs },
+           { fg => 3 },
+           '$win->get_effective_penattrs has fg => 3' );
 
-is( $win->get_effective_pen( 'fg' ), 3, '$win has effective_pen fg 3' );
+is( $win->get_effective_penattr( 'fg' ), 3, '$win has effective pen fg 3' );
+
+my $newpen = Tickit::Pen->new;
+$newpen->chattr( fg => 3 );
+$newpen->chattr( u => 1 );
+
+$win->set_pen( $newpen );
+
+is_deeply( { $win->getpenattrs },
+           { fg => 3, u => 1 },
+           '$win->set_pen replaces window pen' );
+
+$win->pen->chattr( u => undef );
 
 $win->goto( 2, 3 );
 $win->print( "Hello" );

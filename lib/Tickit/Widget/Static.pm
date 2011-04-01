@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Text::CharWidth qw( mbswidth );
 
@@ -48,7 +48,7 @@ This class provides a widget which displays a single piece of static text.
 
 =cut
 
-=head2 $widget = Tickit::Widget::Static->new( %args )
+=head2 $static = Tickit::Widget::Static->new( %args )
 
 Constructs a new C<Tickit::Widget::Static> object.
 
@@ -104,7 +104,7 @@ sub cols
    return mbswidth( $self->{text} );
 }
 
-=head2 $text = $widget->text
+=head2 $text = $static->text
 
 =cut
 
@@ -114,7 +114,7 @@ sub text
    return $self->{text};
 }
 
-=head2 $widget->set_text( $text )
+=head2 $static->set_text( $text )
 
 Accessor for C<text> property; the actual text on display in the widget
 
@@ -127,7 +127,7 @@ sub set_text
    $self->resized;
 }
 
-=head2 $align = $widget->align
+=head2 $align = $static->align
 
 =cut
 
@@ -137,7 +137,7 @@ sub align
    return $self->{align};
 }
 
-=head2 $widget->set_align( $align )
+=head2 $static->set_align( $align )
 
 Accessor for horizontal alignment value.
 
@@ -166,7 +166,7 @@ sub set_align
    $self->redraw;
 }
 
-=head2 $valign = $widget->valign
+=head2 $valign = $static->valign
 
 =cut
 
@@ -176,7 +176,7 @@ sub valign
    return $self->{valign};
 }
 
-=head2 $widget->set_valign( $valign )
+=head2 $static->set_valign( $valign )
 
 Accessor for vertical alignment value.
 

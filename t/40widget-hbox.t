@@ -107,7 +107,7 @@ is_deeply( [ $term->get_display ],
              BLANKS(24) ],
            '$term display after static text change' );
 
-$statics[1]->chpen( fg => 5 );
+$statics[1]->chpenattr( fg => 5 );
 
 wait_for { $term->is_changed };
 
@@ -120,7 +120,7 @@ is_deeply( [ $term->methodlog ],
            ],
            'redraw after static attr change' );
 
-$widget->chpen( b => 1 );
+$widget->chpenattr( b => 1 );
 
 wait_for { $term->is_changed };
 
@@ -198,7 +198,7 @@ is_deeply( [ $term->get_display ],
              BLANKS(29) ],
            '$term display after new widget' );
 
-$widget->chpen( bg => 4 );
+$widget->chpenattr( bg => 4 );
 
 wait_for { $term->is_changed };
 
@@ -220,4 +220,4 @@ is_deeply( [ $term->methodlog ],
              SETPEN(b => 1, bg => 4),
              PRINT("New Widget"),
             ],
-           '$term redrawn after setpen bg' );
+           '$term redrawn after chpen bg' );

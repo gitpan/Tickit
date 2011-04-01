@@ -8,16 +8,19 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use base qw( IO::Async::Stream );
 IO::Async::Stream->VERSION( 0.34 );
 
 use IO::Async::Signal;
 
+use Encode qw( find_encoding );
 use Term::Terminfo;
 use Term::Size;
 use Term::TermKey::Async qw( FORMAT_ALTISMETA FLAG_UTF8 );
+
+use Tickit::Pen;
 
 my $ESC = "\e";
 my $CSI = "$ESC\[";
@@ -115,7 +118,7 @@ sub new
    $spacesym = $tka->keyname2sym( "Space" );
 
    if( $tka->get_flags & FLAG_UTF8 ) {
-      binmode( $out, ":encoding(UTF-8)" );
+      $self->{encoder} = find_encoding( "UTF-8" );
    }
 
    $self->add_child( $tka );
@@ -225,6 +228,8 @@ sub print
    my $self = shift;
    my ( $text ) = @_;
 
+   $text = $self->{encoder}->encode( $text ) if $self->{encoder};
+
    $self->write( $text );
 }
 
@@ -305,28 +310,6 @@ sub scroll
    $self->write( "${CSI}r" );
 }
 
-use constant {
-   COLOUR_BLACK   => 0,
-   COLOUR_RED     => 1,
-   COLOUR_GREEN   => 2,
-   COLOUR_YELLOW  => 3,
-   COLOUR_BLUE    => 4,
-   COLOUR_MAGENTA => 5,
-   COLOUR_CYAN    => 6,
-   COLOUR_WHITE   => 7,
-};
-
-my @COLOURNAMES = qw(
-   black
-   red
-   green
-   yellow
-   blue
-   magenta
-   cyan
-   white
-);
-
 sub _colspec_to_sgr
 {
    my $self = shift;
@@ -334,11 +317,6 @@ sub _colspec_to_sgr
 
    # Simple 0-7 first
    return $spec + ($is_bg?40:30) if $spec =~ m/^\d+$/ and $spec < 8;
-
-   # Named
-   foreach my $num ( 0 .. $#COLOURNAMES ) {
-      return $num + ($is_bg?40:30) if $spec eq $COLOURNAMES[$num];
-   }
 
    # Defaults
    return $is_bg?49:39;
@@ -350,35 +328,19 @@ sub _make_sgr_bg { defined $_[1] ? $_[0]->_colspec_to_sgr( $_[1], 1 ) : 49 }
 sub _make_sgr_b  { $_[1] ? 1 : 22 }
 sub _make_sgr_u  { $_[1] ? 4 : 24 }
 sub _make_sgr_i  { $_[1] ? 3 : 23 }
+sub _make_sgr_rv { $_[1] ? 7 : 27 }
+sub _make_sgr_af { $_[1] ? $_[1]+10 : 10 }
 
-=head2 $term->setpen( %attrs )
+=head2 $term->chpen( %attrs )
 
 Changes the current pen attributes to those given. Any attribute whose value
 is given as C<undef> is reset. Any attributes not named are unchanged.
 
-=over 8
-
-=item fg => COL
-
-=item bg => COL
-
-Foreground or background colour. C<COL> may be an integer C<0-7> or one of the
-eight colour names.
-
-=item b => BOOL
-
-=item u => BOOL
-
-=item i => BOOL
-
-Bold, underline, italics. Note that not all terminals can render the italics
-attribute.
-
-=back
+For details of the supported pen attributes, see L<Tickit::Pen>.
 
 =cut
 
-sub setpen
+sub chpen
 {
    my $self = shift;
    my %new = @_;
@@ -387,13 +349,15 @@ sub setpen
 
    my @SGR;
 
-   foreach my $attr (qw( fg bg b u i )) {
+   foreach my $attr (@Tickit::Pen::ALL_ATTRS) {
       next unless exists $new{$attr};
 
-      next if !defined $pen->{$attr} and !defined $new{$attr};
-      next if  defined $pen->{$attr} and  defined $new{$attr} and $pen->{$attr} eq $new{$attr};
+      my $val = $new{$attr};
 
-      my $val = $pen->{$attr} = $new{$attr};
+      next if !defined $pen->{$attr} and !defined $val and exists $pen->{$attr};
+      next if  defined $pen->{$attr} and  defined $val and $pen->{$attr} eq $val;
+
+      $pen->{$attr} = $val;
 
       my $method = "_make_sgr_$attr";
       push @SGR, $self->$method( $val );
@@ -407,6 +371,21 @@ sub setpen
    else {
       $self->write( "${CSI}m" );
    }
+}
+
+=head2 $term->setpen( %attrs )
+
+Similar to C<chpen>, but completely defines the state of the terminal pen. Any
+attribute not given will be reset to its default value.
+
+=cut
+
+sub setpen
+{
+   my $self = shift;
+   my %new = @_;
+
+   $self->chpen( map { $_ => $new{$_} } @Tickit::Pen::ALL_ATTRS );
 }
 
 =head2 $term->clear
