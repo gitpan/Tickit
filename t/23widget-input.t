@@ -4,10 +4,9 @@ use strict;
 
 use Test::More tests => 4;
 use Test::Refcount;
-use IO::Async::Test;
 
 use t::MockTerm;
-use t::TestWindow;
+use t::TestTickit;
 
 use Tickit::Widget;
 
@@ -20,7 +19,7 @@ is_oneref( $widget, '$widget has refcount 1 initially' );
 
 $widget->set_window( $win );
 
-wait_for { $term->{cursorvis} };
+flush_tickit;
 
 ok( $term->{cursorvis}, 'Cursor visible on window' );
 

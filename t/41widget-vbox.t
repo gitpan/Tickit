@@ -3,11 +3,9 @@
 use strict;
 
 use Test::More tests => 19;
-use Test::Refcount;
-use IO::Async::Test;
 
 use t::MockTerm;
-use t::TestWindow;
+use t::TestTickit;
 
 use Tickit::Widget::Static;
 use Tickit::Widget::VBox;
@@ -31,7 +29,7 @@ is( $widget->cols, 8, '$widget->cols is 8' );
 
 $widget->set_window( $win );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
@@ -63,7 +61,7 @@ is_deeply( [ $term->get_display ],
 
 $widget->set_child_opts( 1, expand => 1 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
@@ -95,7 +93,7 @@ is_deeply( [ $term->get_display ],
 
 $statics[0]->set_text( "A longer piece of text for the static" );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
@@ -125,9 +123,9 @@ is_deeply( [ $term->get_display ],
              PAD("Widget 2") ],
            '$term display after static text change' );
 
-$statics[1]->chpenattr( fg => 5 );
+$statics[1]->pen->chattr( fg => 5 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ GOTO(1,0),
@@ -138,9 +136,9 @@ is_deeply( [ $term->methodlog ],
            ],
            'redraw after static attr change' );
 
-$widget->chpenattr( b => 1 );
+$widget->pen->chattr( b => 1 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN(b => 1),
@@ -165,7 +163,7 @@ is_deeply( [ $term->methodlog ],
 
 $term->resize( 30, 100 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN(b => 1),
@@ -199,7 +197,7 @@ $widget->add( Tickit::Widget::Static->new( text => "New Widget" ) );
 
 is( scalar $widget->children, 4, '$widget now has 4 children after new widget' );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN(b => 1),
@@ -235,9 +233,9 @@ is_deeply( [ $term->get_display ],
              PAD("New Widget") ],
            '$term display after new widget' );
 
-$widget->chpenattr( bg => 4 );
+$widget->pen->chattr( bg => 4 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN(b => 1, bg => 4),

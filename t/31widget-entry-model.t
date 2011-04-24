@@ -2,12 +2,10 @@
 
 use strict;
 
-use Test::More tests => 57;
-use Test::Refcount;
-use IO::Async::Test;
+use Test::More tests => 65;
 
 use t::MockTerm;
-use t::TestWindow;
+use t::TestTickit;
 
 use Tickit::Widget::Entry;
 
@@ -22,14 +20,15 @@ is( $entry->position, 0,  '$entry->position initially' );
 
 $entry->set_window( $win );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
              CLEAR,
              GOTO(0,0),
              SETBG(undef),
-             ERASECH(80) ],
+             ERASECH(80),
+             GOTO(0,0) ],
            '$term written to initially' );
 
 is_deeply( [ $term->get_display ],
@@ -82,8 +81,7 @@ is_deeply( [ $term->get_position ],
            [ 0, 6 ],
            '$term position after ->text_insert at 0' );
 
-$entry->text_delete( 5, 1 );
-
+is( $entry->text_delete( 5, 1 ), "o", '$entry->text_delete' );
 is( $entry->text,     " Hell", '$entry->text after ->text_delete' );
 is( $entry->position, 5,       '$entry->position after ->text_delete' );
 
@@ -102,8 +100,7 @@ is_deeply( [ $term->get_position ],
            [ 0, 5 ],
            '$term position after ->text_delete' );
 
-$entry->text_splice( 0, 2, "Y" );
-
+is( $entry->text_splice( 0, 2, "Y" ), " H", '$entry->text_splice shrink' );
 is( $entry->text,     "Yell", '$entry->text after ->text_splice shrink' );
 is( $entry->position, 4,      '$entry->position after ->text_splice shrink' );
 
@@ -125,8 +122,7 @@ is_deeply( [ $term->get_position ],
            [ 0, 4 ],
            '$term position after ->text_splice shrink' );
 
-$entry->text_splice( 3, 1, "p" );
-
+is( $entry->text_splice( 3, 1, "p" ), "l", '$entry->text_splice preserve' );
 is( $entry->text,     "Yelp", '$entry->text after ->text_splice preserve' );
 is( $entry->position, 4,      '$entry->position after ->text_splice preserve' );
 
@@ -145,8 +141,7 @@ is_deeply( [ $term->get_position ],
            [ 0, 4 ],
            '$term position after ->text_splice preserve' );
 
-$entry->text_splice( 3, 1, "low" );
-
+is( $entry->text_splice( 3, 1, "low" ), "p", '$entry->text_splice grow' );
 is( $entry->text,     "Yellow", '$entry->text after ->text_splice grow' );
 is( $entry->position, 6,        '$entry->position after ->text_splice grow' );
 
@@ -188,7 +183,7 @@ $entry->set_text( "Different text" );
 
 is( $entry->text, "Different text", '$entry->text after ->set_text' );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
@@ -210,6 +205,54 @@ is_deeply( [ $term->get_position ],
            [ 0, 3 ],
            '$term position after ->set_text' );
 
+# A window that doesn't extend to righthand edge of screen, so ICH/DCH won't
+# work
+my $subwin = $win->make_sub( 2, 2, $win->lines - 4, $win->cols - 4 );
+
+$entry->set_window( undef ); $win->clear;
+
+$entry->set_window( $subwin );
+
+flush_tickit;
+
+is_deeply( [ $term->methodlog ],
+           [ SETPEN,
+             CLEAR,
+             GOTO(2,2),
+             SETPEN,
+             PRINT("Different text"),
+             SETBG(undef),
+             ERASECH(62),
+             GOTO(2,5) ],
+           '$term written to in subwindow' );
+
+is_deeply( [ $term->get_display ],
+           [ BLANKS(2),
+             PAD("  Different text"),
+             BLANKS(22) ],
+           '$term display in subwindow' );
+
+$entry->text_insert( "And ", 0 );
+
+flush_tickit;
+
+is_deeply( [ $term->methodlog ],
+           [ GOTO(2,2),
+             SETPEN,
+             PRINT("And Different text"),
+             SETBG(undef),
+             ERASECH(58),
+             GOTO(2,2),
+             GOTO(2,9),
+             GOTO(2,9) ], # TODO: Maybe these can be made more efficient?
+           '$term written to after ->text_insert in subwindow' );
+
+is_deeply( [ $term->get_display ],
+           [ BLANKS(2),
+             PAD("  And Different text"),
+             BLANKS(22) ],
+           '$term display after ->text_insert in subwindow' );
+
 $entry->set_window( undef );
 
 $entry = Tickit::Widget::Entry->new(
@@ -221,10 +264,8 @@ is( $entry->text,     "Some initial text", '$entry->text for initialised' );
 is( $entry->position, 5,                   '$entry->position for initialised' );
 
 $entry->set_window( $win );
-# Hack for test purposes
-$win->restore;
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,

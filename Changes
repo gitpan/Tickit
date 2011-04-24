@@ -1,5 +1,13 @@
 Revision history for Changes
 
+0.04    CHANGES:
+         * Added Tickit::Widget::Frame and ::Box
+         * Support text scrolling in Entry
+         * Support renderable containers
+         * Updated Pen model; first-class objects, observers for updates
+         * Support high-intensity colours
+         * Entry->text_delete/_splice return the deleted text
+
 0.03    CHANGES:
          * Added Tickit::Widget::Entry
          * Tickit::Pen as first-class object

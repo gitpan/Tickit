@@ -3,13 +3,13 @@
 use strict;
 
 use Test::More tests => 40;
+use Test::Fatal;
 use Test::Identity;
 use Test::Refcount;
-use Test::Exception;
 use IO::Async::Test;
 
 use t::MockTerm;
-use t::TestWindow;
+use t::TestTickit;
 
 my ( $term, $rootwin ) = mk_term_and_window;
 
@@ -52,23 +52,23 @@ is( $win->cols, 15, '$win->cols is 15 after resize' );
 
 is( $geom_changed, 1, '$reshaped is 1 after resize' );
 
-dies_ok( sub { $win->goto( 6, 1 ) },
-         '$win->goto out of line bounds' );
+ok( exception { $win->goto( 6, 1 ) },
+   '$win->goto out of line bounds' );
 
-dies_ok( sub { $win->goto( 0, 50 ) },
-         '$win->goto out of col bounds' );
+ok( exception { $win->goto( 0, 50 ) },
+   '$win->goto out of col bounds' );
 
-dies_ok( sub { $win->make_sub( -1, 0, 1, 1 ) },
-         '$win->make_sub out of top bounds' );
+ok( exception { $win->make_sub( -1, 0, 1, 1 ) },
+   '$win->make_sub out of top bounds' );
 
-dies_ok( sub { $win->make_sub( 0, 0, 100, 1 ) },
-         '$win->make_sub out of bottom bounds' );
+ok( exception { $win->make_sub( 0, 0, 100, 1 ) },
+   '$win->make_sub out of bottom bounds' );
 
-dies_ok( sub { $win->make_sub( 0, -1, 1, 1 ) },
-         '$win->make_sub out of left bounds' );
+ok( exception { $win->make_sub( 0, -1, 1, 1 ) },
+   '$win->make_sub out of left bounds' );
 
-dies_ok( sub { $win->make_sub( 0, 0, 1, 100 ) },
-         '$win->make_sub out of right bounds' );
+ok( exception { $win->make_sub( 0, 0, 1, 100 ) },
+   '$win->make_sub out of right bounds' );
 
 my $subwin = $win->make_sub( 2, 2, 1, 10 );
 

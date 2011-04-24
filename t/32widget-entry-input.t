@@ -4,11 +4,9 @@ use strict;
 
 use Test::More tests => 35;
 use Test::Identity;
-use Test::Refcount;
-use IO::Async::Test;
 
 use t::MockTerm;
-use t::TestWindow;
+use t::TestTickit;
 
 use Tickit::Widget::Entry;
 
@@ -22,10 +20,8 @@ is( $entry->text,     "Initial", '$entry->text initially' );
 is( $entry->position, 0,         '$entry->position initially' );
 
 $entry->set_window( $win );
-# Hack for testing
-$win->restore;
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,

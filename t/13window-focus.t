@@ -4,11 +4,9 @@ use strict;
 
 use Test::More tests => 9;
 use Test::Refcount;
-use Test::Exception;
-use IO::Async::Test;
 
 use t::MockTerm;
-use t::TestWindow;
+use t::TestTickit;
 
 my ( $term, $rootwin ) = mk_term_and_window;
 
@@ -25,7 +23,7 @@ is_refcount( $rootwin, 3, '$rootwin has refcount 3 after ->make_sub' );
 
 $win->focus( 0, 0 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ], 
            [ GOTO(3,10),
@@ -36,7 +34,7 @@ ok( $term->{cursorvis}, 'Cursor is visible after window focus' );
 
 $win->reposition( 5, 15 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ GOTO(5,15),

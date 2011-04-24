@@ -18,12 +18,22 @@ my $hbox;
 
 $vbox->add( $hbox = Tickit::Widget::HBox->new( spacing => 2 ) );
 for (qw( red blue green yellow )) {
-   $hbox->add( Tickit::Widget::Static->new( text => "fg $_", fg => $_ ) );
+   $hbox->add( Tickit::Widget::Static->new( text => "fg $_   ", fg => $_ ) );
 }
 
 $vbox->add( $hbox = Tickit::Widget::HBox->new( spacing => 2 ) );
 for (qw( red blue green yellow )) {
-   $hbox->add( Tickit::Widget::Static->new( text => "bg $_", bg => $_ ) );
+   $hbox->add( Tickit::Widget::Static->new( text => "fg hi-$_", fg => "hi-$_" ) );
+}
+
+$vbox->add( $hbox = Tickit::Widget::HBox->new( spacing => 2 ) );
+for (qw( red blue green yellow )) {
+   $hbox->add( Tickit::Widget::Static->new( text => "bg $_   ", bg => $_, fg => "black" ) );
+}
+
+$vbox->add( $hbox = Tickit::Widget::HBox->new( spacing => 2 ) );
+for (qw( red blue green yellow )) {
+   $hbox->add( Tickit::Widget::Static->new( text => "bg hi-$_", bg => "hi-$_", fg => "black" ) );
 }
 
 $vbox->add( Tickit::Widget::Static->new( text => "bold", b => 1 ) );

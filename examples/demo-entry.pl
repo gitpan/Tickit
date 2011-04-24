@@ -10,13 +10,20 @@ use Tickit;
 use Tickit::Widget::Static;
 use Tickit::Widget::Entry;
 
+use Tickit::Widget::Box;
 use Tickit::Widget::VBox;
 
 my $vbox = Tickit::Widget::VBox->new( spacing => 1 );
 
 $vbox->add( Tickit::Widget::Static->new( text => "Enter some text here:" ) );
 
-$vbox->add( my $entry = Tickit::Widget::Entry->new );
+$vbox->add( Tickit::Widget::Box->new(
+   h_border => 2,
+   v_border => 1,
+   bg => 'blue',
+   child =>
+      ( my $entry = Tickit::Widget::Entry->new ),
+) );
 
 $vbox->add( my $label = Tickit::Widget::Static->new( text => "" ) );
 

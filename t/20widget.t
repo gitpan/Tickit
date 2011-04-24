@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 8;
+use Test::More tests => 9;
 use Test::Refcount;
 
 my $widget = TestWidget->new;
@@ -11,20 +11,23 @@ ok( defined $widget, 'defined $widget' );
 
 is_oneref( $widget, '$widget has refcount 1 initially' );
 
-is_deeply( { $widget->getpenattrs }, {}, '$widget pen initially empty' );
-is( $widget->getpenattr('b'), undef, '$widget pen does not define b' );
+my $pen = $widget->pen;
+isa_ok( $pen, "Tickit::Pen", '$pen' );
 
-$widget->chpenattr( b => 1 );
+is_deeply( { $widget->pen->getattrs }, {}, '$widget pen initially empty' );
+is( $widget->pen->getattr('b'), undef, '$widget pen does not define b' );
 
-is_deeply( { $widget->getpenattrs }, { b => 1 }, '$widget pen now has b=1' );
-is( $widget->getpenattr('b'), 1, '$widget pen defines b as 1' );
+$pen->chattr( u => 1 );
+
+is_deeply( { $widget->pen->getattrs }, { u => 1 }, '$widget pen now has u=1' );
+is( $widget->pen->getattr('u'), 1, '$widget pen defines u as 1' );
 
 {
    my $widget = TestWidget->new(
       i => 1,
    );
 
-   is_deeply( { $widget->getpenattrs }, { i => 1 }, 'Widget constructor sets initial pen' );
+   is_deeply( { $widget->pen->getattrs }, { i => 1 }, 'Widget constructor sets initial pen' );
 }
 
 is_oneref( $widget, '$widget has refcount 1 at EOF' );

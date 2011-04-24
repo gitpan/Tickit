@@ -2,6 +2,7 @@ Build.PL
 Changes
 examples/ColourWidget.pm
 examples/demo-entry.pl
+examples/demo-frame.pl
 examples/demo-pen.pl
 examples/HelloWorldWidget-1.pm
 examples/HelloWorldWidget-2.pm
@@ -10,13 +11,18 @@ lib/Tickit.pm
 lib/Tickit/ContainerWidget.pm
 lib/Tickit/Pen.pm
 lib/Tickit/RootWindow.pm
+lib/Tickit/SingleChildWidget.pm
 lib/Tickit/Term.pm
+lib/Tickit/Utils.pm
 lib/Tickit/Widget.pm
+lib/Tickit/Widget/Box.pm
 lib/Tickit/Widget/Entry.pm
+lib/Tickit/Widget/Frame.pm
 lib/Tickit/Widget/HBox.pm
 lib/Tickit/Widget/LinearBox.pm
 lib/Tickit/Widget/Static.pm
 lib/Tickit/Widget/VBox.pm
+lib/Tickit/WidgetRole/Borderable.pm
 lib/Tickit/Window.pm
 Makefile.PL
 MANIFEST			This list of files
@@ -26,6 +32,7 @@ t/01term-output.t
 t/02term-outpen.t
 t/03term-input.t
 t/04term-utf8.t
+t/05utils.t
 t/08pen.t
 t/09tickit.t
 t/10rootwin.t
@@ -40,8 +47,11 @@ t/23widget-input.t
 t/30widget-static.t
 t/31widget-entry-model.t
 t/32widget-entry-input.t
-t/40widget-hbox.t
-t/40widget-vbox.t
+t/33widget-entry-scroll.t
+t/40widget-box.t
+t/41widget-hbox.t
+t/41widget-vbox.t
+t/42widget-frame.t
 t/99pod.t
 t/MockTerm.pm
-t/TestWindow.pm
+t/TestTickit.pm

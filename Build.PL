@@ -6,6 +6,7 @@ use Module::Build;
 my $build = Module::Build->new(
    module_name => 'Tickit',
    requires => {
+      'Exporter' => '5.57',
       'IO::Async' => 0.29,
       'IO::Async::Stream' => '0.34',
       'IO::Async::Test' => 0,
@@ -16,7 +17,7 @@ my $build = Module::Build->new(
       'Text::CharWidth' => 0,
    },
    build_requires => {
-      'Test::Exception' => 0,
+      'Test::Fatal' => 0,
       'Test::HexString' => 0,
       'Test::Identity' => 0,
       'Test::More' => 0,

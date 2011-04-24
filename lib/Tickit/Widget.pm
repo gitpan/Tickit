@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -59,12 +59,13 @@ sub new
          croak "$class cannot ->$method - do you subclass and implement it?";
    }
 
-   my $pen = Tickit::Pen->new_from_attrs( \%args );
-
-   return bless {
-      pen          => $pen,
+   my $self = bless {
       needs_redraw => 0,
    }, $class;
+
+   $self->set_pen( Tickit::Pen->new_from_attrs( \%args ) );
+
+   return $self;
 }
 
 =head1 METHODS
@@ -197,6 +198,7 @@ sub resized
       $self->parent->child_resized( $self );
    }
    else {
+      $self->reshape if $self->window;
       $self->redraw;
    }
 }
@@ -237,7 +239,7 @@ sub _need_redraw
       $parent->_need_redraw( REDRAW_CHILDREN );
    }
    else {
-      $self->window->enqueue_redraw( sub {
+      $self->window->root->enqueue_redraw( sub {
          $self->_do_redraw( @_ );
       } );
    }
@@ -276,54 +278,41 @@ sub _do_redraw
    }
 }
 
-=head2 %attrs = $widget->getpenattrs
+=head2 $pen = $widget->pen
 
-Returns a hash of the currently-applied pen attributes
+Returns the current widget pen. Modifying an attribute of the returned object
+results in the widget being redrawn if the widget has a window associated.
 
 =cut
 
-sub getpenattrs
+sub pen
 {
    my $self = shift;
-   return $self->{pen}->getattrs;
+   return $self->{pen};
 }
 
-=head2 $value = $widget->getpenattr( $name )
+=head2 $widget->set_pen( $pen )
 
-Returns the value of the given pen attribute, or C<undef> if it does not exist
+Set a new C<Tickit::Pen> object. This is stored by reference; changes to the
+pen will be reflected in the rendered look of the widget. The same pen may be
+shared by more than one widget; updates will affect them all.
 
 =cut
 
-sub getpenattr
+sub set_pen
 {
    my $self = shift;
-   my ( $name ) = @_;
-   return $self->{pen}->getattr( $name );
+   my ( $newpen ) = @_;
+   return if $self->{pen} and $self->{pen} == $newpen;
+
+   $self->{pen}->remove_on_changed( $self ) if $self->{pen};
+   $self->{pen} = $newpen;
+   $newpen->add_on_changed( $self );
 }
 
-=head2 $widget->chpenattr( $name, $value )
-
-Changes the value of the given pen attribute. Set the value C<undef> to remove
-it.
-
-If the widget has a window associated with it, the window will be redrawn to
-reflect the pen change.
-
-For details of the supported pen attributes, see L<Tickit::Pen>.
-
-=cut
-
-sub chpenattr
+sub on_pen_changed
 {
    my $self = shift;
-   my ( $name, $value ) = @_;
-
-   # Optimise
-   my $curvalue = $self->getpenattr( $name );
-   return if !defined $curvalue and !defined $value;
-   return if  defined $curvalue and  defined $value and $value == $curvalue;
-
-   $self->{pen}->chattr( $name, $value );
 
    if( $self->window ) {
       $self->redraw;
@@ -447,7 +436,7 @@ change the pen foreground colour.
     my ( $type, $str ) = @_;
  
     if( $type eq "text" and $str =~ m/[0-7]/ ) {
-       $self->chpenattr( fg => $str );
+       $self->pen->chattr( fg => $str );
        $self->redraw;
        return 1;
     }

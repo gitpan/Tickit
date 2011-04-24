@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 10;
+use Test::More tests => 11;
 use Test::HexString;
 use IO::Async::Test;
 
@@ -60,6 +60,9 @@ stream_is( "\e[m", '$term->chpen( u => undef )' );
 
 $term->setpen( fg => 1, bg => 5 );
 stream_is( "\e[31;45m", '$term->setpen( fg => 1, bg => 5 )' );
+
+$term->chpen( fg => 9 );
+stream_is( "\e[91m", '$term->setpen( fg => 9 )' );
 
 $term->setpen( u => 1 );
 stream_is( "\e[39;49;4m", '$term->setpen( u => 1 )' );

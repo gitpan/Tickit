@@ -6,7 +6,7 @@ use Test::More tests => 24;
 use IO::Async::Test;
 
 use t::MockTerm;
-use t::TestWindow;
+use t::TestTickit;
 
 my ( $term, $rootwin ) = mk_term_and_window;
 

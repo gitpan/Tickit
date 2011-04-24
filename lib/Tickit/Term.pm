@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use base qw( IO::Async::Stream );
 IO::Async::Stream->VERSION( 0.34 );
@@ -315,8 +315,8 @@ sub _colspec_to_sgr
    my $self = shift;
    my ( $spec, $is_bg ) = @_;
 
-   # Simple 0-7 first
-   return $spec + ($is_bg?40:30) if $spec =~ m/^\d+$/ and $spec < 8;
+   return $spec + ($is_bg?40:30) if $spec < 8;
+   return +($spec-8) + ($is_bg?100:90) if $spec >= 8 and $spec < 16;
 
    # Defaults
    return $is_bg?49:39;

@@ -9,9 +9,9 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
-use Text::CharWidth qw( mbswidth );
+use Tickit::Utils qw( textwidth substrwidth ); # 'align'
 
 =head1 NAME
 
@@ -101,7 +101,7 @@ sub lines
 sub cols
 {
    my $self = shift;
-   return mbswidth( $self->{text} );
+   return textwidth( $self->{text} );
 }
 
 =head2 $text = $static->text
@@ -211,28 +211,17 @@ sub render
 
    my $window = $self->window or return;
 
-   my $cols = $window->cols;
-
-   my $text = $self->{text};
-
-   my $spare = $cols - mbswidth( $text );
-
-   my $left  = 0;
-   my $right = 0;
-
-   if( $spare >= 0 ) {
-      $left  = int( $spare * $self->{align} );
-      $right = $spare - $left;
-   }
-   else {
-      $text = substr( $text, 0, $cols ); # TODO - Unicode awareness
-   }
-
-   my $top = ( $window->lines - $self->lines ) * $self->{valign};
+   my ( $top ) =
+      Tickit::Utils::align( 1, $window->lines, $self->{valign} );
 
    $window->goto( $top, 0 );
+
+   my $text = $self->{text};
+   my ( $left, $textwidth, $right ) = 
+      Tickit::Utils::align( textwidth( $text ), $window->cols, $self->{align} );
+
    $window->erasech( $left, 1 ) if $left;
-   $window->print( $text );
+   $window->print( substrwidth $text, 0, $textwidth );
    $window->erasech( $right ) if $right;
 }
 

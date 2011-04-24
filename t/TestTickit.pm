@@ -1,10 +1,11 @@
-package t::TestWindow;
+package t::TestTickit;
 
 use strict;
 use Exporter 'import';
 
 our @EXPORT = qw(
    mk_term_and_window
+   flush_tickit
 );
 
 use IO::Async::Test;
@@ -20,7 +21,7 @@ sub mk_term_and_window
 
    my $term = t::MockTerm->new;
 
-   my $tickit = Tickit->new(
+   my $tickit = t::TestTickit->new(
       term => $term
    );
 
@@ -34,6 +35,21 @@ sub mk_term_and_window
    $term->methodlog;
 
    return ( $term, $win );
+}
+
+## Actual object implementation
+
+use base qw( Tickit );
+
+my @later;
+sub later { push @later, $_[1] }
+
+sub flush_tickit
+{
+   while( @later ) {
+      my @queue = @later; @later = ();
+      $_->() for @queue;
+   }
 }
 
 0x55AA;

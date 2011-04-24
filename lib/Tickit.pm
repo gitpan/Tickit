@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( IO::Async::Notifier );
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use Tickit::Term;
 use Tickit::RootWindow;

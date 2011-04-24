@@ -5,6 +5,7 @@ WriteMakefile
           'NAME' => 'Tickit',
           'VERSION_FROM' => 'lib/Tickit.pm',
           'PREREQ_PM' => {
+                           'Exporter' => '5.57',
                            'IO::Async' => '0.29',
                            'IO::Async::Stream' => '0.34',
                            'IO::Async::Test' => 0,
@@ -12,7 +13,7 @@ WriteMakefile
                            'Term::Size' => 0,
                            'Term::TermKey::Async' => 0,
                            'Term::Terminfo' => 0,
-                           'Test::Exception' => 0,
+                           'Test::Fatal' => 0,
                            'Test::HexString' => 0,
                            'Test::Identity' => 0,
                            'Test::More' => 0,

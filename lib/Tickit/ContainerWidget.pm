@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use Carp;
 
@@ -17,7 +17,8 @@ use List::MoreUtils qw( firstidx );
 
 =head1 NAME
 
-C<Tickit::Widget> - abstract base class for widgets that contain other widgets
+C<Tickit::ContainerWidget> - abstract base class for widgets that contain
+other widgets
 
 =head1 SYNOPSIS
 
@@ -61,6 +62,7 @@ sub _do_redraw
    if( $flag & Tickit::Widget::REDRAW_SELF or $force ) {
       # Force a redraw if we cleared
       $self->_do_clear and $force = 1;
+      $self->render;
    }
 
    if( $flag & Tickit::Widget::REDRAW_CHILDREN or $force ) {
@@ -206,6 +208,13 @@ sub remove
 sub child_resized {}
 
 =head1 SUBCLASS METHODS
+
+=head2 $widget->render
+
+Optional. An empty C<render> method is provided for the case where the widget
+is purely a layout container that does not directly draw to its window. If the
+container requires drawing, this method may be overridden. Since the default
+implementation is empty, there is no need for a subclass to C<SUPER> call it.
 
 =head2 $widget->children_changed
 

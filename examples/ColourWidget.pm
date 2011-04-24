@@ -24,7 +24,7 @@ sub on_key
    my ( $type, $str ) = @_;
 
    if( $type eq "text" and $str =~ m/[0-7]/ ) {
-      $self->chpenattr( fg => $str );
+      $self->pen->chattr( fg => $str );
       $self->redraw;
       return 1;
    }

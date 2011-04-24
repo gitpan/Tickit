@@ -3,11 +3,9 @@
 use strict;
 
 use Test::More tests => 23;
-use Test::Refcount;
-use IO::Async::Test;
 
 use t::MockTerm;
-use t::TestWindow;
+use t::TestTickit;
 
 use Tickit::Widget::Static;
 
@@ -51,7 +49,7 @@ $static->set_align( 0.0 );
 $static->set_valign( 0.0 );
 $static->set_window( $win );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
@@ -70,7 +68,7 @@ is_deeply( [ $term->get_display ],
 
 $static->set_text( "Changed message" );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
@@ -92,7 +90,7 @@ is_deeply( [ $term->get_display ],
 
 $static->set_align( 1.0 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
@@ -114,7 +112,7 @@ is_deeply( [ $term->get_display ],
 
 $static->set_valign( 0.5 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
@@ -137,7 +135,7 @@ $term->methodlog; # clear the log
 
 $term->resize( 30, 100 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
@@ -155,9 +153,9 @@ is_deeply( [ $term->get_display ],
              BLANKS(29) ],
            '$term display in correct location' );
 
-$static->chpenattr( bg => 4 );
+$static->pen->chattr( bg => 4 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN(bg => 4),

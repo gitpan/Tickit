@@ -9,9 +9,9 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
-use Text::CharWidth qw( mbswidth );
+use Tickit::Utils qw( textwidth chars2cols substrwidth );
 
 # Positions in this code can get complicated. The following conventions apply:
 #   $pos_ch  = a position in CHaracters within a Unicode string (length, substr,..)
@@ -138,6 +138,8 @@ sub new
    my $textlen = length $self->{text};
    $self->{pos_ch} = $textlen if $self->{pos_ch} > $textlen;
 
+   $self->{scrolloffs_co} = 0;
+
    $self->{keybindings} = {
       'C-k' => "key_delete_line",
       'C-u' => "key_backward_delete_line",
@@ -171,7 +173,7 @@ sub char2col
    my $self = shift;
    my ( $ch ) = @_;
 
-   return mbswidth( substr $self->{text}, 0, $ch );
+   return scalar chars2cols $self->{text}, $ch;
 }
 
 sub render
@@ -182,21 +184,139 @@ sub render
 
    $win->goto( 0, 0 );
 
-   my $text = $self->{text};
+   my $width = $win->cols;
+
+   my $text = substrwidth( $self->text, $self->{scrolloffs_co}, $width );
+   my $textlen_co = textwidth $text;
+
    $win->print( $text );
 
-   $win->erasech( $win->cols - length $text );
+   if( $textlen_co < $width ) {
+      $win->erasech( $width - $textlen_co );
+   }
 
    $self->reposition_cursor;
+}
+
+sub _recalculate_scroll
+{
+   my $self = shift;
+   my ( $pos_ch ) = @_;
+
+   my $pos_co = $self->char2col( $pos_ch );
+   my $off_co = $self->{scrolloffs_co};
+
+   my $pos_x = $pos_co - $off_co;
+
+   my $width = $self->window->cols;
+   my $halfwidth = int( $width / 2 );
+
+   # Try to keep the cursor within 5 columns of the window edge
+   while( $pos_x < 5 and $off_co >= 5 ) {
+      $off_co -= $halfwidth;
+      $off_co = 0 if $off_co < 0;
+      $pos_x = $pos_co - $off_co;
+   }
+   while( $pos_x > ( $width - 5 ) ) {
+      $off_co += $halfwidth;
+      $pos_x = $pos_co - $off_co;
+   }
+
+   return $off_co if $off_co != $self->{scrolloffs_co};
+   return undef;
 }
 
 sub reposition_cursor
 {
    my $self = shift;
+   my ( $pos_ch ) = @_;
 
    my $win = $self->window or return;
 
-   $win->focus( 0, $self->char2col( $self->{pos_ch} ) );
+   $self->{pos_ch} = $pos_ch if defined $pos_ch;
+
+   my $new_scrolloffs = $self->_recalculate_scroll( $self->{pos_ch} );
+   if( defined $new_scrolloffs ) {
+      $self->{scrolloffs_co} = $new_scrolloffs;
+      $self->redraw;
+   }
+
+   my $pos_x = $self->char2col( $self->{pos_ch} ) - $self->{scrolloffs_co};
+
+   $win->focus( 0, $pos_x );
+}
+
+sub _text_spliced
+{
+   my $self = shift;
+   my ( $pos_ch, $deleted, $inserted, $at_end ) = @_;
+
+   my $win = $self->window;
+   my $width = $win->cols;
+
+   my $insertedlen_co = textwidth $inserted;
+   my $deletedlen_co  = textwidth $deleted;
+
+   my $delta_co = $insertedlen_co - $deletedlen_co;
+
+   my $pos_co = $self->char2col( $pos_ch );
+   my $pos_x  = $pos_co - $self->{scrolloffs_co};
+
+   # Don't bother at all if the affected range is scrolled off the right
+   return if $pos_x >= $width;
+
+   if( $pos_x < 0 ) {
+      die "TODO: text_splice before window - what to do??\n";
+   }
+
+   if( $pos_ch != $self->position ) {
+      $win->goto( 0, $pos_x );
+   }
+
+   my $need_reprint = 0;
+
+   if( $delta_co > 0 and !$at_end ) {
+      $win->insertch( $delta_co ) or $need_reprint = 1;
+   }
+   elsif( $delta_co < 0 ) {
+      $win->deletech( -$delta_co ) or $need_reprint = 1;
+   }
+
+   if( $need_reprint ) {
+      # ICH/DCH failed; we'll have to reprint the entire rest of the line from
+      # here
+      my $right_co = $self->{scrolloffs_co} + $width;
+
+      $win->print( substrwidth( $self->text, $pos_co, $right_co - $pos_co ) );
+
+      my $trailing_blank_co = $right_co - length($self->text);
+      $win->erasech( $trailing_blank_co ) if $trailing_blank_co > 0;
+
+      $win->goto( 0, $pos_x );
+      return;
+   }
+
+   if( $insertedlen_co > 0 ) {
+      my $right_co = $self->{scrolloffs_co} + $width;
+
+      my $end_co = $pos_co + $insertedlen_co;
+
+      if( $end_co > $right_co ) {
+         substrwidth( $inserted, $right_co - $pos_co, "" );
+      }
+
+      $win->print( $inserted );
+   }
+
+   if( $delta_co < 0 and $self->{scrolloffs_co} + $width < textwidth $self->text ) {
+      my $rhs_x  = $width + $delta_co;
+      my $rhs_co = $rhs_x + $self->{scrolloffs_co};
+
+      $win->goto( 0, $rhs_x );
+      $win->print( substrwidth( $self->text, $rhs_co, -$delta_co ) );
+
+      $win->goto( 0, $pos_x + $insertedlen_co );
+   }
 }
 
 sub on_key
@@ -278,9 +398,7 @@ sub set_position
    $pos_ch = 0 if $pos_ch < 0;
    $pos_ch = length $self->{text} if $pos_ch > length $self->{text};
 
-   $self->{pos_ch} = $pos_ch;
-
-   $self->reposition_cursor;
+   $self->reposition_cursor( $pos_ch );
 
    if( my $win = $self->window ) {
       $win->restore;
@@ -375,9 +493,9 @@ sub text_insert
    $self->text_splice( $pos_ch, 0, $text );
 }
 
-=head2 $entry->text_delete( $pos_ch, $len_ch )
+=head2 $deleted = $entry->text_delete( $pos_ch, $len_ch )
 
-Delete the given section of text.
+Delete the given section of text. Returns the deleted text.
 
 =cut
 
@@ -386,12 +504,13 @@ sub text_delete
    my $self = shift;
    my ( $pos_ch, $len_ch ) = @_;
 
-   $self->text_splice( $pos_ch, $len_ch, "" );
+   return $self->text_splice( $pos_ch, $len_ch, "" );
 }
 
-=head2 $entry->text_splice( $pos_ch, $len_ch, $text )
+=head2 $deleted = $entry->text_splice( $pos_ch, $len_ch, $text )
 
-Replace the given section of text with the given replacement.
+Replace the given section of text with the given replacement. Returns the
+text deleted from the section.
 
 =cut
 
@@ -400,45 +519,38 @@ sub text_splice
    my $self = shift;
    my ( $pos_ch, $len_ch, $text ) = @_;
 
-   my $win = $self->window;
-
-   my $textlen_co = mbswidth $text;
    my $textlen_ch = length($text);
 
-   my $deletedlen_co = $len_ch ? mbswidth( substr $self->{text}, $pos_ch, $len_ch ) : 0;
-
    my $delta_ch = $textlen_ch - $len_ch;
-   my $delta_co = $textlen_co - $deletedlen_co;
 
-   if( $pos_ch != $self->{pos_ch} ) {
-      $win->goto( 0, $self->char2col( $pos_ch ) );
-   }
+   my $at_end = ( $pos_ch == length $self->{text} );
 
-   if( $delta_co > 0 ) {
-      $win->insertch( $delta_co ) if $pos_ch < length $self->{text};
-   }
-   elsif( $delta_co < 0 ) {
-      $win->deletech( -$delta_co );
-   }
+   my $deleted = substr( $self->{text}, $pos_ch, $len_ch, $text );
 
-   $win->print( $text ) if $textlen_ch;
-   substr( $self->{text}, $pos_ch, $len_ch ) = $text;
+   my $new_pos_ch;
 
    if( $self->{pos_ch} >= $pos_ch + $len_ch ) {
       # Cursor after splice; move to suit
-      $self->{pos_ch} += $delta_ch;
+      $new_pos_ch = $self->position + $delta_ch;
    }
    elsif( $self->{pos_ch} > $pos_ch ) {
       # Cursor within splice; move to start
-      $self->{pos_ch} = $pos_ch;
+      $new_pos_ch = $pos_ch;
    }
    # else { ignore }
 
-   $self->reposition_cursor;
+   # No point incrementally updating as we'll have to scroll anyway
+   unless( defined $new_pos_ch and defined $self->_recalculate_scroll( $new_pos_ch ) ) {
+      $self->_text_spliced( $pos_ch, $deleted, $text, $at_end );
+   }
+
+   $self->reposition_cursor( $new_pos_ch ) if defined $new_pos_ch;
 
    if( $pos_ch + $textlen_ch != $self->{pos_ch} ) {
-      $win->restore;
+      $self->window->restore;
    }
+
+   return $deleted;
 }
 
 =head2 $pos = $entry->find_bow_forward( $initial, $else )
@@ -638,8 +750,7 @@ plugins.
 
 =item * Sideways scrolling
 
-Scroll text left or right to fit the cursor within the visible range. Display
-"more" markers at either end as appropriate.
+Display "more" markers at either end as appropriate.
 
 =item * More readline behaviours
 

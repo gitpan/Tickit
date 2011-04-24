@@ -5,10 +5,9 @@ use strict;
 use Test::More tests => 10;
 use Test::Identity;
 use Test::Refcount;
-use IO::Async::Test;
 
 use t::MockTerm;
-use t::TestWindow;
+use t::TestTickit;
 
 use Tickit::Widget;
 
@@ -31,7 +30,7 @@ is( $render_called, 1, 'render is called after set_window' );
 
 identical( $gained_window, $win, '$widget->window_gained called' );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN,
@@ -41,9 +40,9 @@ is_deeply( [ $term->methodlog ],
              PRINT("Hello"), ],
            '$term written to' );
 
-$widget->chpenattr( fg => 2 );
+$widget->pen->chattr( fg => 2 );
 
-wait_for { $term->is_changed };
+flush_tickit;
 
 is_deeply( [ $term->methodlog ],
            [ SETPEN(fg => 2),
