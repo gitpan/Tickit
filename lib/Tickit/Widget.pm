@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -107,7 +107,7 @@ sub set_window
       $window->set_pen( $self->{pen} );
 
       $self->reshape;
-      $self->_do_redraw( 1 ) if !$self->parent;
+      $self->redraw( 1 );
 
       weaken( my $weakself = $self );
       $window->set_on_geom_changed( sub {
@@ -130,6 +130,12 @@ sub window_gained
          $self->on_key( @_ );
       } );
    }
+   if( $self->can( "on_mouse" ) ) {
+      $self->window->set_on_mouse( sub {
+         shift;
+         $self->on_mouse( @_ );
+      } );
+   }
 }
 
 sub window_lost
@@ -137,6 +143,7 @@ sub window_lost
    my $self = shift;
 
    $self->window->set_on_key( undef );
+   $self->window->set_on_mouse( undef );
 }
 
 =head2 $window = $widget->window
@@ -359,6 +366,12 @@ Optional. If provided, this method will be set as the C<on_key> callback for
 any window set on the widget. By providing this method a subclass can
 implement widgets that respond to user input.
 
+=head2 $handled = $widget->on_mouse( $ev, $button, $line, $col )
+
+Optional. If provided, this method will be set as the C<on_mouse> callback for
+any window set on the widget. By providing this method a subclass can
+implement widgets that respond to user input.
+
 =cut
 
 =head1 EXAMPLES
@@ -454,6 +467,54 @@ the cursor).
 The C<on_key> method then gets invoked for keypresses. It returns a true value
 to indicate the keys it handles, returning false for the others, to allow
 parent widgets or the main C<Tickit> object to handle them instead.
+
+Similarly, by providing an C<on_mouse> method, the widget subclass will
+receive mouse events within the window of the widget. This example saves a
+list of the last 10 mouse clicks and renders them with an C<X>.
+
+ package ClickerWidget;
+ use base 'Tickit::Widget';
+ 
+ # In a real Widget this would be stored in an attribute of $self
+ my @points;
+ 
+ sub lines { 1 }
+ sub cols  { length $text }
+ 
+ sub render
+ {
+    my $self = shift;
+    my $win = $self->window;
+ 
+    $win->clear;
+    foreach my $point ( @points ) {
+       $win->goto( $point->[0], $point->[1] );
+       $win->print( "X" );
+    }
+ }
+ 
+ sub on_mouse
+ {
+    my $self = shift;
+    my ( $ev, $button, $line, $col ) = @_;
+ 
+    return unless $ev eq "press" and $button == 1;
+ 
+    push @points, [ $line, $col ];
+    shift @points while @points > 10;
+    $self->redraw;
+ }
+ 
+ 1;
+
+This time there is no need to set the window focus, because mouse events do
+not need to follow the window that's in focus; they always affect the window
+at the location of the mouse cursor.
+
+The C<on_mouse> method then gets invoked whenever a mouse event happens within
+the window occupied by the widget. In this particular case, the method filters
+only for pressing button 1. It then stores the position of the mouse click in
+the C<@points> array, for the C<render> method to use.
 
 =cut
 

@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::LinearBox;
 
@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use List::Util qw( sum );
 
@@ -58,6 +58,15 @@ sub reshape
 {
    my $self = shift;
    $self->redistribute_child_windows;
+}
+
+sub window_lost
+{
+   my $self = shift;
+
+   $_->set_window( undef ) for $self->children;
+
+   $self->SUPER::window_lost( @_ );
 }
 
 sub add

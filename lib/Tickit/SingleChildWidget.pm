@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Carp;
 
@@ -75,6 +75,16 @@ sub add
    my $self = shift;
    croak "Already have a child; cannot add another" if $self->child;
    $self->SUPER::add( @_ );
+}
+
+sub window_lost
+{
+   my $self = shift;
+
+   my $child = $self->child;
+   $child->set_window( undef ) if $child;
+
+   $self->SUPER::window_lost( @_ );
 }
 
 =head1 AUTHOR

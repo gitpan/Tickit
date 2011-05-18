@@ -1,5 +1,15 @@
 Revision history for Changes
 
+0.05    CHANGES:
+         * Added mouse support
+         * Switchable insert/overwrite mode in Entry
+         * Markers at beginning/end of Entry to indicate scrolling
+         * Reduced API dependency on IO::Async; lazily construct a containing
+           Loop in ->run
+         * Reduced test-time dependency on IO::Async
+         * Export Tickit::Test as real code for out-of-distribution tests
+         * Miscellaneous bugfixes and improvements
+
 0.04    CHANGES:
          * Added Tickit::Widget::Frame and ::Box
          * Support text scrolling in Entry

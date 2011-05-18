@@ -2,14 +2,12 @@
 
 use strict;
 
-use Test::More tests => 40;
+use Test::More tests => 41;
 use Test::Fatal;
 use Test::Identity;
 use Test::Refcount;
-use IO::Async::Test;
 
-use t::MockTerm;
-use t::TestTickit;
+use Tickit::Test;
 
 my ( $term, $rootwin ) = mk_term_and_window;
 
@@ -23,6 +21,7 @@ is_oneref( $win, '$win has refcount 1 initially' );
 is_refcount( $rootwin, 3, '$rootwin has refcount 3 after ->make_sub' );
 
 is( "$win", 'Tickit::Window[20x4 abs@10,3]', '$win string overload' );
+ok( $win != $rootwin, '$win numeric comparison compares object identities' );
 
 my $geom_changed = 0;
 $win->set_on_geom_changed( sub { $geom_changed++ } );

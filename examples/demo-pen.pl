@@ -3,8 +3,6 @@
 use strict;
 use warnings;
 
-use IO::Async::Loop;
-
 use Tickit;
 
 use Tickit::Widget::Static;
@@ -46,10 +44,7 @@ $vbox->add( Tickit::Widget::Static->new( text => "reverse video", rv => 1 ) );
 
 $vbox->add( Tickit::Widget::Static->new( text => "alternate font", af => 1 ) );
 
-my $loop = IO::Async::Loop->new;
-
 my $tickit = Tickit->new();
-$loop->add( $tickit );
 
 $tickit->set_root_widget( $vbox );
 

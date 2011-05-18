@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Carp;
 
@@ -25,12 +25,8 @@ C<Tickit::Widget::Frame> - draw a frame around another widget
  use Tickit;
  use Tickit::Widget::Frame;
  use Tickit::Widget::Static;
- use IO::Async::Loop;
- 
- my $loop = IO::Async::Loop->new;
  
  my $tickit = Tickit->new;
- $loop->add( $tickit );
  
  my $hello = Tickit::Widget::Static->new(
     text   => "Hello, world",
@@ -292,35 +288,35 @@ sub render
 
    my $style = $STYLES{$self->{style}};
 
-   my %frameattrs = $self->{frame_pen}->getattrs;
+   my $framepen = $self->frame_pen;
 
    $win->goto( 0, 0 );
    if( defined( my $title = $self->title ) ) {
       # At most we can fit $cols-4 columns of title
       my ( $left, $titlewidth, $right ) = align( textwidth( $title ), $cols - 4, $self->{title_align} );
 
-      $win->penprint( $style->[CORNER_TL] . ( $style->[TOP] x $left ) . " ", %frameattrs );
-      $win->penprint( $title, %frameattrs );
-      $win->penprint( " " . ( $style->[TOP] x $right ) . $style->[CORNER_TR], %frameattrs );
+      $win->penprint( $style->[CORNER_TL] . ( $style->[TOP] x $left ) . " ", $framepen );
+      $win->penprint( $title, $framepen );
+      $win->penprint( " " . ( $style->[TOP] x $right ) . $style->[CORNER_TR], $framepen );
    }
    else {
       $win->penprint( $style->[CORNER_TL] .
                    ( $style->[TOP] x ($cols - 2) ) .
                    $style->[CORNER_TR],
-                   %frameattrs );
+                   $framepen );
    }
 
    foreach my $line ( 1 .. $win->lines - 2 ) {
       $win->goto( $line, 0 );
-      $win->penprint( $style->[LEFT], %frameattrs );
+      $win->penprint( $style->[LEFT], $framepen );
 
       $win->goto( $line, $cols - 1 );
-      $win->penprint( $style->[RIGHT], %frameattrs );
+      $win->penprint( $style->[RIGHT], $framepen );
    }
 
    $win->goto( $win->lines - 1, 0 );
    $win->penprint( $style->[CORNER_BL] . ( $style->[BOTTOM] x ($cols - 2) ) . $style->[CORNER_BR],
-                   %frameattrs );
+                   $framepen );
 }
 
 =head1 TODO

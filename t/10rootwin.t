@@ -5,24 +5,16 @@ use strict;
 use Test::More tests => 36;
 use Test::Identity;
 use Test::Refcount;
-use IO::Async::Test;
 
-use IO::Async::Loop;
-
-use t::MockTerm;
+use Tickit::Test;
 
 use Tickit;
 
-my $loop = IO::Async::Loop->new();
-testing_loop( $loop );
-
-my $term = t::MockTerm->new;
+my $term = mk_term;
 
 my $tickit = Tickit->new(
    term => $term
 );
-
-$loop->add( $tickit );
 
 my $win = $tickit->rootwin;
 
@@ -64,18 +56,13 @@ is( $win->get_effective_penattr( 'fg' ), undef, '$win has effective pen fg undef
 $win->goto( 2, 3 );
 $win->print( "Hello" );
 
-is_deeply( [ $term->methodlog ], 
-          [ GOTO(2,3),
-            SETPEN,
-            PRINT("Hello"),
-          ],
-          '$term written to' );
+is_termlog( [ GOTO(2,3),
+              SETPEN,
+              PRINT("Hello"), ],
+            'Termlog initially' );
 
-is_deeply( [ $term->get_display ],
-           [ BLANKS(2),
-             PAD("   Hello"),
-             BLANKS(22) ],
-           '$term display' );
+is_display( [ "", "", "   Hello", ],
+            'Display initially' );
 
 $win->pen->chattr( fg => 3 );
 
@@ -106,45 +93,39 @@ $win->pen->chattr( u => undef );
 $win->goto( 2, 3 );
 $win->print( "Hello" );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(2,3),
-             SETPEN(fg => 3),
-             PRINT("Hello") ],
-           '$term written with correct pen' );
+is_termlog( [ GOTO(2,3),
+              SETPEN(fg => 3),
+              PRINT("Hello") ],
+            'Termlog with correct pen' );
 
 $win->scroll( 1, 0 );
 
-is_deeply( [ $term->methodlog ],
-           [ [ scroll => 0, 24, 1 ] ],
-           '$term scrolled' );
+is_termlog( [ SCROLL(0,24,1) ],
+            'Termlog scrolled' );
 
 $win->erasech( 15 );
 
-is_deeply( [ $term->methodlog ],
-           [ SETBG(undef),
-             ERASECH(15) ],
-           '$term chars erased' );
+is_termlog( [ SETBG(undef),
+              ERASECH(15) ],
+            'Termlog chars erased' );
 
 ok( $win->insertch( 10 ), '$win can insertch' );
 
-is_deeply( [ $term->methodlog ],
-           [ SETBG(undef),
-             [ insertch => 10 ] ],
-           '$term chars inserted' );
+is_termlog( [ SETBG(undef),
+              INSERTCH(10) ],
+           'Termlog chars inserted' );
 
 ok( $win->deletech( 8 ), '$win can deletech' );
 
-is_deeply( [ $term->methodlog ],
-           [ SETBG(undef),
-             [ deletech => 8 ] ],
-           '$term chars deleted' );
+is_termlog( [ SETBG(undef),
+              DELETECH(8) ],
+            'Termlog chars deleted' );
 
 $win->clear;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN(fg => 3),
-             CLEAR ],
-           '$term scrolled' );
+is_termlog( [ SETPEN(fg => 3),
+              CLEAR ],
+            'Termlog cleared' );
 
 is( $geom_changed, 0, '$reshaped is 0 before term resize' );
 
@@ -157,7 +138,6 @@ is( $geom_changed, 1, '$reshaped is 1 after term resize' );
 
 is_refcount( $win, 2, '$win has refcount 2 before dropping Tickit' );
 
-$loop->remove( $tickit );
 undef $tickit;
 
 is_oneref( $win, '$win has refcount 1 at EOF' );

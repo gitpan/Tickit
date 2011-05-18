@@ -1,0 +1,68 @@
+NAME
+    "Tickit" - Terminal Interface Construction KIT
+
+SYNOPSIS
+     use Tickit;
+
+     my $tickit = Tickit->new;
+
+     # Create some widgets
+     # ...
+
+     $tickit->set_root_widget( $rootwidget );
+
+     $tickit->run;
+
+DESCRIPTION
+CONSTRUCTOR
+  $tickit = Tickit->new( %args )
+    Constructs a new "Tickit" framework container object.
+
+    Takes the following named arguments at construction time:
+
+    term_in => IO
+    term_out => IO
+            Passed to the Tickit::Term constructor.
+
+METHODS
+  $term = $tickit->term
+    Returns the underlying Tickit::Term object.
+
+  $tickit->bind_key( $key, $code )
+    Installs a callback to invoke if the given key is pressed, overwriting
+    any previous callback for the same key. The code block is invoked as
+
+     $code->( $key )
+
+    If $code is missing or "undef", any existing callback is removed.
+
+    As a convenience for the common application use case, the "Ctrl-C" key
+    is bound to a callback that calls the "loop_stop" method on the
+    underlying "IO::Async::Loop" object the "Tickit" is a member of. This
+    usually has the effect of cleanly stopping the application.
+
+    To remove this binding, simply bind another callback, or remove the
+    binding entirely by setting "undef".
+
+  $tickit->rootwin
+    Returns the Tickit::RootWindow.
+
+  $tickit->set_root_widget( $widget )
+    Sets the root widget for the application's display. This must be a
+    subclass of Tickit::Widget.
+
+  $tickit->start
+    Set up the screen and generally prepare to start running
+
+  $tickit->stop
+    Shut down the screen after running
+
+  $tickit->run
+    A shortcut to the common usage pattern, combining the "start" method
+    with "loop_forever" on the containing "IO::Async::Loop" object. If the
+    "Tickit" object does not yet have a containing Loop, then one will be
+    constructed using the "IO::Async::Loop" magic constructor.
+
+AUTHOR
+    Paul Evans <leonerd@leonerd.org.uk>
+

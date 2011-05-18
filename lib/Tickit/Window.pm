@@ -8,9 +8,11 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Carp;
+
+use Scalar::Util qw( weaken );
 
 use Tickit::Pen;
 
@@ -154,6 +156,52 @@ sub _handle_key
    my $self = shift;
    my $on_key = $self->{on_key} or return 0;
    return $on_key->( $self, @_ );
+}
+
+=head2 $win->set_on_mouse( $on_mouse )
+
+Set the callback to invoke whenever a mouse event is received within the
+window's rectangle.
+
+ $handled = $on_mouse->( $win, $ev, $buttons, $line, $col )
+
+The invoked code should return a true value if it considers the mouse event
+dealt with, or false to pass it up to its parent window. The mouse event is
+passed as defined by L<Tickit::Term>'s C<on_mouse> event, except that the
+line and column counts will be relative to the window, not to the screen.
+
+=cut
+
+sub set_on_mouse
+{
+   my $self = shift;
+   ( $self->{on_mouse} ) = @_;
+}
+
+sub _on_mouse
+{
+   my $self = shift;
+   my ( $ev, $button, $line, $col ) = @_;
+
+   if( my $children = $self->{child_windows} ) {
+      foreach my $child ( @$children ) {
+         next unless $child; # weakrefs; may be undef
+
+         my $child_line = $line - $child->top;
+         my $child_col  = $col  - $child->left;
+
+         next if $child_line < 0 or $child_line >= $child->lines;
+         next if $child_col  < 0 or $child_col  >= $child->cols;
+
+         return 1 if $child->_on_mouse( $ev, $button, $child_line, $child_col );
+      }
+   }
+
+   if( my $on_mouse = $self->{on_mouse} ) {
+      return $on_mouse->( $self, $ev, $button, $line, $col );
+   }
+
+   return 0;
 }
 
 =head2 $parentwin = $win->parent
@@ -343,7 +391,21 @@ sub make_sub
 
    $sub->change_geometry( $top, $left, $lines, $cols );
 
+   $self->_reap_dead_children;
+   push @{ $self->{child_windows} }, $sub;
+   weaken $self->{child_windows}[-1];
+
    return $sub;
+}
+
+sub _reap_dead_children
+{
+   my $self = shift;
+   my $children = $self->{child_windows} or return;
+   for( my $i = 0; $i < @$children; ) {
+      $i++, next if defined $children->[$i];
+      splice @$children, $i, 1, ();
+   }
 }
 
 =head2 $win->goto( $line, $col )
@@ -382,19 +444,24 @@ sub print
    $self->term->print( $text );
 }
 
+=head2 $win->penprint( $text, $pen )
+
 =head2 $win->penprint( $text, %attrs )
 
 Print the given text to the terminal at the current cursor position using the
-pen of the window, overridden by any extra attributes passed.
+pen of the window, overridden by any extra attributes in the given
+C<Tickit::Pen> instance, or directly in the given hash.
 
 =cut
 
 sub penprint
 {
    my $self = shift;
-   my ( $text, %attrs ) = @_;
+   my $text = shift;
 
    return unless length $text;
+
+   my %attrs = ( @_ == 1 ) ? shift->getattrs : @_;
 
    $self->term->setpen( $self->get_effective_penattrs, %attrs );
    $self->term->print( $text );
@@ -577,12 +644,18 @@ sub _flush_line
    }
 }
 
-use overload '""' => sub {
-   my $self = shift;
-   return sprintf "%s[%dx%d abs@%d,%d]",
-      ref $self,
-      $self->cols, $self->lines, $self->abs_left, $self->abs_top;
-};
+use overload
+   '""' => sub {
+      my $self = shift;
+      return sprintf "%s[%dx%d abs@%d,%d]",
+         ref $self,
+         $self->cols, $self->lines, $self->abs_left, $self->abs_top;
+   },
+   '0+' => sub {
+      my $self = shift;
+      return $self;
+   },
+   fallback => 1; 
 
 =head1 AUTHOR
 

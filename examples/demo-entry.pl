@@ -3,8 +3,6 @@
 use strict;
 use warnings;
 
-use IO::Async::Loop;
-
 use Tickit;
 
 use Tickit::Widget::Static;
@@ -32,10 +30,7 @@ $entry->set_on_enter( sub {
    $_[0]->set_text( "" );
 } );
 
-my $loop = IO::Async::Loop->new;
-
 my $tickit = Tickit->new();
-$loop->add( $tickit );
 
 $tickit->set_root_widget( $vbox );
 

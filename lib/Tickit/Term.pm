@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use base qw( IO::Async::Stream );
 IO::Async::Stream->VERSION( 0.34 );
@@ -109,6 +109,11 @@ sub new
          elsif( $key->type_is_keysym  and !$key->modifiers and $key->sym == $spacesym ) {
             $self->maybe_invoke_event( on_key => text => " ", $key );
          }
+         elsif( $key->type_is_mouse ) {
+            my ( $ev, $button, $line, $col ) = $tka->interpret_mouse( $key );
+            my $evname = (qw( * press drag release ))[$ev];
+            $self->maybe_invoke_event( on_mouse => $evname, $button, $line - 1, $col - 1 );
+         }
          else {
             $self->maybe_invoke_event( on_key => key => $tka->format_key( $key, FORMAT_ALTISMETA ), $key );
          }
@@ -159,6 +164,13 @@ for C<text> events, or the textual description of the key as rendered by
 L<Term::TermKey> for C<key> events. C<$key> will be the underlying
 C<Term::TermKey::Key> event structure.
 
+=head2 on_mouse $ev, $button, $line, $col
+
+A mouse event was received. C<$ev> will be C<press>, C<drag> or C<release>.
+The button number will be in C<$button>, though may not be present for
+C<release> events. C<$line> and C<$col> are 0-based. Behaviour of events
+involving more than one mouse button is not well-specified by terminals.
+
 =head1 PARAMETERS
 
 The following named parameters may be passed to C<new> or C<configure>:
@@ -180,7 +192,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( on_resize on_key )) {
+   foreach (qw( on_resize on_key on_mouse )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 }
@@ -499,6 +511,20 @@ sub mode_cursorvis
    $self->{mode_cursorvis} = $on;
 
    $self->write( $on ? "${CSI}?25h" : "${CSI}?25l" );
+}
+
+=head2 $term->mode_mouse( $on )
+
+Set or clear the mouse tracking mode
+
+=cut
+
+sub mode_mouse
+{
+   my $self = shift;
+   my ( $on ) = @_;
+
+   $self->write( $on ? "${CSI}?1002h" : "${CSI}?1002l" );
 }
 
 =head1 AUTHOR

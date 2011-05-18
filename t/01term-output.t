@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 18;
+use Test::More tests => 20;
 use Test::HexString;
 use IO::Async::Test;
 
@@ -118,3 +118,13 @@ $term->mode_altscreen( 0 );
 
 $stream = "";
 stream_is( "\e[?1049l", '$term->mode_altscreen( 0 )' );
+
+$term->mode_mouse( 1 );
+
+$stream = "";
+stream_is( "\e[?1002h", '$term->mode_mouse( 1 )' );
+
+$term->mode_mouse( 0 );
+
+$stream = "";
+stream_is( "\e[?1002l", '$term->mode_mouse( 0 )' );

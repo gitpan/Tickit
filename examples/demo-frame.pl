@@ -3,8 +3,6 @@
 use strict;
 use warnings;
 
-use IO::Async::Loop;
-
 use Tickit;
 
 use Tickit::Widget::Static;
@@ -23,10 +21,7 @@ foreach my $style ( qw( ascii single double thick solid_inside solid_outside ) )
    $frame->frame_pen->chattr( fg => $fg++ );
 }
 
-my $loop = IO::Async::Loop->new;
-
 my $tickit = Tickit->new();
-$loop->add( $tickit );
 
 $tickit->set_root_widget( $vbox );
 

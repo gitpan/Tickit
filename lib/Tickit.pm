@@ -9,7 +9,9 @@ use strict;
 use warnings;
 use base qw( IO::Async::Notifier );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
+
+use IO::Async::Loop;
 
 use Tickit::Term;
 use Tickit::RootWindow;
@@ -21,12 +23,8 @@ C<Tickit> - Terminal Interface Construction KIT
 =head1 SYNOPSIS
 
  use Tickit;
- use IO::Async::Loop;
-
- my $loop = IO::Async::Loop->new;
 
  my $tickit = Tickit->new;
- $loop->add( $tickit );
 
  # Create some widgets
  # ...
@@ -83,6 +81,15 @@ sub new
          return if $self->rootwin->_on_key( $type, $str, $key );
 
          $self->on_key( $type, $str, $key );
+      } ),
+
+      on_mouse => $self->_replace_weakself( sub {
+         my $self = shift or return;
+         my ( $ev, $button, $line, $col ) = @_;
+
+         return if $self->rootwin->_on_mouse( $ev, $button, $line, $col );
+
+         # TODO: consider it here?
       } ),
 
       on_resize => $self->_capture_weakself( sub {
@@ -227,6 +234,7 @@ sub start
    my $term = $self->term;
    $term->mode_altscreen( 1 );
    $term->mode_cursorvis( 0 );
+   $term->mode_mouse( 1 );
    $term->clear;
 
    if( my $widget = $self->{root_widget} ) {
@@ -251,13 +259,16 @@ sub stop
    my $term = $self->term;
    $term->mode_altscreen( 0 );
    $term->mode_cursorvis( 1 );
+   $term->mode_mouse( 0 );
    $term->on_write_ready; # TODO - consider a synchronous flush or similar
 }
 
 =head2 $tickit->run
 
 A shortcut to the common usage pattern, combining the C<start> method with
-C<loop_forever> on the containing C<IO::Async::Loop> object.
+C<loop_forever> on the containing C<IO::Async::Loop> object. If the C<Tickit>
+object does not yet have a containing Loop, then one will be constructed using
+the C<IO::Async::Loop> magic constructor.
 
 =cut
 
@@ -265,8 +276,14 @@ sub run
 {
    my $self = shift;
 
+   my $loop = $self->get_loop || do {
+      my $newloop = IO::Async::Loop->new;
+      $newloop->add( $self );
+      $newloop;
+   };
+
    $self->start;
-   $self->get_loop->loop_forever;
+   $loop->loop_forever;
    $self->stop;
 }
 

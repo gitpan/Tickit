@@ -6,12 +6,11 @@ use Test::More tests => 10;
 use Test::Identity;
 use Test::Refcount;
 
-use t::MockTerm;
-use t::TestTickit;
+use Tickit::Test;
 
 use Tickit::Widget;
 
-my ( $term, $win ) = mk_term_and_window;
+my $win = mk_window;
 
 my $render_called = 0;
 my $gained_window;
@@ -25,32 +24,30 @@ is( $render_called, 0, 'render not yet called' );
 
 $widget->set_window( $win );
 
+flush_tickit;
+
 identical( $widget->window, $win, '$widget->window after set_window' );
 is( $render_called, 1, 'render is called after set_window' );
 
 identical( $gained_window, $win, '$widget->window_gained called' );
 
-flush_tickit;
-
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT("Hello"), ],
-           '$term written to' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN,
+              PRINT("Hello"), ],
+            'Termlog initially' );
 
 $widget->pen->chattr( fg => 2 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN(fg => 2),
-             CLEAR,
-             GOTO(0,0),
-             SETPEN(fg => 2),
-             PRINT("Hello"), ],
-           '$term rewritten with correct pen' );
+is_termlog( [ SETPEN(fg => 2),
+              CLEAR,
+              GOTO(0,0),
+              SETPEN(fg => 2),
+              PRINT("Hello"), ],
+            'Termlog with correct pen' );
 
 $widget->set_window( undef );
 

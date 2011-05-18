@@ -5,8 +5,7 @@ use strict;
 use Test::More tests => 9;
 use Test::Refcount;
 
-use t::MockTerm;
-use t::TestTickit;
+use Tickit::Test;
 
 my ( $term, $rootwin ) = mk_term_and_window;
 
@@ -25,10 +24,8 @@ $win->focus( 0, 0 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ], 
-           [ GOTO(3,10),
-           ],
-           '$term written to' );
+is_termlog( [ GOTO(3,10), ],
+            'Termlog initially' );
 
 ok( $term->{cursorvis}, 'Cursor is visible after window focus' );
 
@@ -36,10 +33,8 @@ $win->reposition( 5, 15 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(5,15),
-           ],
-           '$term focus moved after window reposition' );
+is_termlog( [ GOTO(5,15), ],
+            'Termlog after window reposition' );
 
 is_oneref( $win, '$win has refcount 1 at EOF' );
 is_refcount( $rootwin, 3, '$rootwin has refcount 3 at EOF' );

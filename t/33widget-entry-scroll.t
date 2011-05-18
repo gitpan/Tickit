@@ -4,8 +4,7 @@ use strict;
 
 use Test::More tests => 15;
 
-use t::MockTerm;
-use t::TestTickit;
+use Tickit::Test;
 
 use Tickit::Widget::Entry;
 
@@ -20,97 +19,83 @@ $entry->set_window( $win );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT("A"x70),
-             SETBG(undef),
-             ERASECH(10),
-             GOTO(0,70) ],
-           '$term written to initially' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN,
+              PRINT("A"x70),
+              SETBG(undef),
+              ERASECH(10),
+              GOTO(0,70) ],
+            'Termlog initially' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("A"x70),
-             BLANKS(24) ],
-           '$term display initially' );
+is_display( [ "A"x70 ],
+            'Display initially' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 70 ],
-           '$term position initially' );
+is_cursorpos( 0, 70, 'Position initially' );
 
 $entry->text_insert( "B"x20, $entry->position );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT(("A"x30).("B"x20)),
-             SETBG(undef),
-             ERASECH(30),
-             GOTO(0,50) ],
-           '$term written to after append to scroll' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN(fg => 6),
+              PRINT("<.."),
+              SETPEN,
+              PRINT(("A"x27).("B"x20)),
+              SETBG(undef),
+              ERASECH(30),
+              GOTO(0,50) ],
+            'Termlog after append to scroll' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD(("A"x30).("B"x20)),
-             BLANKS(24) ],
-           '$term display after append to scroll' );
+is_display( [ "<..".("A"x27).("B"x20) ],
+            'Display after append to scroll' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 50 ],
-           '$term position after append to scroll' );
+is_cursorpos( 0, 50, 'Position after append to scroll' );
 
 $entry->set_position( 0 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,0),
-             SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT(("A"x70).("B"x10)),
-             GOTO(0,0) ],
-           '$term written to after ->set_position 0' );
+is_termlog( [ GOTO(0,0),
+              SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN,
+              PRINT(("A"x70).("B"x7)),
+              SETPEN(fg => 6),
+              PRINT("..>"),
+              GOTO(0,0) ],
+            'Termlog after ->set_position 0' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD(("A"x70).("B"x10)),
-             BLANKS(24) ],
-           '$term display after ->set_position 0' );
+is_display( [ ("A"x70).("B"x7)."..>" ],
+            'Display after ->set_position 0' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 0 ],
-           '$term position after ->set_position 0' );
+is_cursorpos( 0, 0, 'Position after ->set_position 0' );
 
 $entry->set_position( 90 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,50),
-             SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT(("A"x30).("B"x20)),
-             SETBG(undef),
-             ERASECH(30),
-             GOTO(0,50) ],
-           '$term written to after ->set_position 90' );
+is_termlog( [ GOTO(0,50),
+              SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN(fg => 6),
+              PRINT("<.."),
+              SETPEN,
+              PRINT(("A"x27).("B"x20)),
+              SETBG(undef),
+              ERASECH(30),
+              GOTO(0,50) ],
+            'Termlog after ->set_position 90' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD(("A"x30).("B"x20)),
-             BLANKS(24) ],
-           '$term display after ->set_position 90' );
+is_display( [ "<..".("A"x27).("B"x20) ],
+            'Display after ->set_position 90' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 50 ],
-           '$term position after ->set_position 90' );
+is_cursorpos( 0, 50, 'Position after ->set_position 90' );
 
 $entry->set_position( 0 );
 
@@ -121,20 +106,15 @@ $entry->text_delete( 0, 1 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETBG(undef),
-             DELETECH(1),
-             GOTO(0,79),
-             SETPEN,
-             PRINT("B"),
-             GOTO(0,0) ],
-           '$term written to after ->text_delete 0, 1' );
+is_termlog( [ SETBG(undef),
+              DELETECH(1),
+              GOTO(0,76),
+              SETPEN,
+              PRINT("BBBB"),
+              GOTO(0,0) ],
+            'Termlog after ->text_delete 0, 1' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD(("A"x69).("B"x11)),
-             BLANKS(24) ],
-           '$term display after ->text_delete 0, 1' );
+is_display( [ ("A"x69).("B"x11) ],
+            'Display after ->text_delete 0, 1' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 0 ],
-           '$term position after ->text_delete 0, 1' );
+is_cursorpos( 0, 0, 'Position after ->text_delete 0, 1' );

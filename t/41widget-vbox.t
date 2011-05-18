@@ -2,10 +2,9 @@
 
 use strict;
 
-use Test::More tests => 19;
+use Test::More tests => 21;
 
-use t::MockTerm;
-use t::TestTickit;
+use Tickit::Test;
 
 use Tickit::Widget::Static;
 use Tickit::Widget::VBox;
@@ -29,169 +28,154 @@ is( $widget->cols, 8, '$widget->cols is 8' );
 
 $widget->set_window( $win );
 
+ok( defined $statics[0]->window, '$static has window after ->set_window $win' );
+
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT("Widget 0"),
-             SETBG(undef),
-             ERASECH(72),
-             GOTO(1,0),
-             SETPEN,
-             PRINT("Widget 1"),
-             SETBG(undef),
-             ERASECH(72),
-             GOTO(2,0),
-             SETPEN,
-             PRINT("Widget 2"),
-             SETBG(undef),
-             ERASECH(72),
-             ],
-           '$term has widgets' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN,
+              PRINT("Widget 0"),
+              SETBG(undef),
+              ERASECH(72),
+              GOTO(1,0),
+              SETPEN,
+              PRINT("Widget 1"),
+              SETBG(undef),
+              ERASECH(72),
+              GOTO(2,0),
+              SETPEN,
+              PRINT("Widget 2"),
+              SETBG(undef),
+              ERASECH(72), ],
+            'Termlog initially' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Widget 0"),
-             PAD("Widget 1"),
-             PAD("Widget 2"),
-             BLANKS(22) ],
-           '$term display' );
+is_display( [ "Widget 0",
+              "Widget 1",
+              "Widget 2" ],
+            'Display' );
 
 $widget->set_child_opts( 1, expand => 1 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT("Widget 0"),
-             SETBG(undef),
-             ERASECH(72),
-             GOTO(1,0),
-             SETPEN,
-             PRINT("Widget 1"),
-             SETBG(undef),
-             ERASECH(72),
-             GOTO(24,0),
-             SETPEN,
-             PRINT("Widget 2"),
-             SETBG(undef),
-             ERASECH(72),
-             ],
-           'widgets moved after expand change' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN,
+              PRINT("Widget 0"),
+              SETBG(undef),
+              ERASECH(72),
+              GOTO(1,0),
+              SETPEN,
+              PRINT("Widget 1"),
+              SETBG(undef),
+              ERASECH(72),
+              GOTO(24,0),
+              SETPEN,
+              PRINT("Widget 2"),
+              SETBG(undef),
+              ERASECH(72), ],
+            'widgets moved after expand change' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Widget 0"),
-             PAD("Widget 1"),
-             BLANKS(22),
-             PAD("Widget 2") ],
-           '$term display after expand change' );
+is_display( [ "Widget 0",
+              "Widget 1",
+              ("") x 22,
+              "Widget 2" ],
+            'Display after expand change' );
 
 $statics[0]->set_text( "A longer piece of text for the static" );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT("A longer piece of text for the static"),
-             SETBG(undef),
-             ERASECH(43),
-             GOTO(1,0),
-             SETPEN,
-             PRINT("Widget 1"),
-             SETBG(undef),
-             ERASECH(72),
-             GOTO(24,0),
-             SETPEN,
-             PRINT("Widget 2"),
-             SETBG(undef),
-             ERASECH(72),
-             ],
-           'widgets moved after static text change' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN,
+              PRINT("A longer piece of text for the static"),
+              SETBG(undef),
+              ERASECH(43),
+              GOTO(1,0),
+              SETPEN,
+              PRINT("Widget 1"),
+              SETBG(undef),
+              ERASECH(72),
+              GOTO(24,0),
+              SETPEN,
+              PRINT("Widget 2"),
+              SETBG(undef),
+              ERASECH(72), ],
+            'widgets moved after static text change' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("A longer piece of text for the static"),
-             PAD("Widget 1"),
-             BLANKS(22),
-             PAD("Widget 2") ],
-           '$term display after static text change' );
+is_display( [ "A longer piece of text for the static",
+              "Widget 1",
+              ( "" ) x 22,
+              "Widget 2" ],
+            'Display after static text change' );
 
 $statics[1]->pen->chattr( fg => 5 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(1,0),
-             SETPEN(fg => 5),
-             PRINT("Widget 1"),
-             SETBG(undef),
-             ERASECH(72),
-           ],
-           'redraw after static attr change' );
+is_termlog( [ GOTO(1,0),
+              SETPEN(fg => 5),
+              PRINT("Widget 1"),
+              SETBG(undef),
+              ERASECH(72), ],
+            'redraw after static attr change' );
 
 $widget->pen->chattr( b => 1 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN(b => 1),
-             CLEAR,
-             GOTO(0,0),
-             SETPEN(b => 1),
-             PRINT("A longer piece of text for the static"),
-             SETBG(undef),
-             ERASECH(43),
-             GOTO(1,0),
-             SETPEN(b => 1, fg => 5),
-             PRINT("Widget 1"),
-             SETBG(undef),
-             ERASECH(72),
-             GOTO(24,0),
-             SETPEN(b => 1),
-             PRINT("Widget 2"),
-             SETBG(undef),
-             ERASECH(72),
-           ],
-           'redraw after widget attr change' );
+is_termlog( [ SETPEN(b => 1),
+              CLEAR,
+              GOTO(0,0),
+              SETPEN(b => 1),
+              PRINT("A longer piece of text for the static"),
+              SETBG(undef),
+              ERASECH(43),
+              GOTO(1,0),
+              SETPEN(b => 1, fg => 5),
+              PRINT("Widget 1"),
+              SETBG(undef),
+              ERASECH(72),
+              GOTO(24,0),
+              SETPEN(b => 1),
+              PRINT("Widget 2"),
+              SETBG(undef),
+              ERASECH(72), ],
+            'redraw after widget attr change' );
 
 $term->resize( 30, 100 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN(b => 1),
-             CLEAR,
-             GOTO(0,0),
-             SETPEN(b => 1),
-             PRINT("A longer piece of text for the static"),
-             SETBG(undef),
-             ERASECH(63),
-             GOTO(1,0),
-             SETPEN(b => 1, fg => 5),
-             PRINT("Widget 1"),
-             SETBG(undef),
-             ERASECH(92),
-             GOTO(29,0),
-             SETPEN(b => 1),
-             PRINT("Widget 2"),
-             SETBG(undef),
-             ERASECH(92),
-           ],
-           '$term redrawn after resize' );
+is_termlog( [ SETPEN(b => 1),
+              CLEAR,
+              GOTO(0,0),
+              SETPEN(b => 1),
+              PRINT("A longer piece of text for the static"),
+              SETBG(undef),
+              ERASECH(63),
+              GOTO(1,0),
+              SETPEN(b => 1, fg => 5),
+              PRINT("Widget 1"),
+              SETBG(undef),
+              ERASECH(92),
+              GOTO(29,0),
+              SETPEN(b => 1),
+              PRINT("Widget 2"),
+              SETBG(undef),
+              ERASECH(92), ],
+            'Termlog after resize' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("A longer piece of text for the static"),
-             PAD("Widget 1"),
-             BLANKS(27),
-             PAD("Widget 2") ],
-           '$term display after resize' );
+is_display( [ "A longer piece of text for the static",
+              "Widget 1",
+              ( "" ) x 27,
+              "Widget 2" ],
+            'Display after resize' );
 
 $widget->add( Tickit::Widget::Static->new( text => "New Widget" ) );
 
@@ -199,66 +183,65 @@ is( scalar $widget->children, 4, '$widget now has 4 children after new widget' )
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN(b => 1),
-             CLEAR,
-             GOTO(0,0),
-             SETPEN(b => 1),
-             PRINT("A longer piece of text for the static"),
-             SETBG(undef),
-             ERASECH(63),
-             GOTO(1,0),
-             SETPEN(b => 1, fg => 5),
-             PRINT("Widget 1"),
-             SETBG(undef),
-             ERASECH(92),
-             GOTO(28,0),
-             SETPEN(b => 1),
-             PRINT("Widget 2"),
-             SETBG(undef),
-             ERASECH(92),
-             GOTO(29,0),
-             SETPEN(b => 1),
-             PRINT("New Widget"),
-             SETBG(undef),
-             ERASECH(90),
-           ],
-           '$term redrawn after new widget' );
+is_termlog( [ SETPEN(b => 1),
+              CLEAR,
+              GOTO(0,0),
+              SETPEN(b => 1),
+              PRINT("A longer piece of text for the static"),
+              SETBG(undef),
+              ERASECH(63),
+              GOTO(1,0),
+              SETPEN(b => 1, fg => 5),
+              PRINT("Widget 1"),
+              SETBG(undef),
+              ERASECH(92),
+              GOTO(28,0),
+              SETPEN(b => 1),
+              PRINT("Widget 2"),
+              SETBG(undef),
+              ERASECH(92),
+              GOTO(29,0),
+              SETPEN(b => 1),
+              PRINT("New Widget"),
+              SETBG(undef),
+              ERASECH(90), ],
+            'Termlog after new widget' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("A longer piece of text for the static"),
-             PAD("Widget 1"),
-             BLANKS(26),
-             PAD("Widget 2"),
-             PAD("New Widget") ],
-           '$term display after new widget' );
+is_display( [ "A longer piece of text for the static",
+              "Widget 1",
+              ( "" ) x 26,
+              "Widget 2",
+              "New Widget" ],
+            'Display after new widget' );
 
 $widget->pen->chattr( bg => 4 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN(b => 1, bg => 4),
-             CLEAR,
-             GOTO(0,0),
-             SETPEN(b => 1, bg => 4),
-             PRINT("A longer piece of text for the static"),
-             SETBG(4),
-             ERASECH(63),
-             GOTO(1,0),
-             SETPEN(b => 1, fg => 5, bg => 4),
-             PRINT("Widget 1"),
-             SETBG(4),
-             ERASECH(92),
-             GOTO(28,0),
-             SETPEN(b => 1, bg => 4),
-             PRINT("Widget 2"),
-             SETBG(4),
-             ERASECH(92),
-             GOTO(29,0),
-             SETPEN(b => 1, bg => 4),
-             PRINT("New Widget"),
-             SETBG(4),
-             ERASECH(90),
-           ],
-           '$term redrawn after new widget' );
+is_termlog( [ SETPEN(b => 1, bg => 4),
+              CLEAR,
+              GOTO(0,0),
+              SETPEN(b => 1, bg => 4),
+              PRINT("A longer piece of text for the static"),
+              SETBG(4),
+              ERASECH(63),
+              GOTO(1,0),
+              SETPEN(b => 1, fg => 5, bg => 4),
+              PRINT("Widget 1"),
+              SETBG(4),
+              ERASECH(92),
+              GOTO(28,0),
+              SETPEN(b => 1, bg => 4),
+              PRINT("Widget 2"),
+              SETBG(4),
+              ERASECH(92),
+              GOTO(29,0),
+              SETPEN(b => 1, bg => 4),
+              PRINT("New Widget"),
+              SETBG(4),
+              ERASECH(90), ],
+           'Termlog after new widget' );
+
+$widget->set_window( undef );
+
+ok( !defined $statics[0]->window, '$static has no window after ->set_window undef' );

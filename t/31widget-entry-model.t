@@ -4,12 +4,11 @@ use strict;
 
 use Test::More tests => 65;
 
-use t::MockTerm;
-use t::TestTickit;
+use Tickit::Test;
 
 use Tickit::Widget::Entry;
 
-my ( $term, $win ) = mk_term_and_window;
+my $win = mk_window;
 
 my $entry = Tickit::Widget::Entry->new;
 
@@ -22,162 +21,123 @@ $entry->set_window( $win );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETBG(undef),
-             ERASECH(80),
-             GOTO(0,0) ],
-           '$term written to initially' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETBG(undef),
+              ERASECH(80),
+              GOTO(0,0) ],
+            'Termlog initially' );
 
-is_deeply( [ $term->get_display ],
-           [ BLANKS(25) ],
-           '$term display initially' );
+is_display( [],
+            'Display initially' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 0 ],
-           '$term position initally' );
+is_cursorpos( 0, 0, 'Position initally' );
 
 $entry->text_insert( "Hello", 0 );
 
 is( $entry->text,     "Hello", '$entry->text after ->text_insert' );
 is( $entry->position, 5,       '$entry->position after ->text_insert' );
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             PRINT("Hello") ],
-           '$term written to after ->text_insert' );
+is_termlog( [ SETPEN,
+              PRINT("Hello") ],
+            'Termlog after ->text_insert' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Hello"),
-             BLANKS(24) ],
-           '$term display after ->text_insert' );
+is_display( [ "Hello" ],
+            'Display after ->text_insert' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 5 ],
-           '$term position after ->text_insert' );
+is_cursorpos( 0, 5, 'Position after ->text_insert' );
 
 $entry->text_insert( " ", 0 );
 
 is( $entry->text,     " Hello", '$entry->text after ->text_insert at 0' );
 is( $entry->position, 6,        '$entry->position after ->text_insert at 0' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,0),
+is_termlog( [ GOTO(0,0),
              SETBG(undef),
              INSERTCH(1),
              SETPEN,
              PRINT(" "),
              GOTO(0,6) ],
-           '$term written to after ->text_insert at 0' );
+           'Termlog after ->text_insert at 0' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD(" Hello"),
-             BLANKS(24) ],
-           '$term display after ->text_insert at 0' );
+is_display( [ " Hello" ],
+            'Display after ->text_insert at 0' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 6 ],
-           '$term position after ->text_insert at 0' );
+is_cursorpos( 0, 6, 'Position after ->text_insert at 0' );
 
 is( $entry->text_delete( 5, 1 ), "o", '$entry->text_delete' );
 is( $entry->text,     " Hell", '$entry->text after ->text_delete' );
 is( $entry->position, 5,       '$entry->position after ->text_delete' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,5),
-             SETBG(undef),
-             DELETECH(1) ],
-           '$term written to after ->text_delete' );
+is_termlog( [ GOTO(0,5),
+              SETBG(undef),
+              DELETECH(1) ],
+            'Termlog after ->text_delete' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD(" Hell"),
-             BLANKS(24) ],
-           '$term display after ->text_delete' );
+is_display( [ " Hell" ],
+            'Display after ->text_delete' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 5 ],
-           '$term position after ->text_delete' );
+is_cursorpos( 0, 5, 'Position after ->text_delete' );
 
 is( $entry->text_splice( 0, 2, "Y" ), " H", '$entry->text_splice shrink' );
 is( $entry->text,     "Yell", '$entry->text after ->text_splice shrink' );
 is( $entry->position, 4,      '$entry->position after ->text_splice shrink' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,0),
-             SETBG(undef),
-             DELETECH(1),
-             SETPEN,
-             PRINT("Y"),
-             GOTO(0,4) ],
-           '$term written to after ->text_splice shrink' );
+is_termlog( [ GOTO(0,0),
+              SETBG(undef),
+              DELETECH(1),
+              SETPEN,
+              PRINT("Y"),
+              GOTO(0,4) ],
+            'Termlog after ->text_splice shrink' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Yell"),
-             BLANKS(24) ],
-           '$term display after ->text_splice shrink' );
+is_display( [ "Yell" ],
+            'Display after ->text_splice shrink' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 4 ],
-           '$term position after ->text_splice shrink' );
+is_cursorpos( 0, 4, 'Position after ->text_splice shrink' );
 
 is( $entry->text_splice( 3, 1, "p" ), "l", '$entry->text_splice preserve' );
 is( $entry->text,     "Yelp", '$entry->text after ->text_splice preserve' );
 is( $entry->position, 4,      '$entry->position after ->text_splice preserve' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,3),
-             SETPEN,
-             PRINT("p") ],
-           '$term written to after ->text_splice preserve' );
+is_termlog( [ GOTO(0,3),
+              SETPEN,
+              PRINT("p") ],
+            'Termlog after ->text_splice preserve' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Yelp"),
-             BLANKS(24) ],
-           '$term display after ->text_splice preserve' );
+is_display( [ "Yelp" ],
+            'Display after ->text_splice preserve' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 4 ],
-           '$term position after ->text_splice preserve' );
+is_cursorpos( 0, 4, 'Position after ->text_splice preserve' );
 
 is( $entry->text_splice( 3, 1, "low" ), "p", '$entry->text_splice grow' );
 is( $entry->text,     "Yellow", '$entry->text after ->text_splice grow' );
 is( $entry->position, 6,        '$entry->position after ->text_splice grow' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,3),
-             SETBG(undef),
-             INSERTCH(2),
-             SETPEN,
-             PRINT("low") ],
-           '$term written to after ->text_splice grow' );
+is_termlog( [ GOTO(0,3),
+              SETBG(undef),
+              INSERTCH(2),
+              SETPEN,
+              PRINT("low") ],
+            'Termlog after ->text_splice grow' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Yellow"),
-             BLANKS(24) ],
-           '$term display after ->text_splice grow' );
+is_display( [ "Yellow" ],
+            'Display after ->text_splice grow' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 6 ],
-           '$term position after ->text_splice grow' );
+is_cursorpos( 0, 6, 'Position after ->text_splice grow' );
 
 $entry->set_position( 3 );
 
 is( $entry->position, 3, '$entry->position after ->set_position' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,3) ],
-           '$term written to after ->set_position' );
+is_termlog( [ GOTO(0,3) ],
+            'Termlog after ->set_position' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Yellow"),
-             BLANKS(24) ],
-           '$term display after ->set_position' );
+is_display( [ "Yellow" ],
+            'Display after ->set_position' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 3 ],
-           '$term position after ->set_position' );
+is_cursorpos( 0, 3, 'Position after ->set_position' );
 
 $entry->set_text( "Different text" );
 
@@ -185,25 +145,20 @@ is( $entry->text, "Different text", '$entry->text after ->set_text' );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT("Different text"),
-             SETBG(undef),
-             ERASECH(66),
-             GOTO(0,3) ],
-           '$term written to after ->set_text' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN,
+              PRINT("Different text"),
+              SETBG(undef),
+              ERASECH(66),
+              GOTO(0,3) ],
+            'Termlog after ->set_text' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Different text"),
-             BLANKS(24) ],
-           '$term display after ->set_text' );
+is_display( [ "Different text" ],
+            'Display after ->set_text' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 3 ],
-           '$term position after ->set_text' );
+is_cursorpos( 0, 3, 'Position after ->set_text' );
 
 # A window that doesn't extend to righthand edge of screen, so ICH/DCH won't
 # work
@@ -215,43 +170,35 @@ $entry->set_window( $subwin );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(2,2),
-             SETPEN,
-             PRINT("Different text"),
-             SETBG(undef),
-             ERASECH(62),
-             GOTO(2,5) ],
-           '$term written to in subwindow' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(2,2),
+              SETPEN,
+              PRINT("Different text"),
+              SETBG(undef),
+              ERASECH(62),
+              GOTO(2,5) ],
+            'Termlog in subwindow' );
 
-is_deeply( [ $term->get_display ],
-           [ BLANKS(2),
-             PAD("  Different text"),
-             BLANKS(22) ],
-           '$term display in subwindow' );
+is_display( [ "", "", "  Different text" ],
+            'Display in subwindow' );
 
 $entry->text_insert( "And ", 0 );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(2,2),
-             SETPEN,
-             PRINT("And Different text"),
-             SETBG(undef),
-             ERASECH(58),
-             GOTO(2,2),
-             GOTO(2,9),
-             GOTO(2,9) ], # TODO: Maybe these can be made more efficient?
-           '$term written to after ->text_insert in subwindow' );
+is_termlog( [ GOTO(2,2),
+              SETPEN,
+              PRINT("And Different text"),
+              SETBG(undef),
+              ERASECH(58),
+              GOTO(2,2),
+              GOTO(2,9),
+              GOTO(2,9) ], # TODO: Maybe these can be made more efficient?
+            'Termlog after ->text_insert in subwindow' );
 
-is_deeply( [ $term->get_display ],
-           [ BLANKS(2),
-             PAD("  And Different text"),
-             BLANKS(22) ],
-           '$term display after ->text_insert in subwindow' );
+is_display( [ "", "", "  And Different text" ],
+            'Display after ->text_insert in subwindow' );
 
 $entry->set_window( undef );
 
@@ -267,25 +214,20 @@ $entry->set_window( $win );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT("Some initial text"),
-             SETBG(undef),
-             ERASECH(63),
-             GOTO(0,5) ],
-           '$term written to for initialised' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN,
+              PRINT("Some initial text"),
+              SETBG(undef),
+              ERASECH(63),
+              GOTO(0,5) ],
+           'Termlog written to for initialised' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Some initial text"),
-             BLANKS(24) ],
-           '$term display for initialised' );
+is_display( [ "Some initial text" ],
+            'Display for initialised' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 5 ],
-           '$term position for initalised' );
+is_cursorpos( 0, 5, 'Position for initalised' );
 
 is( $entry->find_bow_forward( 9 ), 13, 'find_bow_forward( 9 )' );
 is( $entry->find_eow_forward( 9 ), 12, 'find_eow_forward( 9 )' );

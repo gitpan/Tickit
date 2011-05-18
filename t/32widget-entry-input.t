@@ -5,8 +5,7 @@ use strict;
 use Test::More tests => 35;
 use Test::Identity;
 
-use t::MockTerm;
-use t::TestTickit;
+use Tickit::Test;
 
 use Tickit::Widget::Entry;
 
@@ -23,133 +22,101 @@ $entry->set_window( $win );
 
 flush_tickit;
 
-is_deeply( [ $term->methodlog ],
-           [ SETPEN,
-             CLEAR,
-             GOTO(0,0),
-             SETPEN,
-             PRINT("Initial"),
-             SETBG(undef),
-             ERASECH(73),
-             GOTO(0,0) ],
-           '$term written to initially' );
+is_termlog( [ SETPEN,
+              CLEAR,
+              GOTO(0,0),
+              SETPEN,
+              PRINT("Initial"),
+              SETBG(undef),
+              ERASECH(73),
+              GOTO(0,0) ],
+            'Termlog initially' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Initial"),
-             BLANKS(24) ],
-           '$term display initially' );
+is_display( [ "Initial" ],
+            'Display initially' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 0 ],
-           '$term initially' );
+is_cursorpos( 0, 0, 'Position initially' );
 
 $term->presskey( key => "Right" );
 
 is( $entry->position, 1, '$entry->position after Right' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,1) ],
-           '$term written to after Right' );
+is_termlog( [ GOTO(0,1) ],
+            'Termlog after Right' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 1 ],
-           '$term position after Right' );
+is_cursorpos( 0, 1, 'Position after Right' );
 
 $term->presskey( key => "End" );
 
 is( $entry->position, 7, '$entry->position after End' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,7) ],
-           '$term written to after End' );
+is_termlog( [ GOTO(0,7) ],
+            'Termlog after End' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 7 ],
-           '$term position after End' );
+is_cursorpos( 0, 7, 'Position after End' );
 
 $term->presskey( key => "Left" );
 
 is( $entry->position, 6, '$entry->position after Left' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,6) ],
-           '$term written to after Left' );
+is_termlog( [ GOTO(0,6) ],
+            'Termlog after Left' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 6 ],
-           '$term position after Left' );
+is_cursorpos( 0, 6, 'Position after Left' );
 
 $term->presskey( key => "Home" );
 
 is( $entry->position, 0, '$entry->position after Home' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,0) ],
-           '$term written to after Home' );
+is_termlog( [ GOTO(0,0) ],
+            'Termlog after Home' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 0 ],
-           '$term position after Home' );
+is_cursorpos( 0, 0, 'Position after Home' );
 
 $term->presskey( text => "X" );
 
 is( $entry->text,     "XInitial", '$entry->text after X' );
 is( $entry->position, 1,          '$entry->position after X' );
 
-is_deeply( [ $term->methodlog ],
-           [ SETBG(undef),
-             INSERTCH(1),
-             SETPEN,
-             PRINT("X") ],
-           '$term written to after X' );
+is_termlog( [ SETBG(undef),
+              INSERTCH(1),
+              SETPEN,
+              PRINT("X") ],
+            'Termlog after X' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("XInitial"),
-             BLANKS(24) ],
-           '$term display after X' );
+is_display( [ "XInitial" ],
+            'Display after X' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 1 ],
-           '$term position after X' );
+is_cursorpos( 0, 1, 'Position after X' );
 
 $term->presskey( key => "Backspace" );
 
 is( $entry->text,     "Initial", '$entry->text after Backspace' );
 is( $entry->position, 0,         '$entry->position after Backspace' );
 
-is_deeply( [ $term->methodlog ],
-           [ GOTO(0,0),
-             SETBG(undef),
-             DELETECH(1) ],
-           '$term written to after Backspace' );
+is_termlog( [ GOTO(0,0),
+              SETBG(undef),
+              DELETECH(1) ],
+            'Termlog after Backspace' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("Initial"),
-             BLANKS(24) ],
-           '$term display after Backspace' );
+is_display( [ "Initial" ],
+            'Display after Backspace' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 0 ],
-           '$term position after Backspace' );
+is_cursorpos( 0, 0, 'Position after Backspace' );
 
 $term->presskey( key => "Delete" );
 
 is( $entry->text,     "nitial", '$entry->text after Delete' );
 is( $entry->position, 0,        '$entry->position after Delete' );
 
-is_deeply( [ $term->methodlog ],
-           [ SETBG(undef),
-             DELETECH(1) ],
-           '$term written to after Delete' );
+is_termlog( [ SETBG(undef),
+              DELETECH(1) ],
+            'Termlog after Delete' );
 
-is_deeply( [ $term->get_display ],
-           [ PAD("nitial"),
-             BLANKS(24) ],
-           '$term display after Delete' );
+is_display( [ "nitial" ],
+            'Display after Delete' );
 
-is_deeply( [ $term->get_position ],
-           [ 0, 0 ],
-           '$term position after Delete' );
+is_cursorpos( 0, 0, 'Position after Delete' );
 
 my $line;
 $entry->set_on_enter(
@@ -162,4 +129,5 @@ $entry->set_on_enter(
 $term->presskey( key => "Enter" );
 
 is( $line, "nitial", 'on_enter $_[1] is line' );
-is_deeply( [ $term->methodlog ], [], '$term unmodified after Enter' );
+is_termlog( [],
+            'Termlog unmodified after Enter' );

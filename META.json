@@ -1,0 +1,130 @@
+{
+   "abstract" : "Terminal Interface Construction KIT",
+   "author" : [
+      "Paul Evans <leonerd@leonerd.org.uk>"
+   ],
+   "dynamic_config" : 1,
+   "generated_by" : "Module::Build version 0.38, CPAN::Meta::Converter version 2.110930",
+   "license" : [
+      "perl_5"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : "2"
+   },
+   "name" : "Tickit",
+   "prereqs" : {
+      "build" : {
+         "requires" : {
+            "Test::Fatal" : 0,
+            "Test::HexString" : 0,
+            "Test::Identity" : 0,
+            "Test::More" : 0,
+            "Test::Refcount" : 0
+         }
+      },
+      "configure" : {
+         "requires" : {
+            "Module::Build" : "0.38"
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "Exporter" : "5.57",
+            "IO::Async" : "0.29",
+            "IO::Async::Stream" : "0.34",
+            "IO::Async::Test" : 0,
+            "List::MoreUtils" : 0,
+            "Term::Size" : 0,
+            "Term::TermKey::Async" : 0,
+            "Term::Terminfo" : 0,
+            "Text::CharWidth" : 0
+         }
+      }
+   },
+   "provides" : {
+      "Tickit" : {
+         "file" : "lib/Tickit.pm",
+         "version" : "0.05"
+      },
+      "Tickit::ContainerWidget" : {
+         "file" : "lib/Tickit/ContainerWidget.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Pen" : {
+         "file" : "lib/Tickit/Pen.pm",
+         "version" : "0.05"
+      },
+      "Tickit::RootWindow" : {
+         "file" : "lib/Tickit/RootWindow.pm",
+         "version" : "0.05"
+      },
+      "Tickit::SingleChildWidget" : {
+         "file" : "lib/Tickit/SingleChildWidget.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Term" : {
+         "file" : "lib/Tickit/Term.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Test" : {
+         "file" : "lib/Tickit/Test.pm",
+         "version" : 0
+      },
+      "Tickit::Test::MockTerm" : {
+         "file" : "lib/Tickit/Test/MockTerm.pm",
+         "version" : 0
+      },
+      "Tickit::Utils" : {
+         "file" : "lib/Tickit/Utils.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Widget" : {
+         "file" : "lib/Tickit/Widget.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Widget::Box" : {
+         "file" : "lib/Tickit/Widget/Box.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Widget::Entry" : {
+         "file" : "lib/Tickit/Widget/Entry.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Widget::Frame" : {
+         "file" : "lib/Tickit/Widget/Frame.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Widget::HBox" : {
+         "file" : "lib/Tickit/Widget/HBox.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Widget::LinearBox" : {
+         "file" : "lib/Tickit/Widget/LinearBox.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Widget::Static" : {
+         "file" : "lib/Tickit/Widget/Static.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Widget::VBox" : {
+         "file" : "lib/Tickit/Widget/VBox.pm",
+         "version" : "0.05"
+      },
+      "Tickit::WidgetRole::Borderable" : {
+         "file" : "lib/Tickit/WidgetRole/Borderable.pm",
+         "version" : "0.05"
+      },
+      "Tickit::Window" : {
+         "file" : "lib/Tickit/Window.pm",
+         "version" : "0.05"
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://dev.perl.org/licenses/"
+      ]
+   },
+   "version" : "0.05"
+}

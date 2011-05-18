@@ -2,17 +2,17 @@
 
 use strict;
 
-use Test::More tests => 4;
+use Test::More tests => 5;
 use Test::Refcount;
 
-use t::MockTerm;
-use t::TestTickit;
+use Tickit::Test;
 
 use Tickit::Widget;
 
 my ( $term, $win ) = mk_term_and_window;
 
-my @keys;
+my @key_events;
+my @mouse_events;
 my $widget = TestWidget->new;
 
 is_oneref( $widget, '$widget has refcount 1 initially' );
@@ -25,7 +25,11 @@ ok( $term->{cursorvis}, 'Cursor visible on window' );
 
 $term->presskey( text => "A" );
 
-is_deeply( \@keys, [ [ text => "A" ] ], 'on_key A' );
+is_deeply( \@key_events, [ [ text => "A" ] ], 'on_key A' );
+
+$term->pressmouse( press => 1, 4, 3 );
+
+is_deeply( \@mouse_events, [ [ press => 1, 4, 3 ] ], 'on_mouse abs@3,4' );
 
 is_oneref( $widget, '$widget has refcount 1 at EOF' );
 
@@ -45,5 +49,11 @@ sub cols   { 1 }
 sub on_key
 {
    my $self = shift;
-   push @keys, [ $_[0] => $_[1] ];
+   push @key_events, [ $_[0] => $_[1] ];
+}
+
+sub on_mouse
+{
+   my $self = shift;
+   push @mouse_events, [ @_ ];
 }

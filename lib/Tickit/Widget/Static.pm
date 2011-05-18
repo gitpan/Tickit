@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Tickit::Utils qw( textwidth substrwidth ); # 'align'
 
@@ -21,12 +21,8 @@ C<Tickit::Widget::Static> - a widget displaying static text
 
  use Tickit;
  use Tickit::Widget::Static;
- use IO::Async::Loop;
- 
- my $loop = IO::Async::Loop->new;
  
  my $tickit = Tickit->new;
- $loop->add( $tickit );
  
  my $hello = Tickit::Widget::Static->new(
     text   => "Hello, world",

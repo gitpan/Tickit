@@ -9,9 +9,9 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
-use Tickit::Utils qw( textwidth chars2cols substrwidth );
+use Tickit::Utils qw( textwidth chars2cols cols2chars substrwidth );
 
 # Positions in this code can get complicated. The following conventions apply:
 #   $pos_ch  = a position in CHaracters within a Unicode string (length, substr,..)
@@ -26,12 +26,8 @@ C<Tickit::Widget::Entry> - a widget for entering text
 
  use Tickit;
  use Tickit::Widget::Entry;
- use IO::Async::Loop;
- 
- my $loop = IO::Async::Loop->new;
  
  my $tickit = Tickit->new;
- $loop->add( $tickit );
  
  my $entry = Tickit::Widget::Entry->new(
     on_enter => sub {
@@ -95,6 +91,10 @@ Accept a line of input by running the C<on_enter> action
 
 Move the cursor to the beginning of the input line
 
+=item * Insert
+
+Toggle between overwrite and insert mode
+
 =item * Left
 
 Move the cursor one character left
@@ -139,6 +139,7 @@ sub new
    $self->{pos_ch} = $textlen if $self->{pos_ch} > $textlen;
 
    $self->{scrolloffs_co} = 0;
+   $self->{overwrite} = 0;
 
    $self->{keybindings} = {
       'C-k' => "key_delete_line",
@@ -154,6 +155,7 @@ sub new
       'End'       => "key_end_of_line",
       'Enter'     => "key_enter_line",
       'Home'      => "key_beginning_of_line",
+      'Insert'    => "key_overwrite_mode",
       'Left'      => "key_backward_char",
       'C-Left'    => "key_backward_word",
       'Right'     => "key_forward_char",
@@ -161,6 +163,9 @@ sub new
    };
 
    $self->set_on_enter( $params{on_enter} ) if defined $params{on_enter};
+
+   $self->{more_markers} = [ "<..", "..>" ];
+   $self->{more_pen} = Tickit::Pen->new( fg => "cyan" );
 
    return $self;
 }
@@ -176,6 +181,38 @@ sub char2col
    return scalar chars2cols $self->{text}, $ch;
 }
 
+sub pretext_width
+{
+   my $self = shift;
+
+   return 0 if $self->{scrolloffs_co} == 0;
+   return textwidth( $self->{more_markers}[0] );
+}
+
+sub pretext_render
+{
+   my $self = shift;
+   my ( $win ) = @_;
+
+   $win->penprint( $self->{more_markers}[0], $self->{more_pen} );
+}
+
+sub posttext_width
+{
+   my $self = shift;
+
+   return 0 if textwidth( $self->text ) <= $self->{scrolloffs_co} + $self->window->cols;
+   return textwidth( $self->{more_markers}[1] );
+}
+
+sub posttext_render
+{
+   my $self = shift;
+   my ( $win ) = @_;
+
+   $win->penprint( $self->{more_markers}[1], $self->{more_pen} );
+}
+
 sub render
 {
    my $self = shift;
@@ -189,11 +226,17 @@ sub render
    my $text = substrwidth( $self->text, $self->{scrolloffs_co}, $width );
    my $textlen_co = textwidth $text;
 
-   $win->print( $text );
+   my $pretext_width  = $self->pretext_width;
+   my $posttext_width = $self->posttext_width;
 
-   if( $textlen_co < $width ) {
-      $win->erasech( $width - $textlen_co );
+   $self->pretext_render( $win ) if $pretext_width;
+
+   $win->print( substrwidth( $text, $pretext_width, $width - $pretext_width - $posttext_width ) );
+   if( $textlen_co < $width - $posttext_width ) {
+      $win->erasech( $width - $posttext_width - $textlen_co );
    }
+
+   $self->posttext_render( $win ) if $posttext_width;
 
    $self->reposition_cursor;
 }
@@ -309,11 +352,14 @@ sub _text_spliced
    }
 
    if( $delta_co < 0 and $self->{scrolloffs_co} + $width < textwidth $self->text ) {
-      my $rhs_x  = $width + $delta_co;
+      my $marker = $self->{more_markers}[1];
+      my $damagewidth = -$delta_co + textwidth $marker;
+
+      my $rhs_x  = $width - $damagewidth;
       my $rhs_co = $rhs_x + $self->{scrolloffs_co};
 
       $win->goto( 0, $rhs_x );
-      $win->print( substrwidth( $self->text, $rhs_co, -$delta_co ) );
+      $win->print( substrwidth( $self->text, $rhs_co, $damagewidth ) );
 
       $win->goto( 0, $pos_x + $insertedlen_co );
    }
@@ -340,7 +386,18 @@ sub on_text
    my $self = shift;
    my ( $text ) = @_;
 
-   $self->text_insert( $text, $self->{pos_ch} );
+   $self->text_splice( $self->{pos_ch}, $self->{overwrite} ? 1 : 0, $text );
+}
+
+sub on_mouse
+{
+   my $self = shift;
+   my ( $ev, $button, $line, $col ) = @_;
+
+   return unless $ev eq "press" and $button == 1;
+
+   my $pos_ch = scalar cols2chars $self->{text}, $col + $self->{scrolloffs_co};
+   $self->set_position( $pos_ch );
 }
 
 =head1 ACCESSORS
@@ -533,9 +590,9 @@ sub text_splice
       # Cursor after splice; move to suit
       $new_pos_ch = $self->position + $delta_ch;
    }
-   elsif( $self->{pos_ch} > $pos_ch ) {
-      # Cursor within splice; move to start
-      $new_pos_ch = $pos_ch;
+   elsif( $self->{pos_ch} >= $pos_ch ) {
+      # Cursor within splice; move to end
+      $new_pos_ch = $pos_ch + $textlen_ch;
    }
    # else { ignore }
 
@@ -544,7 +601,7 @@ sub text_splice
       $self->_text_spliced( $pos_ch, $deleted, $text, $at_end );
    }
 
-   $self->reposition_cursor( $new_pos_ch ) if defined $new_pos_ch;
+   $self->reposition_cursor( $new_pos_ch ) if defined $new_pos_ch and $new_pos_ch != $self->{pos_ch};
 
    if( $pos_ch + $textlen_ch != $self->{pos_ch} ) {
       $self->window->restore;
@@ -738,6 +795,13 @@ sub key_forward_word
    $self->set_position( $bow );
 }
 
+sub key_overwrite_mode
+{
+   my $self = shift;
+
+   $self->{overwrite} = !$self->{overwrite};
+}
+
 =head1 TODO
 
 =over 4
@@ -748,22 +812,14 @@ Try to find a nice way to allow loaded plugins, possibly per-instance if not
 just globally or per-class. See how many of these TODO items can be done using
 plugins.
 
-=item * Sideways scrolling
-
-Display "more" markers at either end as appropriate.
-
 =item * More readline behaviours
 
-Insert/overwrite. History. Isearch. History replay. Transpose. Transcase. Yank
-ring. Numeric prefixes.
+History. Isearch. History replay. Transpose. Transcase. Yank ring. Numeric
+prefixes.
 
 =item * Visual selection behaviour
 
-Shift-movement, or vim-style.
-
-=item * Mouse support
-
-Click to position cursor. Drag to start a selection.
+Shift-movement, or vim-style. Mouse.
 
 =back
 

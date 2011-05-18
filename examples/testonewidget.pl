@@ -4,7 +4,6 @@ use strict;
 use warnings;
 
 use Tickit;
-use IO::Async::Loop;
 use Getopt::Long;
 
 my $widgetclass;
@@ -14,10 +13,7 @@ GetOptions(
    'file=s'   => \$file,
 ) or exit 1;
 
-my $loop = IO::Async::Loop->new;
-
 my $tickit = Tickit->new;
-$loop->add( $tickit );
 
 defined $file or ( $file = "$widgetclass.pm" ) =~ s{::}{/}g;
 

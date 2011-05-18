@@ -1,57 +1,17 @@
-package t::MockTerm;
+package Tickit::Test::MockTerm;
 
 use strict;
 use warnings;
 
-use base qw( IO::Async::Stream );
-
-use Data::Dump qw( pp );
-
-# Some handy testing functions
-use Exporter 'import';
-our @EXPORT = qw(
-   PAD
-   BLANK
-   BLANKS
-   DEFAULTPEN
-
-   CLEAR
-   GOTO
-   ERASECH
-   INSERTCH
-   DELETECH
-   PRINT
-   SETPEN
-   SETBG
-);
-
-use Tickit::Pen;
-
-my $LINES = 25;
-my $COLS  = 80;
-
-sub PAD { sprintf "% -*s", $COLS, shift }
-sub BLANK { PAD("") }
-sub BLANKS { (BLANK) x shift }
-
-use constant DEFAULTPEN => map { $_ => undef } @Tickit::Pen::ALL_ATTRS;
-
-sub CLEAR    { [ clear => ] }
-sub GOTO     { [ goto => $_[0], $_[1] ] }
-sub ERASECH  { [ erasech => $_[0], $_[1] || 0 ] }
-sub INSERTCH { [ insertch => $_[0] ] }
-sub DELETECH { [ deletech => $_[0] ] }
-sub PRINT    { [ print => $_[0] ] }
-sub SETPEN   { [ chpen => { DEFAULTPEN, @_ } ] }
-sub SETBG    { [ chpen => { bg => $_[0] } ] }
-
-my $ON_RESIZE;
-my $ON_KEY;
-
 sub new
 {
    my $class = shift;
-   my $self = $class->SUPER::new( @_ );
+   my %args = @_;
+
+   my $self = bless {
+      lines => $args{lines} || 25,
+      cols  => $args{cols}  || 80,
+   }, $class;
 
    $self->clear;
 
@@ -66,10 +26,9 @@ sub configure
    my $self = shift;
    my %args = @_;
 
-   $ON_RESIZE = delete $args{on_resize} if exists $args{on_resize};
-   $ON_KEY    = delete $args{on_key}    if exists $args{on_key};
-
-   $self->SUPER::configure( %args );
+   $self->{on_resize} = delete $args{on_resize} if exists $args{on_resize};
+   $self->{on_key}    = delete $args{on_key}    if exists $args{on_key};
+   $self->{on_mouse}  = delete $args{on_mouse}  if exists $args{on_mouse};
 }
 
 sub is_changed
@@ -82,7 +41,7 @@ sub get_display
 {
    my $self = shift;
 
-   return map { $self->{lines}[$_] } 0 .. $#{ $self->{lines} };
+   return map { $self->{display}[$_] } 0 .. $#{ $self->{display} };
 }
 
 sub get_position
@@ -121,7 +80,7 @@ sub showlog
          printf "# SETPEN(%s)\n", join( ", ", map { defined $pen->{$_} ? "$_ => $pen->{$_}" : () } sort keys %$pen );
       }
       else {
-         printf "# %s(%s)\n", uc $l->[0], join( ", ", map pp($_), @{$l}[1..$#$l] );
+         printf "# %s(%s)\n", uc $l->[0], join( ", ", @{$l}[1..$#$l] );
       }
    }
 }
@@ -132,13 +91,13 @@ sub resize
    my ( $newlines, $newcols ) = @_;
 
    # Extend the buffer
-   substr( $self->{lines}[$_], $COLS, 0 ) = " " x ( $newcols - $newcols ) for 0 .. $LINES-1;
-   $self->{lines}[$_] = " " x $newcols for $LINES .. $newlines-1;
+   substr( $self->{display}[$_], $self->cols, 0 ) = " " x ( $newcols - $newcols ) for 0 .. $self->lines-1;
+   $self->{display}[$_] = " " x $newcols for $self->lines .. $newlines-1;
 
-   $LINES = $newlines;
-   $COLS = $newcols;
+   $self->{lines} = $newlines;
+   $self->{cols}  = $newcols;
 
-   $ON_RESIZE->( $self );
+   $self->{on_resize}->( $self );
 }
 
 sub presskey
@@ -147,11 +106,19 @@ sub presskey
    my ( $type, $str ) = @_;
 
    # TODO: See if we'll ever need to fake a Term::TermKey::Key event object
-   $ON_KEY->( $self, $type, $str, undef );
+   $self->{on_key}->( $self, $type, $str, undef );
 }
 
-sub lines { $LINES }
-sub cols  { $COLS }
+sub pressmouse
+{
+   my $self = shift;
+   my ( $ev, $button, $line, $col ) = @_;
+
+   $self->{on_mouse}->( $self, $ev, $button, $line, $col );
+}
+
+sub lines { $_[0]->{lines} }
+sub cols  { $_[0]->{cols} }
 
 sub clear
 {
@@ -159,7 +126,7 @@ sub clear
 
    $self->_push_methodlog( clear => @_ );
 
-   $self->{lines}[$_] = " " x $self->cols for 0 .. $self->lines-1;
+   $self->{display}[$_] = " " x $self->cols for 0 .. $self->lines-1;
 
    $self->{changed}++;
 }
@@ -171,7 +138,7 @@ sub erasech
 
    $self->_push_methodlog( erasech => $count, $moveend || 0 );
 
-   substr( $self->{lines}[$self->{line}], $self->{col}, $count ) = " " x $count;
+   substr( $self->{display}[$self->{line}], $self->{col}, $count ) = " " x $count;
    $self->{col} += $count if $moveend;
 
    $self->{changed}++;
@@ -184,10 +151,10 @@ sub insertch
 
    $self->_push_methodlog( insertch => $count );
 
-   substr( $self->{lines}[$self->{line}], $self->{col} + $count ) =
-      substr( $self->{lines}[$self->{line}], $self->{col}, $self->cols - $self->{col} - $count );
+   substr( $self->{display}[$self->{line}], $self->{col} + $count ) =
+      substr( $self->{display}[$self->{line}], $self->{col}, $self->cols - $self->{col} - $count );
 
-   substr( $self->{lines}[$self->{line}], $self->{col}, $count ) = " " x $count;
+   substr( $self->{display}[$self->{line}], $self->{col}, $count ) = " " x $count;
 
    $self->{changed}++;
 }
@@ -199,10 +166,10 @@ sub deletech
 
    $self->_push_methodlog( deletech => $count );
 
-   substr( $self->{lines}[$self->{line}], $self->{col}, $self->cols - $self->{col} - $count ) =
-      substr( $self->{lines}[$self->{line}], $self->{col} + $count );
+   substr( $self->{display}[$self->{line}], $self->{col}, $self->cols - $self->{col} - $count ) =
+      substr( $self->{display}[$self->{line}], $self->{col} + $count );
 
-   substr( $self->{lines}[$self->{line}], $self->cols - $count, $count ) = " " x $count;
+   substr( $self->{display}[$self->{line}], $self->cols - $count, $count ) = " " x $count;
 
    $self->{changed}++;
 }
@@ -224,7 +191,7 @@ sub print
 
    $self->_push_methodlog( print => @_ );
 
-   substr( $self->{lines}[$self->{line}], $self->{col}, length $text ) = $text;
+   substr( $self->{display}[$self->{line}], $self->{col}, length $text ) = $text;
 
    $self->{col} += length $text;
    $self->{changed}++;
@@ -234,6 +201,22 @@ sub scroll
 {
    my $self = shift;
    my ( $top, $bottom, $downward ) = @_;
+
+   # Logic is simpler if $bottom is the first line -beyond- the scroll region
+   $bottom++;
+
+   my $display = $self->{display};
+
+   if( $downward > 0 ) {
+      splice @$display, $top, $downward, ();
+      splice @$display, $bottom - $downward, 0, ( " " x $self->cols ) x $downward;
+   }
+   elsif( $downward < 0 ) {
+      my $upward = -$downward;
+
+      splice @$display, $bottom - $upward, $upward, ();
+      splice @$display, $top, 0, ( " " x $self->cols ) x $upward;
+   }
 
    $self->_push_methodlog( scroll => @_ );
 
@@ -265,6 +248,11 @@ sub mode_cursorvis
 {
    my $self = shift;
    ( $self->{cursorvis} ) = @_;
+}
+
+sub mode_mouse
+{
+   # ignore
 }
 
 0x55AA;
