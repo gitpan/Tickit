@@ -7,9 +7,9 @@ package Tickit::Widget::Static;
 
 use strict;
 use warnings;
-use base qw( Tickit::Widget );
+use base qw( Tickit::OneLineWidget );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use Tickit::Utils qw( textwidth substrwidth ); # 'align'
 
@@ -80,7 +80,6 @@ sub new
 
    $self->set_text( $args{text} );
    $self->set_align( $args{align} || 0 );
-   $self->set_valign( $args{valign} || 0 );
 
    return $self;
 }
@@ -88,11 +87,6 @@ sub new
 =head1 ACCESSORS
 
 =cut
-
-sub lines
-{
-   return 1;
-}
 
 sub cols
 {
@@ -162,55 +156,10 @@ sub set_align
    $self->redraw;
 }
 
-=head2 $valign = $static->valign
-
-=cut
-
-sub valign
+sub render_line
 {
    my $self = shift;
-   return $self->{valign};
-}
-
-=head2 $static->set_valign( $valign )
-
-Accessor for vertical alignment value.
-
-Gives a value in the range from C<0.0> to C<1.0> to align the text display
-within the window. If the window is taller than one line, it will be aligned
-according to this value; with C<0.0> at the top, C<1.0> at the bottom, and
-other values inbetween.
-
-The symbolic values C<top>, C<middle> and C<bottom> can be supplied instead of
-C<0.0>, C<0.5> and C<1.0> respectively.
-
-=cut
-
-sub set_valign
-{
-   my $self = shift;
-   my ( $valign ) = @_;
-
-   # Convert symbolics
-   $valign = 0.0 if $valign eq "top";
-   $valign = 0.5 if $valign eq "middle";
-   $valign = 1.0 if $valign eq "bottom";
-
-   $self->{valign} = $valign;
-
-   $self->redraw;
-}
-
-sub render
-{
-   my $self = shift;
-
-   my $window = $self->window or return;
-
-   my ( $top ) =
-      Tickit::Utils::align( 1, $window->lines, $self->{valign} );
-
-   $window->goto( $top, 0 );
+   my $window = $self->window;
 
    my $text = $self->{text};
    my ( $left, $textwidth, $right ) = 

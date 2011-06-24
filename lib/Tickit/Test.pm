@@ -16,6 +16,11 @@ our @EXPORT = qw(
    mk_term_and_window
    flush_tickit
 
+   resize_term
+
+   presskey
+   pressmouse
+
    is_termlog
    is_display
    is_cursorpos
@@ -83,6 +88,7 @@ installable module, so that authors of widget subclasses can use it too.
 =cut
 
 my $term;
+my $tickit;
 
 =head2 $term = mk_term
 
@@ -112,7 +118,7 @@ sub mk_window
 {
    mk_term;
 
-   my $tickit = __PACKAGE__->new(
+   $tickit = __PACKAGE__->new(
       term => $term
    );
 
@@ -148,6 +154,9 @@ use base qw( Tickit );
 my @later;
 sub later { push @later, $_[1] }
 
+sub lines { return $term->lines }
+sub cols  { return $term->cols  }
+
 =head2 flush_tickit
 
 Flushes any pending C<later> events in the testing C<Tickit> object. Because
@@ -162,6 +171,48 @@ sub flush_tickit
       my @queue = @later; @later = ();
       $_->() for @queue;
    }
+}
+
+=head2 resize_term( $lines, $cols )
+
+Resize the virtual testing terminal to the size given
+
+=cut
+
+sub resize_term
+{
+   my ( $lines, $cols ) = @_;
+   $term->resize( $lines, $cols );
+
+   # This is evil hackery
+   $tickit->rootwin->resize( $tickit->lines, $tickit->cols );
+}
+
+=head2 presskey( $type, $str )
+
+Fire a key event
+
+=cut
+
+sub presskey
+{
+   my ( $type, $str ) = @_;
+
+   # TODO: See if we'll ever need to fake a Term::TermKey::Key event object
+   $tickit->on_key( $type, $str, undef );
+}
+
+=head2 pressmouse( $ev, $button, $line, $col )
+
+Fire a mouse button event
+
+=cut
+
+sub pressmouse
+{
+   my ( $ev, $button, $line, $col ) = @_;
+
+   $tickit->on_mouse( $ev, $button, $line, $col );
 }
 
 =head1 TEST FUNCTIONS

@@ -56,7 +56,8 @@ is_termlog( [ SETPEN,
               SETPEN,
               PRINT("Another message"),
               SETBG(undef),
-              ERASECH(65) ],
+              ERASECH(65),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ) ],
             'Termlog initially' );
 
 is_display( [ "Another message" ],
@@ -72,7 +73,8 @@ is_termlog( [ SETPEN,
               SETPEN,
               PRINT("Changed message"),
               SETBG(undef),
-              ERASECH(65) ],
+              ERASECH(65),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ) ],
             'Termlog again after changed text' );
 
 is_display( [ "Changed message" ],
@@ -91,11 +93,12 @@ is_termlog( [ SETPEN,
               SETBG(undef),
               ERASECH(65,1),
               SETPEN,
-              PRINT("Changed message"), ],
-            'Termlog in correct location' );
+              PRINT("Changed message"),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ) ],
+            'Termlog in correct location for align' );
 
 is_display( [ (" " x 65) . "Changed message" ],
-            'Display in correct location' );
+            'Display in correct location for align' );
 
 # Terminal is 25 columns wide. Text is 1 line tall. Therefore, middle-
 # valigned it would start on the 13th line
@@ -106,21 +109,23 @@ flush_tickit;
 
 is_termlog( [ SETPEN,
               CLEAR,
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 0 .. 11 ),
               GOTO(12,0),
               SETBG(undef),
               ERASECH(65,1),
               SETPEN,
-              PRINT("Changed message"), ],
-            'Termlog in correct location' );
+              PRINT("Changed message"),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 13 .. 24 ) ],
+            'Termlog in correct location for valign' );
 
 is_display( [ ( "" ) x 12,
               (" " x 65) . "Changed message" ],
-            'Display in correct location' );
+            'Display in correct location for valign' );
 
 $static->set_valign( 0.0 );
 $term->methodlog; # clear the log
 
-$term->resize( 30, 100 );
+resize_term( 30, 100 );
 
 flush_tickit;
 
@@ -130,11 +135,12 @@ is_termlog( [ SETPEN,
               SETBG(undef),
               ERASECH(85,1),
               SETPEN,
-              PRINT("Changed message"), ],
+              PRINT("Changed message"),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(100) } 1 .. 29 ) ],
             'Termlog redrawn after resize' );
 
 is_display( [ (" " x 85) . "Changed message" ],
-            'Display in correct location' );
+            'Display after resize' );
 
 $static->pen->chattr( bg => 4 );
 
@@ -146,5 +152,6 @@ is_termlog( [ SETPEN(bg => 4),
               SETBG(4),
               ERASECH(85,1),
               SETPEN(bg => 4),
-              PRINT("Changed message"), ],
+              PRINT("Changed message"),
+              ( map { GOTO($_,0), SETBG(4), ERASECH(100) } 1 .. 29 ) ],
             'Termlog redrawn after chpen bg' );

@@ -23,11 +23,11 @@ flush_tickit;
 
 ok( $term->{cursorvis}, 'Cursor visible on window' );
 
-$term->presskey( text => "A" );
+presskey( text => "A" );
 
 is_deeply( \@key_events, [ [ text => "A" ] ], 'on_key A' );
 
-$term->pressmouse( press => 1, 4, 3 );
+pressmouse( press => 1, 4, 3 );
 
 is_deeply( \@mouse_events, [ [ press => 1, 4, 3 ] ], 'on_mouse abs@3,4' );
 

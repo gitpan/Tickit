@@ -8,17 +8,10 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.05';
-
-use base qw( IO::Async::Stream );
-IO::Async::Stream->VERSION( 0.34 );
-
-use IO::Async::Signal;
+our $VERSION = '0.06';
 
 use Encode qw( find_encoding );
 use Term::Terminfo;
-use Term::Size;
-use Term::TermKey::Async qw( FORMAT_ALTISMETA FLAG_UTF8 );
 
 use Tickit::Pen;
 
@@ -27,27 +20,20 @@ my $CSI = "$ESC\[";
 
 =head1 NAME
 
-C<Tickit::Term> - terminal IO handler
+C<Tickit::Term> - terminal formatting abstraction
 
 =head1 SYNOPSIS
 
 =head1 DESCRIPTION
 
-Provides terminal IO primatives for C<Tickit>. Split into two primary
-sections:
+Provides terminal control primatives for L<Tickit>; a number of methods that
+control the terminal by writing control strings. This object itself performs
+no acutal IO work; it writes bytes to a delegated object given to the
+constructor called the writer.
 
-=over 4
-
-=item * Output
-
-Methods to provide terminal output; writing text, changing pen attributes,
-moving the cursor, etc.
-
-=item * Input
-
-Event callbacks for keypress events.
-
-=back
+This object is not normally constructed directly by the containing
+application; instead it is used indirectly by other parts of the C<Tickit>
+distribution.
 
 =cut
 
@@ -57,18 +43,26 @@ Event callbacks for keypress events.
 
 =head2 $term = Tickit::Term->new( %params )
 
-As well as the configuration named parameters, takes the following named
-arguments at construction time:
+Constructs a new C<Tickit::Term> object.
+
+Takes the following named arguments at construction time:
 
 =over 8
 
-=item term_in => IO
+=item encoding => STRING
 
-IO handle for terminal input. Will default to C<STDIN>.
+Optional. If supplied, applies the named encoding to the Unicode string
+supplied to the C<print> and C<penprint> methods.
 
-=item term_out => IO
+=item writer => OBJECT
 
-IO handle for terminal output. Will default to C<STDOUT>.
+An object delegated to for sending strings of terminal control bytes to the
+terminal itself. This object must support a single method, C<write>, taking
+a string of bytes.
+
+ $writer->write( $data )
+
+Such an interface is supported by an C<IO::Handle> object.
 
 =back
 
@@ -79,155 +73,47 @@ sub new
    my $class = shift;
    my %params = @_;
 
-   my $in  = delete $params{term_in}  || \*STDIN;
-   my $out = delete $params{term_out} || \*STDOUT;
+   my $encoding = delete $params{encoding};
 
-   my $self = $class->SUPER::new( %params );
-   $self->SUPER::configure(
-      write_handle => $out,
-      autoflush => 1,
-   );
+   my $self = bless {
+      writer => $params{writer},
+   }, $class;
 
    my $ti = Term::Terminfo->new();
 
    # Precache some terminfo flags that we know won't change
    $self->{has_bce} = $ti->getflag( "bce" );
 
-   my $spacesym;
-
-   my $tka = Term::TermKey::Async->new(
-      term => $in,
-      on_key => $self->_capture_weakself( sub {
-         my $self = shift;
-         my ( $tka, $key ) = @_;
-
-         # libtermkey represents unmodified Space as a keysym, whereas we'd
-         # prefer to treat it as plain text
-         if( $key->type_is_unicode and !$key->modifiers ) {
-            $self->maybe_invoke_event( on_key => text => $key->utf8, $key );
-         }
-         elsif( $key->type_is_keysym  and !$key->modifiers and $key->sym == $spacesym ) {
-            $self->maybe_invoke_event( on_key => text => " ", $key );
-         }
-         elsif( $key->type_is_mouse ) {
-            my ( $ev, $button, $line, $col ) = $tka->interpret_mouse( $key );
-            my $evname = (qw( * press drag release ))[$ev];
-            $self->maybe_invoke_event( on_mouse => $evname, $button, $line - 1, $col - 1 );
-         }
-         else {
-            $self->maybe_invoke_event( on_key => key => $tka->format_key( $key, FORMAT_ALTISMETA ), $key );
-         }
-      } ),
-   );
-
-   $spacesym = $tka->keyname2sym( "Space" );
-
-   if( $tka->get_flags & FLAG_UTF8 ) {
-      $self->{encoder} = find_encoding( "UTF-8" );
+   if( defined $encoding ) {
+      $self->{encoder} = find_encoding( $encoding );
    }
-
-   $self->add_child( $tka );
-
-   $self->add_child( IO::Async::Signal->new( 
-      name => "WINCH",
-      on_receipt => $self->_capture_weakself( sub {
-         my $self = shift;
-         $self->_recache_size;
-         $self->maybe_invoke_event( on_resize => );
-      } ),
-   ) );
 
    $self->{pen} = {};
 
    # Almost certainly we'll start in a mode where the cursor is still visible
    $self->{mode_cursorvis} = 1;
 
-   $self->_recache_size;
-
    return $self;
 }
 
-=head1 EVENTS
-
-The following events are invoked, either using subclass methods or CODE
-references in parameters:
-
-=head2 on_resize
-
-The terminal window has been resized.
-
-=head2 on_key $type, $str, $key
-
-A key was pressed. C<$type> will be C<text> for normal unmodified Unicode, or
-C<key> for special keys or modified Unicode. C<$str> will be the UTF-8 string
-for C<text> events, or the textual description of the key as rendered by
-L<Term::TermKey> for C<key> events. C<$key> will be the underlying
-C<Term::TermKey::Key> event structure.
-
-=head2 on_mouse $ev, $button, $line, $col
-
-A mouse event was received. C<$ev> will be C<press>, C<drag> or C<release>.
-The button number will be in C<$button>, though may not be present for
-C<release> events. C<$line> and C<$col> are 0-based. Behaviour of events
-involving more than one mouse button is not well-specified by terminals.
-
-=head1 PARAMETERS
-
-The following named parameters may be passed to C<new> or C<configure>:
-
-=over 8
-
-=item on_resize => CODE
-
-=item on_key => CODE
-
-CODE references for event handlers.
-
-=back
-
-=cut
-
-sub configure
+sub write
 {
    my $self = shift;
-   my %params = @_;
-
-   foreach (qw( on_resize on_key on_mouse )) {
-      $self->{$_} = delete $params{$_} if exists $params{$_};
-   }
+   $self->{writer}->write( @_ );
 }
 
 =head1 METHODS
 
 =cut
 
-sub _recache_size
+sub set_size
 {
    my $self = shift;
-
-   ( $self->{cols}, $self->{lines} ) = Term::Size::chars $self->write_handle;
+   ( $self->{lines}, $self->{cols} ) = @_;
 }
 
-=head2 $cols = $term->cols
-
-=head2 $lines = $term->lines
-
-Query the current size of the terminal. Will be cached and updated on receipt
-of C<SIGWINCH> signals.
-
-=cut
-
-sub cols
-{
-   my $self = shift;
-   return $self->{cols};
-}
-
-sub lines
-{
-   my $self = shift;
-   return $self->{lines};
-}
+sub lines { shift->{lines} }
+sub cols  { shift->{cols}  }
 
 =head2 $term->print( $text )
 

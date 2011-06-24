@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Window );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use Carp;
 use Scalar::Util qw( weaken refaddr );
@@ -34,15 +34,15 @@ Provides the methods given in C<Tickit::Window>.
 sub new
 {
    my $class = shift;
-   my ( $tickit ) = @_;
+   my ( $tickit, $lines, $cols ) = @_;
 
    my $term = $tickit->term;
 
    my $self = bless {
       tickit  => $tickit,
       term    => $term,
-      cols    => $term->cols,
-      lines   => $term->lines,
+      cols    => $cols,
+      lines   => $lines,
       updates => [],
       pen     => Tickit::Pen->new,
    }, $class;
@@ -143,17 +143,9 @@ sub scroll_region
    return 0;
 }
 
-sub _requeue_focus
+sub _requeue_focus_parent
 {
    my $self = shift;
-   my ( $focuswin ) = @_;
-
-   if( $focuswin ) {
-      if( $self->{focused_window} and refaddr( $self->{focused_window} ) != refaddr( $focuswin ) ) {
-         $self->{focused_window}->_lose_focus;
-      }
-      weaken( $self->{focused_window} = $focuswin );
-   }
 
    $self->_enqueue_flush;
 }
@@ -162,9 +154,13 @@ sub restore
 {
    my $self = shift;
 
-   if( my $focused_window = $self->{focused_window} ) {
+   if( my $focus_child = $self->{focus_child} ) {
       $self->{term}->mode_cursorvis( 1 );
-      $focused_window->_gain_focus;
+      $focus_child->_gain_focus;
+   }
+   elsif( defined $self->{focus_line} ) {
+      $self->{term}->mode_cursorvis( 1 );
+      $self->_gain_focus;
    }
 }
 
@@ -176,19 +172,6 @@ sub clear
 
    $term->setpen( $self->getpenattrs );
    $term->clear;
-}
-
-sub _on_key
-{
-   my $self = shift;
-
-   if( my $win = $self->{focused_window} ) {
-      do {
-         $win->_handle_key( @_ ) and return 1;
-      } while( $win = $win->parent );
-   }
-
-   return 0;
 }
 
 =head1 AUTHOR

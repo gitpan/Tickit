@@ -41,7 +41,8 @@ is_termlog( [ SETPEN,
               SETPEN,
               PRINT("Widget"),
               SETBG(undef),
-              ERASECH(72), ],
+              ERASECH(72),
+              ( map { GOTO($_,1), SETBG(undef), ERASECH(78) } 2 .. 23 ) ],
             'Termlog initially' );
 
 is_display( [ "+".("-"x78)."+",
@@ -68,7 +69,8 @@ is_termlog( [ SETPEN,
               SETPEN,
               PRINT("Widget"),
               SETBG(undef),
-              ERASECH(72), ],
+              ERASECH(72),
+              ( map { GOTO($_,1), SETBG(undef), ERASECH(78) } 2 .. 23 ) ],
             'Termlog after ->set_style' );
 
 is_display( [ "\x{250C}".("\x{2500}"x78)."\x{2510}",
@@ -102,7 +104,8 @@ is_termlog( [ SETPEN,
               SETPEN,
               PRINT("Widget"),
               SETBG(undef),
-              ERASECH(72), ],
+              ERASECH(72),
+              ( map { GOTO($_,1), SETBG(undef), ERASECH(78) } 2 .. 23 ) ],
             'Termlog with title' );
 
 is_display( [ "+ Title ".("-"x71)."+",
@@ -133,7 +136,8 @@ is_termlog( [ SETPEN,
               SETPEN,
               PRINT("Widget"),
               SETBG(undef),
-              ERASECH(72), ],
+              ERASECH(72),
+              ( map { GOTO($_,1), SETBG(undef), ERASECH(78) } 2 .. 23 ) ],
             'Termlog with right-aligned title' );
 
 is_display( [ "+".("-"x71)." Title +",
@@ -164,7 +168,8 @@ is_termlog( [ SETPEN,
               SETPEN,
               PRINT("Widget"),
               SETBG(undef),
-              ERASECH(72), ],
+              ERASECH(72),
+              ( map { GOTO($_,1), SETBG(undef), ERASECH(78) } 2 .. 23 ) ],
             'Termlog with correct pen' );
 
 $widget->set_window( undef );

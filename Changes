@@ -1,5 +1,13 @@
 Revision history for Changes
 
+0.06    CHANGES:
+         * Shut down terminal state before $SIG{__DIE__}'ing
+         * Cope correctly with zero-sized children in {V,H,}Box and Frame
+         * Broadcast unhandled keypresses out to sibling windows around the
+           widget tree
+         * Neater unit testing functions
+         * Rearranged code to prepare for abstract/IO::Async split
+
 0.05    CHANGES:
          * Added mouse support
          * Switchable insert/overwrite mode in Entry

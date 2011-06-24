@@ -2,21 +2,13 @@
 
 use strict;
 
-use Test::More tests => 36;
+use Test::More tests => 35;
 use Test::Identity;
 use Test::Refcount;
 
 use Tickit::Test;
 
-use Tickit;
-
-my $term = mk_term;
-
-my $tickit = Tickit->new(
-   term => $term
-);
-
-my $win = $tickit->rootwin;
+my ( $term, $win ) = mk_term_and_window;
 
 isa_ok( $win, "Tickit::RootWindow", '$win isa Tickit::RootWindow' );
 isa_ok( $win, "Tickit::Window", '$win isa Tickit::Window' );
@@ -129,7 +121,7 @@ is_termlog( [ SETPEN(fg => 3),
 
 is( $geom_changed, 0, '$reshaped is 0 before term resize' );
 
-$term->resize( 30, 100 );
+resize_term( 30, 100 );
 
 is( $win->lines, 30, '$win->lines is 30 after term resize' );
 is( $win->cols, 100, '$win->cols is 100 after term resize' );
@@ -137,7 +129,3 @@ is( $win->cols, 100, '$win->cols is 100 after term resize' );
 is( $geom_changed, 1, '$reshaped is 1 after term resize' );
 
 is_refcount( $win, 2, '$win has refcount 2 before dropping Tickit' );
-
-undef $tickit;
-
-is_oneref( $win, '$win has refcount 1 at EOF' );

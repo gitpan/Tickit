@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use Carp;
 
@@ -269,12 +269,22 @@ sub set_child_window
    my $window = $self->window or return;
    my $child  = $self->child  or return;
 
-   if( my $childwin = $child->window ) {
-      $childwin->change_geometry( 1, 1, $window->lines - 2, $window->cols - 2 );
+   my $lines = $window->lines;
+   my $cols  = $window->cols;
+
+   if( $lines > 2 and $cols > 2 ) {
+      if( my $childwin = $child->window ) {
+         $childwin->change_geometry( 1, 1, $lines - 2, $cols - 2 );
+      }
+      else {
+         my $childwin = $window->make_sub( 1, 1, $lines - 2, $cols - 2 );
+         $child->set_window( $childwin );
+      }
    }
    else {
-      my $childwin = $window->make_sub( 1, 1, $window->lines - 2, $window->cols - 2 );
-      $child->set_window( $childwin );
+      if( $child->window ) {
+         $child->set_window( undef );
+      }
    }
 }
 
@@ -297,26 +307,33 @@ sub render
 
       $win->penprint( $style->[CORNER_TL] . ( $style->[TOP] x $left ) . " ", $framepen );
       $win->penprint( $title, $framepen );
-      $win->penprint( " " . ( $style->[TOP] x $right ) . $style->[CORNER_TR], $framepen );
+      $win->penprint( " " . ( $style->[TOP] x $right ) . $style->[CORNER_TR], $framepen ) if $cols > 1;
    }
    else {
-      $win->penprint( $style->[CORNER_TL] .
-                   ( $style->[TOP] x ($cols - 2) ) .
-                   $style->[CORNER_TR],
-                   $framepen );
+      my $line = $style->[CORNER_TL];
+      $line .= $style->[TOP] x ($cols - 2) if $cols > 2;
+      $line .= $style->[CORNER_TR] if $cols > 1;
+
+      $win->penprint( $line, $framepen );
    }
 
    foreach my $line ( 1 .. $win->lines - 2 ) {
       $win->goto( $line, 0 );
       $win->penprint( $style->[LEFT], $framepen );
 
+      next if $cols == 1;
+
       $win->goto( $line, $cols - 1 );
       $win->penprint( $style->[RIGHT], $framepen );
    }
 
    $win->goto( $win->lines - 1, 0 );
-   $win->penprint( $style->[CORNER_BL] . ( $style->[BOTTOM] x ($cols - 2) ) . $style->[CORNER_BR],
-                   $framepen );
+
+   my $line = $style->[CORNER_BL];
+   $line .= $style->[BOTTOM] x ($cols - 2) if $cols > 2;
+   $line .= $style->[CORNER_BR] if $cols > 1;
+
+   $win->penprint( $line, $framepen );
 }
 
 =head1 TODO

@@ -2,11 +2,11 @@
 
 use strict;
 
-use Test::More tests => 11;
+use Test::More tests => 12;
 
 use Tickit::Test;
 
-my ( $term, $rootwin ) = mk_term_and_window;
+my $rootwin = mk_window;
 
 my $win = $rootwin->make_sub( 3, 10, 4, 20 );
 
@@ -18,7 +18,7 @@ $win->set_on_key( sub {
    return 1;
 } );
 
-$term->presskey( text => "A" );
+presskey( text => "A" );
 
 is_deeply( \@key_events, [ [ text => "A" ] ], 'on_key A' );
 
@@ -29,12 +29,12 @@ $win->set_on_mouse( sub {
 } );
 
 undef @mouse_events;
-$term->pressmouse( press => 1, 5, 15 );
+pressmouse( press => 1, 5, 15 );
 
 is_deeply( \@mouse_events, [ [ press => 1, 2, 5 ] ], 'on_mouse abs@15,5' );
 
 undef @mouse_events;
-$term->pressmouse( press => 1, 1, 2 );
+pressmouse( press => 1, 1, 2 );
 
 is_deeply( \@mouse_events, [], 'no event for mouse abs@2,1' );
 
@@ -56,14 +56,14 @@ $subwin->set_on_mouse( sub {
 
 undef @key_events;
 
-$term->presskey( text => "B" );
+presskey( text => "B" );
 
 is_deeply( \@subkey_events, [ [ text => "B" ] ], 'on_key B on subwin' );
 is_deeply( \@key_events,    [ ],                 'on_key B on win' );
 
 undef @mouse_events;
 
-$term->pressmouse( press => 1, 5, 15 );
+pressmouse( press => 1, 5, 15 );
 
 is_deeply( \@submouse_events, [ [ press => 1, 0, 3 ] ], 'on_mouse abs@15,5 on subwin' );
 is_deeply( \@mouse_events,    [ ],                      'on_mouse abs@15,5 on win' );
@@ -73,7 +73,7 @@ $subret = 0;
 undef @key_events;
 undef @subkey_events;
 
-$term->presskey( text => "C" );
+presskey( text => "C" );
 
 is_deeply( \@subkey_events, [ [ text => "C" ] ], 'on_key C on subwin' );
 is_deeply( \@key_events,    [ [ text => "C" ] ], 'on_key C on win' );
@@ -81,7 +81,18 @@ is_deeply( \@key_events,    [ [ text => "C" ] ], 'on_key C on win' );
 undef @mouse_events;
 undef @submouse_events;
 
-$term->pressmouse( press => 1, 5, 15 );
+pressmouse( press => 1, 5, 15 );
 
 is_deeply( \@submouse_events, [ [ press => 1, 0, 3 ] ], 'on_mouse abs@15,5 on subwin' );
 is_deeply( \@mouse_events,    [ [ press => 1, 2, 5 ] ], 'on_mouse abs@15,5 on win' );
+
+my $otherwin = $rootwin->make_sub( 10, 10, 4, 20 );
+
+my @handlers;
+$win->set_on_key     ( sub { push @handlers, "win";      return 0 } );
+$subwin->set_on_key  ( sub { push @handlers, "subwin";   return 0 } );
+$otherwin->set_on_key( sub { push @handlers, "otherwin"; return 0 } );
+
+presskey( text => "D" );
+
+is_deeply( \@handlers, [qw( subwin win otherwin )], 'on_key D propagates to otherwin after win' );

@@ -9,9 +9,14 @@ use strict;
 use warnings;
 use base qw( IO::Async::Notifier );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use IO::Async::Loop;
+use IO::Async::Signal;
+use IO::Async::Stream;
+
+use Term::Size;
+use Term::TermKey::Async qw( FORMAT_ALTISMETA FLAG_UTF8 );
 
 use Tickit::Term;
 use Tickit::RootWindow;
@@ -51,9 +56,11 @@ Takes the following named arguments at construction time:
 
 =item term_in => IO
 
+IO handle for terminal input. Will default to C<STDIN>.
+
 =item term_out => IO
 
-Passed to the L<Tickit::Term> constructor.
+IO handle for terminal output. Will default to C<STDOUT>.
 
 =back
 
@@ -66,43 +73,73 @@ sub new
 
    # Test code also accepts 'term' argument but we won't document that for now
 
-   my $term = delete $args{term} || Tickit::Term->new(
-      term_in  => delete $args{term_in},
-      term_out => delete $args{term_out},
-   );
+   my $in  = delete $args{term_in}  || \*STDIN;
+   my $out = delete $args{term_out} || \*STDOUT;
+
+   my $term = delete $args{term};
 
    my $self = $class->SUPER::new( %args );
 
-   $term->configure(
-      on_key => $self->_replace_weakself( sub {
-         my $self = shift or return;
-         my ( $type, $str, $key ) = @_;
+   my $spacesym;
 
-         return if $self->rootwin->_on_key( $type, $str, $key );
+   my $tka = Term::TermKey::Async->new(
+      term => $in,
+      on_key => $self->_capture_weakself( sub {
+         my $self = shift;
+         my ( $tka, $key ) = @_;
 
-         $self->on_key( $type, $str, $key );
-      } ),
-
-      on_mouse => $self->_replace_weakself( sub {
-         my $self = shift or return;
-         my ( $ev, $button, $line, $col ) = @_;
-
-         return if $self->rootwin->_on_mouse( $ev, $button, $line, $col );
-
-         # TODO: consider it here?
-      } ),
-
-      on_resize => $self->_capture_weakself( sub {
-         my $self = shift or return;
-         my $term = shift;
-         $self->rootwin->resize( $term->lines, $term->cols );
+         # libtermkey represents unmodified Space as a keysym, whereas we'd
+         # prefer to treat it as plain text
+         if( $key->type_is_unicode and !$key->modifiers ) {
+            $self->maybe_invoke_event( on_key => text => $key->utf8, $key );
+         }
+         elsif( $key->type_is_keysym  and !$key->modifiers and $key->sym == $spacesym ) {
+            $self->maybe_invoke_event( on_key => text => " ", $key );
+         }
+         elsif( $key->type_is_mouse ) {
+            my ( $ev, $button, $line, $col ) = $tka->interpret_mouse( $key );
+            my $evname = (qw( * press drag release ))[$ev];
+            $self->maybe_invoke_event( on_mouse => $evname, $button, $line - 1, $col - 1 );
+         }
+         else {
+            $self->maybe_invoke_event( on_key => key => $tka->format_key( $key, FORMAT_ALTISMETA ), $key );
+         }
       } ),
    );
+   $self->add_child( $tka );
+
+   $spacesym = $tka->keyname2sym( "Space" );
+
+   unless( $term ) {
+      my $writer = IO::Async::Stream->new(
+         write_handle => $out,
+         autoflush => 1,
+      );
+
+      $term = Tickit::Term->new(
+         writer => $writer,
+         ( $tka->get_flags & FLAG_UTF8 ) ? ( encoding => "UTF-8" ) : (),
+      );
+
+      $self->add_child( $writer );
+   }
 
    $self->{term} = $term;
-   $self->add_child( $term );
+   $self->{term_out} = $out;
 
-   $self->{rootwin} = Tickit::RootWindow->new( $self );
+   $self->_recache_size;
+
+   $self->add_child( IO::Async::Signal->new( 
+      name => "WINCH",
+      on_receipt => $self->_capture_weakself( sub {
+         my $self = shift or return;
+
+         $self->_recache_size;
+         $self->rootwin->resize( $self->lines, $self->cols );
+      } ),
+   ) );
+
+   $self->{rootwin} = Tickit::RootWindow->new( $self, $self->lines, $self->cols );
 
    $self->bind_key( 'C-c' => $self->_capture_weakself( sub {
       my $self = shift;
@@ -152,13 +189,34 @@ sub term
    return $self->{term};
 }
 
+=head2 $cols = $tickit->cols
+
+=head2 $lines = $tickit->lines
+
+Query the current size of the terminal. Will be cached and updated on receipt
+of C<SIGWINCH> signals.
+
+=cut
+
+sub _recache_size
+{
+   my $self = shift;
+   ( $self->{cols}, $self->{lines} ) = Term::Size::chars $self->{term_out};
+   $self->term->set_size( $self->{cols}, $self->{lines} );
+}
+
+sub lines { shift->{lines} }
+sub cols  { shift->{cols}  }
+
 sub on_key
 {
    my $self = shift;
    my ( $type, $str, $key ) = @_;
 
+   $self->rootwin->_handle_key( $type, $str, $key ) and return;
+
    if( exists $self->{key_binds}{$str} ) {
-      $self->{key_binds}{$str}->( $str );
+      $self->{key_binds}{$str}->( $str ) and return;
    }
 }
 
@@ -192,6 +250,14 @@ sub bind_key
    else {
       delete $self->{key_binds}{$key};
    }
+}
+
+sub on_mouse
+{
+   my $self = shift;
+   my ( $ev, $button, $line, $col ) = @_;
+
+   $self->rootwin->_handle_mouse( $ev, $button, $line, $col ) and return;
 }
 
 =head2 $tickit->rootwin
@@ -260,7 +326,6 @@ sub stop
    $term->mode_altscreen( 0 );
    $term->mode_cursorvis( 1 );
    $term->mode_mouse( 0 );
-   $term->on_write_ready; # TODO - consider a synchronous flush or similar
 }
 
 =head2 $tickit->run
@@ -283,6 +348,17 @@ sub run
    };
 
    $self->start;
+
+   my $old_DIE = $SIG{__DIE__};
+   local $SIG{__DIE__} = sub {
+      local $SIG{__DIE__} = $old_DIE;
+
+      die @_ if $^S;
+
+      $self->stop;
+      die @_;
+   };
+
    $loop->loop_forever;
    $self->stop;
 }

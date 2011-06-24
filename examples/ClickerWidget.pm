@@ -5,7 +5,7 @@ use base 'Tickit::Widget';
 my @points;
 
 sub lines { 1 }
-sub cols  { length $text }
+sub cols  { 1 }
 
 sub render
 {

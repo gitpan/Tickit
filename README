@@ -21,12 +21,19 @@ CONSTRUCTOR
     Takes the following named arguments at construction time:
 
     term_in => IO
+            IO handle for terminal input. Will default to "STDIN".
+
     term_out => IO
-            Passed to the Tickit::Term constructor.
+            IO handle for terminal output. Will default to "STDOUT".
 
 METHODS
   $term = $tickit->term
     Returns the underlying Tickit::Term object.
+
+  $cols = $tickit->cols
+  $lines = $tickit->lines
+    Query the current size of the terminal. Will be cached and updated on
+    receipt of "SIGWINCH" signals.
 
   $tickit->bind_key( $key, $code )
     Installs a callback to invoke if the given key is pressed, overwriting

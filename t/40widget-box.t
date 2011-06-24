@@ -40,7 +40,8 @@ is_termlog( [ SETPEN,
               SETPEN,
               PRINT("Widget"),
               SETBG(undef),
-              ERASECH(74), ],
+              ERASECH(74),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ) ],
             'Termlog initially' );
 
 is_display( [ "Widget" ],
@@ -56,7 +57,8 @@ is_termlog( [ SETPEN,
               SETPEN,
               PRINT("Widget"),
               SETBG(undef),
-              ERASECH(70), ],
+              ERASECH(70),
+              ( map { GOTO($_,2), SETBG(undef), ERASECH(76) } 3 .. 22 ) ],
             'Termlog after ->set_border' );
 
 is_display( [ "", "", "  Widget" ],
@@ -86,7 +88,8 @@ is_termlog( [ GOTO(0,0),
               SETPEN,
               PRINT("Widget"),
               SETBG(undef),
-              ERASECH(74), ],
+              ERASECH(74),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ) ],
             'Termlog after late adding of child' );
 
 is_display( [ "Widget" ],

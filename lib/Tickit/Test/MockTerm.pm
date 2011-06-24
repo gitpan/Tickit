@@ -96,25 +96,11 @@ sub resize
 
    $self->{lines} = $newlines;
    $self->{cols}  = $newcols;
-
-   $self->{on_resize}->( $self );
 }
 
-sub presskey
+sub set_size
 {
-   my $self = shift;
-   my ( $type, $str ) = @_;
-
-   # TODO: See if we'll ever need to fake a Term::TermKey::Key event object
-   $self->{on_key}->( $self, $type, $str, undef );
-}
-
-sub pressmouse
-{
-   my $self = shift;
-   my ( $ev, $button, $line, $col ) = @_;
-
-   $self->{on_mouse}->( $self, $ev, $button, $line, $col );
+   # ignore
 }
 
 sub lines { $_[0]->{lines} }

@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use Carp;
 
@@ -106,6 +106,9 @@ sub change_geometry
    $top + $lines <= $self->parent->lines or croak 'bottom out of bounds';
    $left + $cols <= $self->parent->cols or croak 'right out of bounds';
 
+   $lines > 0 or croak 'lines zero or negative';
+   $cols  > 0 or croak 'cols zero or negative';
+
    if( !defined $self->{top} or 
        $self->{lines} != $lines or $self->{cols} != $cols or
        $self->{top} != $top or $self->{left} != $left ) {
@@ -140,8 +143,29 @@ of its child windows, has the input focus.
 
  $handled = $on_key->( $win, $type, $str, $key )
 
+C<$type> will be C<text> for normal unmodified Unicode, or C<key> for special
+keys or modified Unicode. C<$str> will be the UTF-8 string for C<text> events,
+or the textual description of the key as rendered by L<Term::TermKey> for
+C<key> events. C<$key> will be the underlying C<Term::TermKey::Key> event
+structure.
+
 The invoked code should return a true value if it considers the keypress dealt
 with, or false to pass it up to its parent window.
+
+Before passing it to its parent, a window will also try any other non-focused
+sibling windows of the currently-focused window in order of creation (though
+note this order is not necessarily the order the child widgets that own those
+windows were created or added to their container).
+
+If no window actually handles the keypress, then every window will eventually
+be consulted about it, preferring windows closer to the focused one.
+
+This broadcast-like behaviour allows widgets to handle keypresses that should
+make sense even though their window does not actually have the keyboard focus.
+This feature should be used sparingly, to only capture one or two keypresses
+that really make sense; for example to capture the C<PageUp> and C<PageDown>
+keys in a scrolling list, or a numbered function key that performs some
+special action.
 
 =cut
 
@@ -154,8 +178,26 @@ sub set_on_key
 sub _handle_key
 {
    my $self = shift;
-   my $on_key = $self->{on_key} or return 0;
-   return $on_key->( $self, @_ );
+
+   my $focus_child = $self->{focus_child};
+   if( $focus_child ) {
+      $focus_child->_handle_key( @_ ) and return 1;
+   }
+
+   if( my $on_key = $self->{on_key} ) {
+      $on_key->( $self, @_ ) and return 1;
+   }
+
+   if( my $children = $self->{child_windows} ) {
+      foreach my $child ( @$children ) {
+         next unless $child; # weakrefs; may be undef
+         next if $focus_child and $child == $focus_child;
+
+         $child->_handle_key( @_ );
+      }
+   }
+
+   return 0;
 }
 
 =head2 $win->set_on_mouse( $on_mouse )
@@ -164,6 +206,11 @@ Set the callback to invoke whenever a mouse event is received within the
 window's rectangle.
 
  $handled = $on_mouse->( $win, $ev, $buttons, $line, $col )
+
+C<$ev> will be C<press>, C<drag> or C<release>. The button number will be in
+C<$button>, though may not be present for C<release> events. C<$line> and
+C<$col> are 0-based. Behaviour of events involving more than one mouse button
+is not well-specified by terminals.
 
 The invoked code should return a true value if it considers the mouse event
 dealt with, or false to pass it up to its parent window. The mouse event is
@@ -178,7 +225,7 @@ sub set_on_mouse
    ( $self->{on_mouse} ) = @_;
 }
 
-sub _on_mouse
+sub _handle_mouse
 {
    my $self = shift;
    my ( $ev, $button, $line, $col ) = @_;
@@ -193,7 +240,7 @@ sub _on_mouse
          next if $child_line < 0 or $child_line >= $child->lines;
          next if $child_col  < 0 or $child_col  >= $child->cols;
 
-         return 1 if $child->_on_mouse( $ev, $button, $child_line, $child_col );
+         return 1 if $child->_handle_mouse( $ev, $button, $child_line, $child_col );
       }
    }
 
@@ -572,21 +619,38 @@ sub focus
    $self->{focus_line} = $line;
    $self->{focus_col}  = $col;
 
-   $self->_requeue_focus( $self );
+   $self->_requeue_focus
 }
 
 sub _requeue_focus
 {
    my $self = shift;
    my ( $focuswin ) = @_;
-   $self->parent->_requeue_focus( $focuswin );
+
+   if( $self->{focus_child} and defined $focuswin and $self->{focus_child} != $focuswin ) {
+      $self->{focus_child}->_lose_focus;
+   }
+
+   weaken( $self->{focus_child} = $focuswin );
+   $self->_requeue_focus_parent;
+}
+
+sub _requeue_focus_parent
+{
+   my $self = shift;
+   $self->parent->_requeue_focus( $self );
 }
 
 sub _gain_focus
 {
    my $self = shift;
 
-   $self->goto( $self->{focus_line}, $self->{focus_col} );
+   if( my $focus_child = $self->{focus_child} ) {
+      $focus_child->_gain_focus;
+   }
+   else {
+      $self->goto( $self->{focus_line}, $self->{focus_col} );
+   }
 }
 
 sub _lose_focus
@@ -610,6 +674,21 @@ sub restore
    $self->root->restore;
 }
 
+=head2 $win->clearline( $line )
+
+Erase the entire content of one line of the window
+
+=cut
+
+sub clearline
+{
+   my $self = shift;
+   my ( $line ) = @_;
+
+   $self->goto( $line, 0 );
+   $self->erasech( $self->cols );
+}
+
 =head2 $win->clear
 
 Erase the entire content of the window and reset it to the current background
@@ -621,10 +700,7 @@ sub clear
 {
    my $self = shift;
 
-   foreach my $line ( 0 .. $self->lines - 1 ) {
-      $self->goto( $line, 0 );
-      $self->erasech( $self->cols );
-   }
+   $self->clearline( $_ ) for 0 .. $self->lines - 1;
 }
 
 sub _flush_line

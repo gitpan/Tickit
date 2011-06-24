@@ -8,7 +8,7 @@ package Tickit::WidgetRole::Borderable;
 use strict;
 use warnings;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 =head1 NAME
 
@@ -187,12 +187,10 @@ sub get_border_geom
    my $content_top  = $self->top_border;
    my $content_left = $self->left_border;
 
-   return (
-      $content_top,
-      $content_left,
-      $window->lines - $content_top  - $self->bottom_border,
-      $window->cols  - $content_left - $self->right_border,
-   );
+   ( my $lines = $window->lines - $content_top  - $self->bottom_border ) > 0 or return;
+   ( my $cols  = $window->cols  - $content_left - $self->right_border  ) > 0 or return;
+
+   return ( $content_top, $content_left, $lines, $cols );
 }
 
 =head1 AUTHOR

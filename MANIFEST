@@ -10,6 +10,7 @@ examples/HelloWorldWidget-2.pm
 examples/testonewidget.pl
 lib/Tickit.pm
 lib/Tickit/ContainerWidget.pm
+lib/Tickit/OneLineWidget.pm
 lib/Tickit/Pen.pm
 lib/Tickit/RootWindow.pm
 lib/Tickit/SingleChildWidget.pm
@@ -27,18 +28,20 @@ lib/Tickit/Widget/Static.pm
 lib/Tickit/Widget/VBox.pm
 lib/Tickit/WidgetRole/Borderable.pm
 lib/Tickit/Window.pm
+LICENSE
 Makefile.PL
 MANIFEST			This list of files
+META.json
 META.yml
+README
 t/00use.t
 t/01term-output.t
 t/02term-outpen.t
-t/03term-input.t
-t/04term-utf8.t
 t/05utils.t
 t/06mockterm.t
-t/08pen.t
-t/09tickit.t
+t/07pen.t
+t/08tickit.t
+t/09tickit-input.t
 t/10rootwin.t
 t/11window.t
 t/12window-output.t
@@ -57,6 +60,3 @@ t/41widget-hbox.t
 t/41widget-vbox.t
 t/42widget-frame.t
 t/99pod.t
-README
-LICENSE
-META.json

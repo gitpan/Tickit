@@ -2,6 +2,12 @@
 
 use strict;
 
+# We need a UTF-8 locale to force libtermkey into UTF-8 handling, even if the
+# system locale is not
+BEGIN {
+   $ENV{LANG} .= ".UTF-8" unless $ENV{LANG} =~ m/\.UTF-8$/;
+}
+
 use Test::More tests => 8;
 use Test::HexString;
 use Test::Refcount;
@@ -14,10 +20,9 @@ use Tickit;
 my $loop = IO::Async::Loop->new();
 testing_loop( $loop );
 
-my ( $my_rd, $term_wr, $term_rd, $my_wr ) = $loop->pipequad or die "Cannot pipequad - $!";
+my ( $my_rd, $term_wr ) = $loop->pipepair or die "Cannot pipepair - $!";
 
 my $tickit = Tickit->new(
-   term_in  => $term_rd,
    term_out => $term_wr,
 );
 
@@ -33,6 +38,7 @@ $loop->add( $tickit );
 is_refcount( $tickit, 2, '$tickit has refcount 2 after $loop->add' );
 
 # There might be some terminal setup code here... Flush it
+$my_rd->blocking( 0 );
 sysread( $my_rd, my $buffer, 8192 );
 
 my $stream = "";
@@ -50,14 +56,15 @@ $term->print( "Hello" );
 $stream = "";
 stream_is( "Hello", '$term->print' );
 
-my $got_Ctrl_A;
-$tickit->bind_key( "C-a" => sub { $got_Ctrl_A++ } );
+# We'll test with a Unicode character outside of Latin-1, to ensure it
+# roundtrips correctly
+#
+# 'ĉ' [U+0109] - LATIN SMALL LETTER C WITH CIRCUMFLEX
+#  UTF-8: 0xc4 0x89
 
-$my_wr->syswrite( "\cA" );
-
-wait_for { $got_Ctrl_A };
-
-is( $got_Ctrl_A, 1, 'bind Ctrl-A' );
+$term->print( "\x{109}" );
+$stream = "";
+stream_is( "\xc4\x89", 'print outputs UTF-8' );
 
 is_refcount( $tickit, 2, '$tickit has refcount 2 before $loop->remove' );
 

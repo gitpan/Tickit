@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -479,7 +479,7 @@ list of the last 10 mouse clicks and renders them with an C<X>.
  my @points;
  
  sub lines { 1 }
- sub cols  { length $text }
+ sub cols  { 1 }
  
  sub render
  {

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use List::Util qw( sum );
 
@@ -140,6 +140,11 @@ sub redistribute_child_windows
    $self->foreach_child( sub {
       my ( $child, %opts ) = @_;
 
+      if( $current >= $total ) {
+         $self->set_child_window( $child, undef, undef, undef );
+         next;
+      }
+
       my $extra = $expand_total ? ( $spare * $opts{expand} / $expand_total ) : 0;
       $err += $extra - int($extra);
 
@@ -147,6 +152,9 @@ sub redistribute_child_windows
       $extra++, $err-- if $err >= 1;
 
       my $amount = $base{$child} + $extra;
+      if( $current + $amount > $total ) {
+         $amount = $total - $current; # All remaining space
+      }
 
       $self->set_child_window( $child, $current, $amount, $window );
 

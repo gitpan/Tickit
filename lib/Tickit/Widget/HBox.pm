@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget::LinearBox );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use List::Util qw( sum max );
 
@@ -79,12 +79,19 @@ sub set_child_window
    my $self = shift;
    my ( $child, $left, $cols, $window ) = @_;
 
-   if( my $childwin = $child->window ) {
-      $childwin->change_geometry( 0, $left, $window->lines, $cols );
+   if( $window and $cols ) {
+      if( my $childwin = $child->window ) {
+         $childwin->change_geometry( 0, $left, $window->lines, $cols );
+      }
+      else {
+         my $childwin = $window->make_sub( 0, $left, $window->lines, $cols );
+         $child->set_window( $childwin );
+      }
    }
    else {
-      my $childwin = $window->make_sub( 0, $left, $window->lines, $cols );
-      $child->set_window( $childwin );
+      if( $child->window ) {
+         $child->set_window( undef );
+      }
    }
 }
 

@@ -4,31 +4,18 @@ use strict;
 
 use Test::More tests => 11;
 use Test::HexString;
-use IO::Async::Test;
-
-use IO::Async::Loop;
 
 use Tickit::Term;
 
-# TODO: Either Tickit or IO::Async itself should do this
-$SIG{PIPE} = "IGNORE";
+my $stream = "";
+my $writer = bless [], "TestWriter";
+sub TestWriter::write { $stream .= $_[1] }
 
-my $loop = IO::Async::Loop->new();
-testing_loop( $loop );
-
-my ( $rd, $wr ) = $loop->pipepair or die "Cannot pipe() - $!";
-
-my $term = Tickit::Term->new( term_out => $wr );
-
-$loop->add( $term );
+my $term = Tickit::Term->new( writer => $writer );
 
 sub stream_is
 {
    my ( $expect, $name ) = @_;
-
-   my $stream = "";
-
-   wait_for_stream { length $stream >= length $expect } $rd => $stream;
 
    is_hexstr( substr( $stream, 0, length $expect, "" ), $expect, $name );
 }

@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 25;
+use Test::More tests => 24;
 
 use Tickit::Test;
 
@@ -59,16 +59,11 @@ is_termlog( [ SETPEN(b => 1, u => 1),
             'Termlog with pen attributes hash' );
 
 $win->pen->chattr( bg => 4 );
-$win->clear;
 
-is_termlog( [ GOTO(3,10), SETBG(4), ERASECH(20),
-              GOTO(4,10), SETBG(4), ERASECH(20),
-              GOTO(5,10), SETBG(4), ERASECH(20),
-              GOTO(6,10), SETBG(4), ERASECH(20) ],
-            '$rootwin->flush redraws lines' );
+$win->clearline( 0 );
 
-is_display( [ ],
-            'Display after bg change' );
+is_termlog( [ GOTO(3,10), SETBG(4), ERASECH(20) ],
+            '$win->clearline clears one line' );
 
 $win->clear;
 

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget Tickit::WidgetRole::Borderable );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 =head1 NAME
 
@@ -64,12 +64,21 @@ sub set_child_window
    my $window = $self->window or return;
    my $child  = $self->child  or return;
 
-   if( my $childwin = $child->window ) {
-      $childwin->change_geometry( $self->get_border_geom );
+   my @geom = $self->get_border_geom;
+
+   if( @geom ) {
+      if( my $childwin = $child->window ) {
+         $childwin->change_geometry( @geom );
+      }
+      else {
+         my $childwin = $window->make_sub( @geom );
+         $child->set_window( $childwin );
+      }
    }
    else {
-      my $childwin = $window->make_sub( $self->get_border_geom );
-      $child->set_window( $childwin );
+      if( $child->window ) {
+         $child->set_window( undef );
+      }
    }
 }
 
