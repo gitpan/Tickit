@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( IO::Async::Notifier );
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use IO::Async::Loop;
 use IO::Async::Signal;
@@ -116,7 +116,7 @@ sub new
          autoflush => 1,
       );
 
-      $term = Tickit::Term->new(
+      $term = Tickit::Term->find_for_term(
          writer => $writer,
          ( $tka->get_flags & FLAG_UTF8 ) ? ( encoding => "UTF-8" ) : (),
       );
@@ -163,6 +163,14 @@ sub _add_to_loop
       delete $self->{todo_later};
    }
 }
+
+=head2 $tickit->later( $code )
+
+Runs the given CODE reference at some time soon in the future. It will not be
+invoked yet, but will be invoked at some point before the next round of input
+events are processed.
+
+=cut
 
 sub later
 {

@@ -1,5 +1,16 @@
 Revision history for Changes
 
+0.07    CHANGES:
+         * Provide (trivial) Tickit::Async subclass for users to prepare for
+           IO::Async split
+         * Try to find $TERM-specific subclass of Tickit::Term for terminal-
+           specific optimisations or abilities
+         * Support 256 colour xterm
+         * Unit test in more generic SCROLLRECT operation
+
+        BUGFIXES:
+         * Ensure Tickit::Test and Tickit::Test::MockTerm have a $VERSION
+
 0.06    CHANGES:
          * Shut down terminal state before $SIG{__DIE__}'ing
          * Cope correctly with zero-sized children in {V,H,}Box and Frame

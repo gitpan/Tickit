@@ -27,6 +27,11 @@ CONSTRUCTOR
             IO handle for terminal output. Will default to "STDOUT".
 
 METHODS
+  $tickit->later( $code )
+    Runs the given CODE reference at some time soon in the future. It will
+    not be invoked yet, but will be invoked at some point before the next
+    round of input events are processed.
+
   $term = $tickit->term
     Returns the underlying Tickit::Term object.
 

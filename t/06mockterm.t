@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 17;
+use Test::More tests => 19;
 use Tickit::Test;
 
 my $term = mk_term lines => 3, cols => 10;
@@ -40,24 +40,24 @@ $term->methodlog; # flush log
 is_display( [ "0000000000", "1111111111", "2222222222" ],
             'Display after scroll fill' );
 
-$term->scroll( 0, 2, +1 );
+ok( $term->scrollrect( 0,0,3,10, +1,0 ), '$term->scrollrect down OK' );
 is_display( [ "1111111111", "2222222222", "" ],
-            'Display after scroll +1' );
+            'Display after scroll 1 down' );
 
-$term->scroll( 0, 2, -1 );
+ok( $term->scrollrect( 0,0,3,10, -1,0 ), '$term->scrollrect up OK' );
 is_display( [ "", "1111111111", "2222222222" ],
-            'Display after scroll -1' );
+            'Display after scroll 1 up' );
 
 for my $l ( 0 .. 2 ) { $term->goto( $l, 0 ); $term->print( $l x 10 ) }
 $term->methodlog; # flush log
 
-$term->scroll( 0, 1, +1 );
+$term->scrollrect( 0,0,2,10, +1,0 );
 is_display( [ "1111111111", "", "2222222222" ],
-            'Display after scroll partial +1' );
+            'Display after scroll partial 1 down' );
 
-$term->scroll( 0, 1, -1 );
+$term->scrollrect( 0,0,2,10, -1,0 );
 is_display( [ "", "1111111111", "2222222222" ],
-            'Display after scroll partial -1' );
+            'Display after scroll partial 1 up' );
 
 # Now some test content for mangling
 for my $l ( 0 .. 2 ) { $term->goto( $l, 0 ); $term->print( "ABCDEFGHIJ" ) }

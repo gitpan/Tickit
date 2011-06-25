@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use Encode qw( find_encoding );
 use Term::Terminfo;
@@ -40,6 +40,30 @@ distribution.
 =head1 CONSTRUCTOR
 
 =cut
+
+=head2 $term = Tickit::Term->find_for_term( %params )
+
+Attempts to load and construct a subclass determined by the current terminal
+type (as given by C<$ENV{TERM}>). If this fails, returns a normal
+C<Tickit::Term> instead.
+
+=cut
+
+sub find_for_term
+{
+   my $class = shift;
+
+   if( defined( my $term = $ENV{TERM} ) ) {
+      my $subclass = "${class}::$term";
+      ( my $file = "$subclass.pm" ) =~ s{::}{/}g;
+
+      my $self;
+      eval { require $file and $self = $subclass->new( @_ ) } and
+         return $self;
+   }
+
+   return $class->new( @_ );
+}
 
 =head2 $term = Tickit::Term->new( %params )
 
@@ -180,19 +204,38 @@ sub move
    }
 }
 
-=head2 $term->scroll( $from, $to, $by )
+=head2 $success = $term->scrollrect( $top, $left, $lines, $cols, $downward, $rightward )
 
-Scroll the region of the screen that starts on line C<$from> until (and
-including) line C<$to> down, C<$by> lines (upwards if negative).
+Attempt to scroll the rectangle of the screen defined by the first four
+parameters by an amount given by the latter two. Since most terminals cannot
+perform arbitrary rectangle scrolling, this method returns a boolean to
+indicate if it was successful. The caller should test this return value and
+fall back to another drawing strategy if the attempt was unsuccessful.
+
+The cursor may move as a result of calling this method; its location is
+undefined if this method returns successful.
 
 =cut
 
-sub scroll
+sub scrollrect
+{
+   my $self = shift;
+   my ( $top, $left, $lines, $cols, $downward, $rightward ) = @_;
+
+   return 1 if !$downward and !$rightward;
+
+   if( $left == 0 and $cols == $self->cols and $rightward == 0 ) {
+      $self->_DECscroll( $top, $top + $lines - 1, $downward );
+      return 1;
+   }
+
+   die "TODO";
+}
+
+sub _DECscroll
 {
    my $self = shift;
    my ( $from, $to, $by ) = @_;
-
-   return if $by == 0;
 
    $self->write( sprintf "${CSI}%d;%dr", $from+1, $to+1 );
 

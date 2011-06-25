@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use Carp;
 
@@ -594,7 +594,7 @@ sub scroll
    my $self = shift;
    my ( $downward, $rightward ) = @_;
 
-   return $self->root->scroll_region(
+   return $self->term->scrollrect(
       $self->abs_top,
       $self->abs_left,
       $self->lines,

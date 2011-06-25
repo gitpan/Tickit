@@ -13,14 +13,14 @@ use IO::Async::Test;
 
 use IO::Async::Loop;
 
-use Tickit;
+use Tickit::Async;
 
 my $loop = IO::Async::Loop->new();
 testing_loop( $loop );
 
 my ( $term_rd, $my_wr ) = $loop->pipepair or die "Cannot pipepair - $!";
 
-my $tickit = Tickit->new(
+my $tickit = Tickit::Async->new(
    term_in  => $term_rd,
 );
 

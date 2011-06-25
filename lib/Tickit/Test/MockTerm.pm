@@ -3,6 +3,8 @@ package Tickit::Test::MockTerm;
 use strict;
 use warnings;
 
+our $VERSION = '0.07';
+
 sub new
 {
    my $class = shift;
@@ -183,13 +185,16 @@ sub print
    $self->{changed}++;
 }
 
-sub scroll
+sub scrollrect
 {
    my $self = shift;
-   my ( $top, $bottom, $downward ) = @_;
+   my ( $top, $left, $lines, $cols, $downward, $rightward ) = @_;
+
+   # Lots of scroll types we don't support (for now...)
+   return 0 if $left > 0 or $cols != $self->cols or $rightward != 0;
 
    # Logic is simpler if $bottom is the first line -beyond- the scroll region
-   $bottom++;
+   my $bottom = $top + $lines;
 
    my $display = $self->{display};
 
@@ -204,9 +209,11 @@ sub scroll
       splice @$display, $top, 0, ( " " x $self->cols ) x $upward;
    }
 
-   $self->_push_methodlog( scroll => @_ );
+   $self->_push_methodlog( scrollrect => @_ );
 
    $self->{changed}++;
+
+   return 1;
 }
 
 # For testing purposes we'll store this in a hash instead

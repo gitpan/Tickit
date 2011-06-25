@@ -8,6 +8,8 @@ package Tickit::Test;
 use strict;
 use warnings;
 
+our $VERSION = '0.07';
+
 use Exporter 'import';
 
 our @EXPORT = qw(
@@ -30,7 +32,7 @@ our @EXPORT = qw(
    ERASECH
    INSERTCH
    DELETECH
-   SCROLL
+   SCROLLRECT
    PRINT
    SETPEN
    SETBG
@@ -290,22 +292,22 @@ to C<is_termlog>.
  ERASECH($count,$move_to_end)
  INSERTCH($count)
  DELETECH($count)
- SCROLL($from,$to,$by)
+ SCROLLRECT($top,$left,$lines,$cols,$downward,$rightward)
  PRINT($string)
  SETPEN(%attrs)
  SETBG($bg_attr)
 
 =cut
 
-sub CLEAR    { [ clear => ] }
-sub GOTO     { [ goto => $_[0], $_[1] ] }
-sub ERASECH  { [ erasech => $_[0], $_[1] || 0 ] }
-sub INSERTCH { [ insertch => $_[0] ] }
-sub DELETECH { [ deletech => $_[0] ] }
-sub SCROLL   { [ scroll => @_[0..2] ] }
-sub PRINT    { [ print => $_[0] ] }
-sub SETPEN   { [ chpen => { DEFAULTPEN, @_ } ] }
-sub SETBG    { [ chpen => { bg => $_[0] } ] }
+sub CLEAR      { [ clear => ] }
+sub GOTO       { [ goto => $_[0], $_[1] ] }
+sub ERASECH    { [ erasech => $_[0], $_[1] || 0 ] }
+sub INSERTCH   { [ insertch => $_[0] ] }
+sub DELETECH   { [ deletech => $_[0] ] }
+sub SCROLLRECT { [ scrollrect => @_[0..5] ] }
+sub PRINT      { [ print => $_[0] ] }
+sub SETPEN     { [ chpen => { DEFAULTPEN, @_ } ] }
+sub SETBG      { [ chpen => { bg => $_[0] } ] }
 
 =head1 AUTHOR
 

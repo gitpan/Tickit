@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -218,9 +218,8 @@ completely redraw the widget.
 This redraw doesn't happen immediately. The widget is marked as needing to
 redraw, and its parent is marked that it has a child needing redraw,
 recursively to the root widget. These will then be flushed out down the widget
-tree using an C<IO::Async::Loop> C<later> call. This allows other widgets to
-register a requirement to redraw, and have them all flushed in a fairly
-efficient manner.
+tree using an C<Tickit> C<later> call. This allows other widgets to register a
+requirement to redraw, and have them all flushed in a fairly efficient manner.
 
 =cut
 

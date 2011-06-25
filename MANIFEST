@@ -5,16 +5,19 @@ examples/ColourWidget.pm
 examples/demo-entry.pl
 examples/demo-frame.pl
 examples/demo-pen.pl
+examples/demo-xterm256.pl
 examples/HelloWorldWidget-1.pm
 examples/HelloWorldWidget-2.pm
 examples/testonewidget.pl
 lib/Tickit.pm
+lib/Tickit/Async.pm
 lib/Tickit/ContainerWidget.pm
 lib/Tickit/OneLineWidget.pm
 lib/Tickit/Pen.pm
 lib/Tickit/RootWindow.pm
 lib/Tickit/SingleChildWidget.pm
 lib/Tickit/Term.pm
+lib/Tickit/Term/xterm.pm
 lib/Tickit/Test.pm
 lib/Tickit/Test/MockTerm.pm
 lib/Tickit/Utils.pm
@@ -40,8 +43,6 @@ t/02term-outpen.t
 t/05utils.t
 t/06mockterm.t
 t/07pen.t
-t/08tickit.t
-t/09tickit-input.t
 t/10rootwin.t
 t/11window.t
 t/12window-output.t
@@ -59,4 +60,6 @@ t/40widget-box.t
 t/41widget-hbox.t
 t/41widget-vbox.t
 t/42widget-frame.t
+t/80tickit-async.t
+t/81tickit-async-input.t
 t/99pod.t

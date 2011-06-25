@@ -108,7 +108,7 @@ is_display( [ ( "") x 5,
 
 $rootwin->scroll( 1, 0 );
 
-is_termlog( [ SCROLL(0,24,1) ],
+is_termlog( [ SCROLLRECT(0,0,25,80, 1,0) ],
             'Termlog scrolled' );
 
 ok( !$win->scroll( 1, 0 ), '$win does not support scrolling' );

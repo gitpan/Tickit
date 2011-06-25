@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -31,9 +31,12 @@ Supports the following named pen attributes:
 
 =item bg => COL
 
-Foreground or background colour. C<COL> may be an integer C<0-7> or one of the
-eight colour names. May also be prefixed by C<hi-> for the high-intensity
-version (may not be supported by all terminals).
+Foreground or background colour. C<COL> may be an integer or one of the eight
+colour names. A colour name may optionally be prefixed by C<hi-> for the
+high-intensity version (may not be supported by all terminals). Some terminals
+may support a palette of 256 colours instead, some 16, and some only 8. The
+C<Pen> object will not check this as it cannot be reliably detected in all
+cases.
 
 =item b => BOOL
 
@@ -168,6 +171,8 @@ sub _canonicalise_colour
    my ( undef, $colour ) = @_;
 
    return undef if !defined $colour;
+
+   return $colour if $colour =~ m/^\d+$/;
 
    my $high = ( $colour =~ s/^hi-// ) * 8;
 

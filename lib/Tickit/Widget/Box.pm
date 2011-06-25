@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget Tickit::WidgetRole::Borderable );
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 =head1 NAME
 

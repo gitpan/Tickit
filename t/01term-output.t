@@ -19,6 +19,7 @@ my $writer = bless [], "TestWriter";
 sub TestWriter::write { $stream .= $_[1] }
 
 my $term = Tickit::Term->new( writer => $writer );
+$term->set_size( 25, 80 );
 
 isa_ok( $term, "Tickit::Term", '$term isa Tickit::Term' );
 
@@ -47,12 +48,12 @@ $term->move( undef, 7 );
 stream_is( "\e[7C", '$term->move( 4, undef )' );
 
 $stream = "";
-$term->scroll( 3, 9, 3 );
-stream_is( "\e[4;10r\e[10H\n\n\n\e[r", '$term->scroll( 3, 9, 3 )' );
+$term->scrollrect( 3, 0, 7, 80, 3, 0 );
+stream_is( "\e[4;10r\e[10H\n\n\n\e[r", '$term->scrollrect( 3,0,7,80, 3,0 )' );
 
 $stream = "";
-$term->scroll( 3, 9, -3 );
-stream_is( "\e[4;10r\e[4H\eM\eM\eM\e[r", '$term->scroll( 3, 9, -3 )' );
+$term->scrollrect( 3, 0, 7, 80, -3, 0 );
+stream_is( "\e[4;10r\e[4H\eM\eM\eM\e[r", '$term->scrollrect( 3,0,7,80, -3,0 )' );
 
 $stream = "";
 $term->chpen( b => 1 );

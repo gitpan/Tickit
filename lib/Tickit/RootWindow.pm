@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Window );
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use Carp;
 use Scalar::Util qw( weaken refaddr );
@@ -127,21 +127,6 @@ sub top      { 0 }
 sub left     { 0 }
 sub abs_top  { 0 }
 sub abs_left { 0 }
-
-sub scroll_region
-{
-   my $self = shift;
-   my ( $top, $left, $lines, $cols, $downward, $rightward ) = @_;
-
-   if( $left == 0 and $cols == $self->cols and $rightward == 0 ) {
-      $self->{term}->scroll( $top, $top + $lines - 1, $downward );
-      return 1;
-   }
-
-   # TODO: Consider other possible scrolls
-
-   return 0;
-}
 
 sub _requeue_focus_parent
 {

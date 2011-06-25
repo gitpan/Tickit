@@ -15,18 +15,18 @@ use IO::Async::Test;
 
 use IO::Async::Loop;
 
-use Tickit;
+use Tickit::Async;
 
 my $loop = IO::Async::Loop->new();
 testing_loop( $loop );
 
 my ( $my_rd, $term_wr ) = $loop->pipepair or die "Cannot pipepair - $!";
 
-my $tickit = Tickit->new(
+my $tickit = Tickit::Async->new(
    term_out => $term_wr,
 );
 
-isa_ok( $tickit, 'Tickit', '$tickit' );
+isa_ok( $tickit, 'Tickit::Async', '$tickit' );
 is_oneref( $tickit, '$tickit has refcount 1 initially' );
 
 my $term = $tickit->term;

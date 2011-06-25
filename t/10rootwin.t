@@ -92,7 +92,7 @@ is_termlog( [ GOTO(2,3),
 
 $win->scroll( 1, 0 );
 
-is_termlog( [ SCROLL(0,24,1) ],
+is_termlog( [ SCROLLRECT(0,0,25,80, 1,0) ],
             'Termlog scrolled' );
 
 $win->erasech( 15 );
