@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Carp;
 
@@ -470,38 +470,20 @@ sub goto
    $line >= 0 and $line < $self->lines or croak '$line out of bounds';
    $col  >= 0 and $col  < $self->cols  or croak '$col out of bounds';
 
-   $self->term->goto( $self->abs_top + $line, $self->abs_left + $col );
+   $self->parent->goto( $self->top + $line, $self->left + $col );
 }
 
-=head2 $win->print( $text )
+=head2 $win->print( $text, $pen )
+
+=head2 $win->print( $text, %attrs )
 
 Print the given text to the terminal at the current cursor position using the
-pen of the window.
+pen of the window, possibly overridden by any extra attributes in the given
+C<Tickit::Pen> instance, or directly in the given hash, if one is provided.
 
 =cut
 
 sub print
-{
-   my $self = shift;
-   my ( $text ) = @_;
-
-   return unless length $text;
-
-   $self->term->setpen( $self->get_effective_penattrs );
-   $self->term->print( $text );
-}
-
-=head2 $win->penprint( $text, $pen )
-
-=head2 $win->penprint( $text, %attrs )
-
-Print the given text to the terminal at the current cursor position using the
-pen of the window, overridden by any extra attributes in the given
-C<Tickit::Pen> instance, or directly in the given hash.
-
-=cut
-
-sub penprint
 {
    my $self = shift;
    my $text = shift;
@@ -514,18 +496,39 @@ sub penprint
    $self->term->print( $text );
 }
 
-=head2 $win->erasech( $count, $moveend )
+=head2 $win->penprint( ... )
 
-Erase C<$count> columns forwards.
+A deprecated synonym for C<print>.
+
+=cut
+
+*penprint = \&print;
+
+=head2 $win->erasech( $count, $moveend, $pen )
+
+=head2 $win->erasech( $count, $moveend, %attrs )
+
+Erase C<$count> columns forwards. If C<$moveend> is true, the cursor will be
+placed at the end of the erased region. If defined but false, it will not move
+from its current location. If undefined, the terminal will take which ever
+option it can implement most efficiently.
+
+If a C<Tickit::Pen> or pen attributes are provided, they are used to override
+the background colour for the erased region.
 
 =cut
 
 sub erasech
 {
    my $self = shift;
-   my ( $count, $moveend ) = @_;
+   my $count = shift;
+   my $moveend = shift;
 
-   $self->term->chpen( bg => $self->get_effective_penattr( 'bg' ) );
+   my %attrs = ( @_ == 1 ) ? shift->getattrs : @_;
+
+   my $bg = exists $attrs{bg} ? $attrs{bg} : $self->get_effective_penattr( 'bg' );
+
+   $self->term->chpen( bg => $bg );
    $self->term->erasech( $count, $moveend );
 }
 
@@ -539,6 +542,8 @@ beyond it.
 If this window does not extend to the righthand edge, then this method will
 simply return false. If it does, the characters are inserted and the method
 returns true.
+
+This method is deprecated; instead you should use the C<scrollrect> method.
 
 =cut
 
@@ -565,6 +570,8 @@ If this window does not extend to the righthand edge, then this method will
 simply return false. If it does, the characters are inserted and the method
 returns true.
 
+This method is deprecated; instead you should use the C<scrollrect> method.
+
 =cut
 
 sub deletech
@@ -579,13 +586,53 @@ sub deletech
    return 1;
 }
 
+=head2 $success = $win->scrollrect( $top, $left, $lines, $cols, $downward, $rightward )
+
+=head2 $success = $win->scrollrect( ..., $pen )
+
+=head2 $success = $win->scrollrect( ..., %attrs )
+
+Attempt to scroll the rectangle of the window defined by the first four
+parameters by an amount given by the latter two. Since most terminals cannot
+perform arbitrary rectangle scrolling, this method returns a boolean to
+indicate if it was successful. The caller should test this return value and
+fall back to another drawing strategy if the attempt was unsuccessful.
+
+Optionally, a C<Tickit::Pen> instance or hash of pen attributes may be
+provided, to override the background colour used for erased sections behind
+the scroll.
+
+The cursor may move as a result of calling this method; its location is
+undefined if this method returns successful. The terminal pen, in particular
+the background colour, may be modified by this method even if it fails to
+scroll the terminal (and returns false).
+
+=cut
+
+sub scrollrect
+{
+   my $self = shift;
+   my ( $top, $left, $lines, $cols, $downward, $rightward, @args ) = @_;
+
+   $top  >= 0 and $top  < $self->lines or croak '$top out of bounds';
+   $left >= 0 and $left < $self->cols  or croak '$left out of bounds';
+
+   $lines > 0 and $top + $lines <= $self->lines or croak '$lines out of bounds';
+   $cols  > 0 and $left + $cols <= $self->cols  or croak '$cols out of bounds';
+
+   my %attrs = ( @args == 1 ) ? $args[0]->getattrs : @args;
+   exists $attrs{bg} or $attrs{bg} = $self->get_effective_penattr( 'bg' );
+
+   return $self->parent->scrollrect(
+      $self->top  + $top, $self->left + $left, $lines, $cols,
+      $downward, $rightward,
+      bg => $attrs{bg},
+   );
+}
+
 =head2 $success = $win->scroll( $downward, $rightward )
 
-Attempt to scroll the contents of the window in the given direction. Most
-terminals cannot scroll arbitrary regions. If the terminal does not support
-the type of scrolling requested, this method returns false to indicate that
-the caller should instead redraw the required contents. If the scrolling was
-sucessful, the method returns true.
+A shortcut for calling C<scrollrect> on the entire region of the window.
 
 =cut
 
@@ -594,13 +641,9 @@ sub scroll
    my $self = shift;
    my ( $downward, $rightward ) = @_;
 
-   return $self->term->scrollrect(
-      $self->abs_top,
-      $self->abs_left,
-      $self->lines,
-      $self->cols,
-      $downward,
-      $rightward
+   return $self->scrollrect(
+      0, 0, $self->lines, $self->cols,
+      $downward, $rightward
    );
 }
 

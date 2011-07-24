@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 35;
+use Test::More tests => 39;
 use Test::Identity;
 use Test::Refcount;
 
@@ -92,8 +92,33 @@ is_termlog( [ GOTO(2,3),
 
 $win->scroll( 1, 0 );
 
-is_termlog( [ SCROLLRECT(0,0,25,80, 1,0) ],
+is_termlog( [ SETBG(undef),
+              SCROLLRECT(0,0,25,80, 1,0) ],
             'Termlog scrolled' );
+
+$win->scrollrect( 5,0,10,80, 3,0 );
+
+is_termlog( [ SETBG(undef),
+              SCROLLRECT(5,0,10,80, 3,0) ],
+            'Termlog after scrollrect' );
+
+ok( !$win->scrollrect( 5,20,10,40, 3,0 ), '$win does not support partial line scrolling' );
+# Flush a SETBG that might have happened
+$term->methodlog;
+
+$win->scrollrect( 20,0,1,80, 0,1 );
+
+is_termlog( [ SETBG(undef),
+              GOTO(20,0),
+              INSERTCH(1) ],
+            'Termlog after scrollrect ICH emulation' );
+
+$win->scrollrect( 21,10,1,70, 0,-1 );
+
+is_termlog( [ SETBG(undef),
+              GOTO(21,10),
+              DELETECH(1) ],
+            'Termlog after scrollrect DCH emulation' );
 
 $win->erasech( 15 );
 

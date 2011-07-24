@@ -8,7 +8,7 @@ package Tickit::Utils;
 use strict;
 use warnings;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Exporter 'import';
 our @EXPORT_OK = qw(
@@ -22,7 +22,9 @@ our @EXPORT_OK = qw(
    align
 );
 
-use Text::CharWidth qw( mbwidth mbswidth );
+require XSLoader;
+XSLoader::load( __PACKAGE__, $VERSION );
+# Provides textwidth
 
 =head1 NAME
 
@@ -42,8 +44,7 @@ Returns the number of screen columns consumed by the given (Unicode) string.
 
 =cut
 
-# For now; see if we can reimplement natively
-*textwidth = \&Text::CharWidth::mbswidth;
+# Provided by XS
 
 =head2 @cols = chars2cols( $text, @chars )
 
@@ -52,26 +53,7 @@ widths of those characters. In scalar context returns the first columns width.
 
 =cut
 
-# TODO: This could be done a lot more efficiently in C
-sub chars2cols
-{
-   my $text = shift;
-
-   my $char = 0;
-   my $col  = 0;
-
-   my @cols;
-
-   while( @_ ) {
-      my $thischar = shift;
-      $col += textwidth( substr $text, 0, $thischar - $char, "" );
-      push @cols, $col;
-      $char = $thischar;
-   }
-
-   return $cols[0] if !wantarray;
-   return @cols;
-}
+# Provided by XS
 
 =head2 @chars = cols2chars( $text, @cols )
 
@@ -81,30 +63,7 @@ position.
 
 =cut
 
-# TODO: This could be done a lot more efficiently in C
-sub cols2chars
-{
-   my $text = shift;
-   my $textlen = length $text;
-
-   my $col  = 0;
-   my $char = 0;
-
-   my @chars;
-
-   while( @_ ) {
-      my $thiscol = shift;
-      while( $char < $textlen and
-             $col + ( my $thiswidth = mbwidth substr $text, $char ) <= $thiscol ) {
-         $col += $thiswidth;
-         $char++;
-      }
-      push @chars, $char;
-   }
-
-   return $chars[0] if !wantarray;
-   return @chars;
-}
+# Provided by XS
 
 =head2 $substr = substrwidth $text, $startcol
 

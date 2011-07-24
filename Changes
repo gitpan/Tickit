@@ -1,5 +1,17 @@
 Revision history for Changes
 
+0.08    CHANGES:
+         * More efficient XS implementation of low-level string length
+           handling utilities in Tickit::Util
+         * Allow forcing size of child widgets in Tickit::Widget::VBox and
+           ::HBox
+         * Pass region information into Widget->render methods; even if
+           currently it is a fixed 0/0/$lines/$cols
+         * Accept a pen argmuent to Window->print; deprecate ->penprint
+         * Implement Window->scrollrect; deprecate ->insertch and ->deletech
+         * Print a deprecation warning if a plain Tickit object is used as an
+           IO::Async::Notifier
+
 0.07    CHANGES:
          * Provide (trivial) Tickit::Async subclass for users to prepare for
            IO::Async split

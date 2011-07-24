@@ -3,7 +3,7 @@ package Tickit::Test::MockTerm;
 use strict;
 use warnings;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 sub new
 {
@@ -185,16 +185,18 @@ sub print
    $self->{changed}++;
 }
 
-sub scrollrect
+# Tickit::Term::scrollrect is implemented using _scroll_lines or
+# goto/insertch/deletech. Either way, we can use it here
+require Tickit::Term;
+*scrollrect = \&Tickit::Term::scrollrect;
+
+sub _scroll_lines
 {
    my $self = shift;
-   my ( $top, $left, $lines, $cols, $downward, $rightward ) = @_;
-
-   # Lots of scroll types we don't support (for now...)
-   return 0 if $left > 0 or $cols != $self->cols or $rightward != 0;
+   my ( $top, $bottom, $downward ) = @_;
 
    # Logic is simpler if $bottom is the first line -beyond- the scroll region
-   my $bottom = $top + $lines;
+   $bottom++;
 
    my $display = $self->{display};
 
@@ -209,7 +211,7 @@ sub scrollrect
       splice @$display, $top, 0, ( " " x $self->cols ) x $upward;
    }
 
-   $self->_push_methodlog( scrollrect => @_ );
+   $self->_push_methodlog( scrollrect => $top, 0, $bottom - $top, $self->cols, $downward, 0 );
 
    $self->{changed}++;
 

@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 10;
+use Test::More tests => 11;
 use Test::Identity;
 use Test::Refcount;
 
@@ -13,6 +13,7 @@ use Tickit::Widget;
 my $win = mk_window;
 
 my $render_called = 0;
+my %render_args;
 my $gained_window;
 my $lost_window;
 my $widget = TestWidget->new;
@@ -28,6 +29,14 @@ flush_tickit;
 
 identical( $widget->window, $win, '$widget->window after set_window' );
 is( $render_called, 1, 'render is called after set_window' );
+
+is_deeply( \%render_args,
+   {
+      top   => 0,
+      left  => 0,
+      lines => 25,
+      cols  => 80,
+   }, 'render arguments after set_window' );
 
 identical( $gained_window, $win, '$widget->window_gained called' );
 
@@ -62,6 +71,7 @@ use base qw( Tickit::Widget );
 sub render
 {
    my $self = shift;
+   %render_args = @_;
 
    $render_called++;
 

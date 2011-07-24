@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 24;
+use Test::More tests => 26;
 
 use Tickit::Test;
 
@@ -46,19 +46,37 @@ is_termlog( [ GOTO(5,13),
               PRINT("Hello"), ],
             'Termlog with correct pen' );
 
-$win->penprint( "large", Tickit::Pen->new( fg => 'red' ) );
+$win->print( "large", Tickit::Pen->new( fg => 'red' ) );
 
 is_termlog( [ SETPEN(b => 1, fg => 1),
               PRINT("large"), ],
             'Termlog with passed pen' );
 
-$win->penprint( "world", u => 1 );
+$win->print( "world", u => 1 );
 
 is_termlog( [ SETPEN(b => 1, u => 1),
               PRINT("world"), ],
             'Termlog with pen attributes hash' );
 
 $win->pen->chattr( bg => 4 );
+
+$win->erasech( 4 );
+
+is_termlog( [ SETBG(4),
+              ERASECH(4) ],
+            'Termlog after erasech' );
+
+$win->erasech( 4, undef, Tickit::Pen->new( bg => 2 ) );
+
+is_termlog( [ SETBG(2),
+              ERASECH(4) ],
+            'Termlog after erasech with passed pen' );
+
+$win->erasech( 4, undef, bg => 6 );
+
+is_termlog( [ SETBG(6),
+              ERASECH(4) ],
+            'Termlog after erasech with pen attributes hash' );
 
 $win->clearline( 0 );
 
@@ -108,10 +126,8 @@ is_display( [ ( "") x 5,
 
 $rootwin->scroll( 1, 0 );
 
-is_termlog( [ SCROLLRECT(0,0,25,80, 1,0) ],
+is_termlog( [ SETBG(undef),
+              SCROLLRECT(0,0,25,80, 1,0) ],
             'Termlog scrolled' );
 
 ok( !$win->scroll( 1, 0 ), '$win does not support scrolling' );
-
-is_termlog( [ ],
-            'Termlog empty after scroll failure' );

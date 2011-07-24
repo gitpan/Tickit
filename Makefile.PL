@@ -6,6 +6,7 @@ WriteMakefile
           'VERSION_FROM' => 'lib/Tickit.pm',
           'PREREQ_PM' => {
                            'Exporter' => '5.57',
+                           'ExtUtils::CBuilder' => 0,
                            'IO::Async' => '0.29',
                            'IO::Async::Stream' => '0.34',
                            'IO::Async::Test' => 0,
@@ -17,8 +18,7 @@ WriteMakefile
                            'Test::HexString' => 0,
                            'Test::Identity' => 0,
                            'Test::More' => 0,
-                           'Test::Refcount' => 0,
-                           'Text::CharWidth' => 0
+                           'Test::Refcount' => 0
                          },
           'INSTALLDIRS' => 'site',
           'EXE_FILES' => [],

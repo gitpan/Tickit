@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use List::Util qw( sum );
 
@@ -37,6 +37,11 @@ For example, if all the children have a C<expand> value of 1, extra space is
 distributed evenly. If one child has a value of 2, it will gain twice as much
 extra space as its siblings. Any child with a value of 0 will obtain no extra
 space.
+
+=item force_size => NUM
+
+If provided, forces the size of this child widget, overriding the value
+returned by C<get_child_base>.
 
 =back
 
@@ -74,10 +79,9 @@ sub add
    my $self = shift;
    my ( $child, %opts ) = @_;
 
-   my $expand = $opts{expand} || 0;
-
    $self->SUPER::add( $child, 
-      expand => $expand,
+      expand     => $opts{expand} || 0,
+      force_size => $opts{force_size},
    );
 }
 
@@ -120,7 +124,8 @@ sub redistribute_child_windows
    $self->foreach_child( sub {
       my ( $child, %opts ) = @_;
 
-      $base{$child} = $self->get_child_base( $child );
+      $base{$child} = defined $opts{force_size} ? $opts{force_size} 
+                                                : $self->get_child_base( $child );
 
       $spare -= $base{$child};
       $expand_total += $opts{expand};
@@ -161,19 +166,6 @@ sub redistribute_child_windows
       $current += $amount + $self->{spacing};
    } );
 }
-
-=head1 TODO
-
-=over 4
-
-=item * Undersize handling
-
-This widget doesn't correctly handle the case where its window is too small to
-fit all the children even at minimum size. Consider how it might do this.
-Give them smaller windows or drop them entirely. Use priority-based ordering
-to pick a victim.
-
-=back
 
 =head1 AUTHOR
 

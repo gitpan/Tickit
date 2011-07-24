@@ -8,6 +8,7 @@ examples/demo-pen.pl
 examples/demo-xterm256.pl
 examples/HelloWorldWidget-1.pm
 examples/HelloWorldWidget-2.pm
+examples/SpinnerWidget.pm
 examples/testonewidget.pl
 lib/Tickit.pm
 lib/Tickit/Async.pm
@@ -21,6 +22,7 @@ lib/Tickit/Term/xterm.pm
 lib/Tickit/Test.pm
 lib/Tickit/Test/MockTerm.pm
 lib/Tickit/Utils.pm
+lib/Tickit/Utils.xs
 lib/Tickit/Widget.pm
 lib/Tickit/Widget/Box.pm
 lib/Tickit/Widget/Entry.pm

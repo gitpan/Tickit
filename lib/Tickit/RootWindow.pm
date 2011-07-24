@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Window );
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Carp;
 use Scalar::Util qw( weaken refaddr );
@@ -127,6 +127,38 @@ sub top      { 0 }
 sub left     { 0 }
 sub abs_top  { 0 }
 sub abs_left { 0 }
+
+sub goto
+{
+   my $self = shift;
+   my ( $line, $col ) = @_;
+
+   $line >= 0 and $line < $self->lines or croak '$line out of bounds';
+   $col  >= 0 and $col  < $self->cols  or croak '$col out of bounds';
+
+   $self->term->goto( $line, $col );
+}
+
+sub scrollrect
+{
+   my $self = shift;
+   my ( $top, $left, $lines, $cols, $downward, $rightward, @args ) = @_;
+
+   $top  >= 0 and $top  < $self->lines or croak '$top out of bounds';
+   $left >= 0 and $left < $self->cols  or croak '$left out of bounds';
+
+   $lines > 0 and $top + $lines <= $self->lines or croak '$lines out of bounds';
+   $cols  > 0 and $left + $cols <= $self->cols  or croak '$cols out of bounds';
+
+   my %attrs = ( @args == 1 ) ? $args[0]->getattrs : @args;
+   exists $attrs{bg} or $attrs{bg} = $self->get_effective_penattr( 'bg' );
+
+   $self->term->chpen( bg => $attrs{bg} );
+   return $self->term->scrollrect(
+      $top, $left, $lines, $cols,
+      $downward, $rightward
+   );
+}
 
 sub _requeue_focus_parent
 {

@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Encode qw( find_encoding );
 use Term::Terminfo;
@@ -76,7 +76,7 @@ Takes the following named arguments at construction time:
 =item encoding => STRING
 
 Optional. If supplied, applies the named encoding to the Unicode string
-supplied to the C<print> and C<penprint> methods.
+supplied to the C<print> method.
 
 =item writer => OBJECT
 
@@ -225,14 +225,23 @@ sub scrollrect
    return 1 if !$downward and !$rightward;
 
    if( $left == 0 and $cols == $self->cols and $rightward == 0 ) {
-      $self->_DECscroll( $top, $top + $lines - 1, $downward );
+      $self->_scroll_lines( $top, $top + $lines - 1, $downward );
       return 1;
    }
 
-   die "TODO";
+   if( $left + $cols == $self->cols and $downward == 0 ) {
+      foreach my $line ( $top .. $top + $lines - 1 ) {
+         $self->goto( $line, $left );
+         $rightward > 0 ? $self->insertch(  $rightward )
+                        : $self->deletech( -$rightward );
+      }
+      return 1;
+   }
+
+   return 0;
 }
 
-sub _DECscroll
+sub _scroll_lines
 {
    my $self = shift;
    my ( $from, $to, $by ) = @_;
@@ -356,8 +365,10 @@ sub eraseinline
 =head2 $term->erasech( $count, $moveend )
 
 Erase C<$count> characters forwards. If C<$moveend> is true, the cursor is
-moved to the end of the erased region. If false, the cursor will remain where
-it is.
+moved to the end of the erased region. If defined but false, the cursor will
+remain where it is. If undefined, the terminal will perform whichever of these
+behaviours is more efficient, and the cursor will end at some undefined
+location.
 
 Using C<$moveend> may be more efficient than separate C<erasech> and C<goto>
 calls on terminals that do not have an erase function, as it will be
@@ -374,7 +385,7 @@ sub erasech
    # colour erase, we'll need to print spaces to set the colour
    if( $self->{pen}{bg} and !$self->{has_bce} ) {
       $self->write( " " x $count );
-      $self->write( sprintf "${CSI}%dD", $count ) if !$moveend;
+      $self->write( sprintf "${CSI}%dD", $count ) if defined $moveend and !$moveend;
    }
    else {
       $self->write( sprintf "${CSI}%dX", $count );
@@ -455,6 +466,16 @@ sub mode_mouse
 
    $self->write( $on ? "${CSI}?1002h" : "${CSI}?1002l" );
 }
+
+=head1 TODO
+
+=over 4
+
+=item *
+
+Track cursor position, and optimise (or eliminate entirely) C<goto> calls.
+
+=back
 
 =head1 AUTHOR
 

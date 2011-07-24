@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 16;
+use Test::More tests => 22;
 
 use Tickit::Utils qw(
    textwidth
@@ -16,19 +16,27 @@ is( textwidth( "" ),            0, 'textwidth empty' );
 is( textwidth( "ABC" ),         3, 'textwidth ASCII' );
 is( textwidth( "cafe\x{301}" ), 4, 'textwidth combining' );
 
-is_deeply( [ chars2cols "ABC", 0, 1, 3 ],
-           [ 0, 1, 3 ],
+is_deeply( [ chars2cols "ABC", 0, 1, 3, 4 ],
+           [ 0, 1, 3, 3 ],
            'chars2cols ASCII' );
-is_deeply( [ chars2cols "cafe\x{301}", 3, 4, 5 ],
-           [ 3, 4, 4 ],
+is_deeply( [ chars2cols "cafe\x{301}", 3, 4, 5, 6 ],
+           [ 3, 4, 4, 4 ],
            'chars2cols combining' );
 
-is_deeply( [ cols2chars "ABC", 0, 1, 3 ],
-           [ 0, 1, 3 ],
+is( scalar chars2cols( "ABC", 2 ), 2, 'scalar chars2cols' );
+is( scalar chars2cols( "ABC", 3 ), 3, 'scalar chars2cols EOS' );
+is( scalar chars2cols( "ABC", 4 ), 3, 'scalar chars2cols past EOS' );
+
+is_deeply( [ cols2chars "ABC", 0, 1, 3, 4 ],
+           [ 0, 1, 3, 3 ],
            'cols2chars ASCII' );
-is_deeply( [ cols2chars "cafe\x{301}", 3, 4 ],
-           [ 3, 5 ],
+is_deeply( [ cols2chars "cafe\x{301}", 3, 4, 5 ],
+           [ 3, 5, 5 ],
            'cols2chars combining' );
+
+is( scalar cols2chars( "ABC", 2 ), 2, 'scalar cols2chars' );
+is( scalar cols2chars( "ABC", 3 ), 3, 'scalar cols2chars EOS' );
+is( scalar cols2chars( "ABC", 4 ), 3, 'scalar cols2chars past EOS' );
 
 is( substrwidth( "ABC", 0, 1 ), "A", 'substrwidth ASCII' );
 is( substrwidth( "ABC", 2 ),    "C", 'substrwidth ASCII trail' );

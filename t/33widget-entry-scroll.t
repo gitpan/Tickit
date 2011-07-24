@@ -107,6 +107,7 @@ $entry->text_delete( 0, 1 );
 flush_tickit;
 
 is_termlog( [ SETBG(undef),
+              GOTO(0,0),
               DELETECH(1),
               GOTO(0,76),
               SETPEN,

@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -280,7 +280,7 @@ sub _do_redraw
 
    if( $flag & REDRAW_SELF or $force ) {
       $self->_do_clear;
-      $self->render;
+      $self->render( top => 0, left => 0, lines => $window->lines, cols => $window->cols );
    }
 }
 
@@ -333,10 +333,31 @@ sub reshape { }
 Because this is an abstract class, the constructor must be called on a
 subclass which implements the following methods.
 
-=head2 $widget->render
+=head2 $widget->render( %args )
 
 Called to redraw the widget's content to its window. Methods can be called on
 the contained L<Tickit::Window> object obtained from C<< $widget->window >>.
+
+Will be passed hints on the region of the window that requires rendering; the
+method implementation may choose to use this information to restrict drawing,
+or it may ignore it entirely.
+
+=over 8
+
+=item top => INT
+
+=item left => INT
+
+The top-left corner of the region that requires rendering, relative to the
+widget's window.
+
+=item lines => INT
+
+=item cols => INT
+
+The size of the region that requires rendering.
+
+=back
 
 =head2 $widget->reshape
 

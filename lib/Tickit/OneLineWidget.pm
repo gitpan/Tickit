@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Carp;
 
@@ -97,20 +97,23 @@ sub set_valign
 sub render
 {
    my $self = shift;
+   my %args = @_;
+
+   my $bottom = $args{top} + $args{lines} - 1;
 
    my $window = $self->window or return;
 
-   my ( $top ) =
+   my ( $above ) =
       Tickit::Utils::align( 1, $window->lines, $self->valign );
 
    my $cols = $window->cols;
 
-   $window->goto( $_, 0 ), $window->erasech( $cols ) for 0 .. $top - 1;
+   $window->goto( $_, 0 ), $window->erasech( $cols ) for $args{top} .. $above - 1;
 
-   $window->goto( $top, 0 );
+   $window->goto( $above, 0 );
    $self->render_line;
 
-   $window->goto( $_, 0 ), $window->erasech( $cols ) for $top + 1 .. $window->lines - 1;
+   $window->goto( $_, 0 ), $window->erasech( $cols ) for $above + 1 .. $bottom;
 }
 
 =head1 SUBCLASS METHODS

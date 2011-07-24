@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Carp;
 
@@ -59,10 +59,12 @@ sub _do_redraw
    my $flag = $self->{needs_redraw};
    $self->{needs_redraw} = 0;
 
+   my $window = $self->window or return;
+
    if( $flag & Tickit::Widget::REDRAW_SELF or $force ) {
       # Force a redraw if we cleared
       $self->_do_clear and $force = 1;
-      $self->render;
+      $self->render( top => 0, left => 0, lines => $window->lines, cols => $window->cols );
    }
 
    if( $flag & Tickit::Widget::REDRAW_CHILDREN or $force ) {
@@ -209,7 +211,7 @@ sub child_resized {}
 
 =head1 SUBCLASS METHODS
 
-=head2 $widget->render
+=head2 $widget->render( %args )
 
 Optional. An empty C<render> method is provided for the case where the widget
 is purely a layout container that does not directly draw to its window. If the

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( IO::Async::Notifier );
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use IO::Async::Loop;
 use IO::Async::Signal;
@@ -156,6 +156,12 @@ sub new
 sub _add_to_loop
 {
    my $self = shift;
+
+   if( ref $self eq __PACKAGE__ and not $self->{no_IO_Async_warning} ) {
+      # This ought only to be called on the Tickit::Async subclass
+      warn "Using Tickit as an IO::Async::Notifier subclass is deprecated; see Tickit::Async\n";
+   }
+
    $self->SUPER::_add_to_loop( @_ );
 
    if( $self->{todo_later} ) {
@@ -210,7 +216,7 @@ sub _recache_size
 {
    my $self = shift;
    ( $self->{cols}, $self->{lines} ) = Term::Size::chars $self->{term_out};
-   $self->term->set_size( $self->{cols}, $self->{lines} );
+   $self->term->set_size( $self->{lines}, $self->{cols} );
 }
 
 sub lines { shift->{lines} }
@@ -350,6 +356,7 @@ sub run
    my $self = shift;
 
    my $loop = $self->get_loop || do {
+      local $self->{no_IO_Async_warning} = 1;
       my $newloop = IO::Async::Loop->new;
       $newloop->add( $self );
       $newloop;

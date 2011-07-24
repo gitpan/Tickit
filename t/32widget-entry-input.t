@@ -79,6 +79,7 @@ is( $entry->text,     "XInitial", '$entry->text after X' );
 is( $entry->position, 1,          '$entry->position after X' );
 
 is_termlog( [ SETBG(undef),
+              GOTO(0,0),
               INSERTCH(1),
               SETPEN,
               PRINT("X") ],
@@ -94,8 +95,8 @@ presskey( key => "Backspace" );
 is( $entry->text,     "Initial", '$entry->text after Backspace' );
 is( $entry->position, 0,         '$entry->position after Backspace' );
 
-is_termlog( [ GOTO(0,0),
-              SETBG(undef),
+is_termlog( [ SETBG(undef),
+              GOTO(0,0),
               DELETECH(1) ],
             'Termlog after Backspace' );
 
@@ -110,6 +111,7 @@ is( $entry->text,     "nitial", '$entry->text after Delete' );
 is( $entry->position, 0,        '$entry->position after Delete' );
 
 is_termlog( [ SETBG(undef),
+              GOTO(0,0),
               DELETECH(1) ],
             'Termlog after Delete' );
 

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget );
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Carp;
 
@@ -291,49 +291,56 @@ sub set_child_window
 sub render
 {
    my $self = shift;
+   my %args = @_;
 
    my $win = $self->window or return;
 
-   my $cols = $win->cols;
+   my $cols  = $win->cols;
+   my $lines = $win->lines;
 
    my $style = $STYLES{$self->{style}};
 
    my $framepen = $self->frame_pen;
 
-   $win->goto( 0, 0 );
-   if( defined( my $title = $self->title ) ) {
-      # At most we can fit $cols-4 columns of title
-      my ( $left, $titlewidth, $right ) = align( textwidth( $title ), $cols - 4, $self->{title_align} );
-
-      $win->penprint( $style->[CORNER_TL] . ( $style->[TOP] x $left ) . " ", $framepen );
-      $win->penprint( $title, $framepen );
-      $win->penprint( " " . ( $style->[TOP] x $right ) . $style->[CORNER_TR], $framepen ) if $cols > 1;
-   }
-   else {
-      my $line = $style->[CORNER_TL];
-      $line .= $style->[TOP] x ($cols - 2) if $cols > 2;
-      $line .= $style->[CORNER_TR] if $cols > 1;
-
-      $win->penprint( $line, $framepen );
-   }
-
-   foreach my $line ( 1 .. $win->lines - 2 ) {
+   foreach my $line ( $args{top} .. $args{top} + $args{lines} - 1 ) {
       $win->goto( $line, 0 );
-      $win->penprint( $style->[LEFT], $framepen );
 
-      next if $cols == 1;
+      if( $line == 0 ) {
+         # Top line
+         if( defined( my $title = $self->title ) ) {
+            # At most we can fit $cols-4 columns of title
+            my ( $left, $titlewidth, $right ) = align( textwidth( $title ), $cols - 4, $self->{title_align} );
 
-      $win->goto( $line, $cols - 1 );
-      $win->penprint( $style->[RIGHT], $framepen );
+            $win->print( $style->[CORNER_TL] . ( $style->[TOP] x $left ) . " ", $framepen );
+            $win->print( $title, $framepen );
+            $win->print( " " . ( $style->[TOP] x $right ) . $style->[CORNER_TR], $framepen ) if $cols > 1;
+         }
+         else {
+            my $str = $style->[CORNER_TL];
+            $str .= $style->[TOP] x ($cols - 2) if $cols > 2;
+            $str .= $style->[CORNER_TR] if $cols > 1;
+
+            $win->print( $str, $framepen );
+         }
+      }
+      elsif( $line < $lines - 1 ) {
+         # Middle line
+         $win->print( $style->[LEFT], $framepen );
+
+         next if $cols == 1;
+
+         $win->goto( $line, $cols - 1 );
+         $win->print( $style->[RIGHT], $framepen );
+      }
+      else {
+         # Bottom line
+         my $str = $style->[CORNER_BL];
+         $str .= $style->[BOTTOM] x ($cols - 2) if $cols > 2;
+         $str .= $style->[CORNER_BR] if $cols > 1;
+
+         $win->print( $str, $framepen );
+      }
    }
-
-   $win->goto( $win->lines - 1, 0 );
-
-   my $line = $style->[CORNER_BL];
-   $line .= $style->[BOTTOM] x ($cols - 2) if $cols > 2;
-   $line .= $style->[CORNER_BR] if $cols > 1;
-
-   $win->penprint( $line, $framepen );
 }
 
 =head1 TODO

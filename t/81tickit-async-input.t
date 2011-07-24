@@ -4,8 +4,11 @@ use strict;
 
 # We need a UTF-8 locale to force libtermkey into UTF-8 handling, even if the
 # system locale is not
+# We also need to fool libtermkey into believing TERM=xterm even if it isn't,
+# so we can reliably control it with fake escape sequences
 BEGIN {
    $ENV{LANG} .= ".UTF-8" unless $ENV{LANG} =~ m/\.UTF-8$/;
+   $ENV{TERM} = "xterm";
 }
 
 use Test::More tests => 8;

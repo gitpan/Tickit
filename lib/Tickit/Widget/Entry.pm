@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Tickit::Utils qw( textwidth chars2cols cols2chars substrwidth );
 
@@ -79,7 +79,7 @@ Delete one character forwards
 
 Delete one word forwards
 
-=item * End
+=item * End or Ctrl-E
 
 Move the cursor to the end of the input line
 
@@ -87,7 +87,7 @@ Move the cursor to the end of the input line
 
 Accept a line of input by running the C<on_enter> action
 
-=item * Home
+=item * Home or Ctrl-A
 
 Move the cursor to the beginning of the input line
 
@@ -142,6 +142,8 @@ sub new
    $self->{overwrite} = 0;
 
    $self->{keybindings} = {
+      'C-a' => "key_beginning_of_line",
+      'C-e' => "key_end_of_line",
       'C-k' => "key_delete_line",
       'C-u' => "key_backward_delete_line",
       'C-w' => "key_backward_delete_word",
@@ -194,7 +196,7 @@ sub pretext_render
    my $self = shift;
    my ( $win ) = @_;
 
-   $win->penprint( $self->{more_markers}[0], $self->{more_pen} );
+   $win->print( $self->{more_markers}[0], $self->{more_pen} );
 }
 
 sub posttext_width
@@ -210,7 +212,7 @@ sub posttext_render
    my $self = shift;
    my ( $win ) = @_;
 
-   $win->penprint( $self->{more_markers}[1], $self->{more_pen} );
+   $win->print( $self->{more_markers}[1], $self->{more_pen} );
 }
 
 sub render
@@ -312,17 +314,12 @@ sub _text_spliced
       die "TODO: text_splice before window - what to do??\n";
    }
 
-   if( $pos_ch != $self->position ) {
-      $win->goto( 0, $pos_x );
-   }
-
    my $need_reprint = 0;
 
-   if( $delta_co > 0 and !$at_end ) {
-      $win->insertch( $delta_co ) or $need_reprint = 1;
-   }
-   elsif( $delta_co < 0 ) {
-      $win->deletech( -$delta_co ) or $need_reprint = 1;
+   if( $delta_co > 0 and !$at_end or
+       $delta_co < 0 ) {
+      $win->scrollrect( 0, $pos_x, 1, $win->cols - $pos_x, 0, $delta_co ) or
+         $need_reprint = 1;
    }
 
    if( $need_reprint ) {
@@ -330,6 +327,7 @@ sub _text_spliced
       # here
       my $right_co = $self->{scrolloffs_co} + $width;
 
+      $win->goto( 0, $pos_x ) if $pos_ch != $self->position;
       $win->print( substrwidth( $self->text, $pos_co, $right_co - $pos_co ) );
 
       my $trailing_blank_co = $right_co - length($self->text);
@@ -348,6 +346,7 @@ sub _text_spliced
          substrwidth( $inserted, $right_co - $pos_co, "" );
       }
 
+      $win->goto( 0, $pos_x ) if $pos_ch != $self->position;
       $win->print( $inserted );
    }
 

@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 21;
+use Test::More tests => 23;
 
 use Tickit::Test;
 
@@ -218,6 +218,37 @@ is_termlog( [ SETPEN(b => 1, bg => 4),
               PRINT("New Widget"),
               ( map { GOTO($_,90), SETBG(4), ERASECH(10) } 1 .. 29 ) ],
             'Termlog after chpen bg' );
+
+$widget->set_child_opts( 2, force_size => 15 );
+
+flush_tickit;
+
+is_display( [ "A longer piece of text for the static  Widget 1                          Widget 2         New Widget" ],
+            'Display after force_size' );
+
+is_termlog( [ SETPEN(b => 1, bg => 4),
+              CLEAR(),
+              GOTO(0,0),
+              SETPEN(b => 1, bg => 4),
+              PRINT("A longer piece of text for the static"),
+              ( map { GOTO($_,0), SETBG(4), ERASECH(37) } 1 .. 29 ),
+              GOTO(0,39),
+              SETPEN(b => 1, fg => 5, bg => 4),
+              PRINT("Widget 1"),
+              SETBG(4),
+              ERASECH(24),
+              ( map { GOTO($_,39), SETBG(4), ERASECH(32) } 1 .. 29 ),
+              GOTO(0,73),
+              SETPEN(b => 1, bg => 4),
+              PRINT("Widget 2"),
+              SETBG(4),
+              ERASECH(7),
+              ( map { GOTO($_,73), SETBG(4), ERASECH(15) } 1 .. 29 ),
+              GOTO(0,90),
+              SETPEN(b => 1, bg => 4),
+              PRINT("New Widget"),
+              ( map { GOTO($_,90), SETBG(4), ERASECH(10) } 1 .. 29 ) ],
+            'Termlog after force_size' );
 
 $widget->set_window( undef );
 

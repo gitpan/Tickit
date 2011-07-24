@@ -53,13 +53,14 @@ $entry->text_insert( " ", 0 );
 is( $entry->text,     " Hello", '$entry->text after ->text_insert at 0' );
 is( $entry->position, 6,        '$entry->position after ->text_insert at 0' );
 
-is_termlog( [ GOTO(0,0),
-             SETBG(undef),
-             INSERTCH(1),
-             SETPEN,
-             PRINT(" "),
-             GOTO(0,6) ],
-           'Termlog after ->text_insert at 0' );
+is_termlog( [ SETBG(undef),
+              GOTO(0,0),
+              INSERTCH(1),
+              GOTO(0,0),
+              SETPEN,
+              PRINT(" "),
+              GOTO(0,6) ],
+            'Termlog after ->text_insert at 0' );
 
 is_display( [ " Hello" ],
             'Display after ->text_insert at 0' );
@@ -70,8 +71,8 @@ is( $entry->text_delete( 5, 1 ), "o", '$entry->text_delete' );
 is( $entry->text,     " Hell", '$entry->text after ->text_delete' );
 is( $entry->position, 5,       '$entry->position after ->text_delete' );
 
-is_termlog( [ GOTO(0,5),
-              SETBG(undef),
+is_termlog( [ SETBG(undef),
+              GOTO(0,5),
               DELETECH(1) ],
             'Termlog after ->text_delete' );
 
@@ -84,9 +85,10 @@ is( $entry->text_splice( 0, 2, "Y" ), " H", '$entry->text_splice shrink' );
 is( $entry->text,     "Yell", '$entry->text after ->text_splice shrink' );
 is( $entry->position, 4,      '$entry->position after ->text_splice shrink' );
 
-is_termlog( [ GOTO(0,0),
-              SETBG(undef),
+is_termlog( [ SETBG(undef),
+              GOTO(0,0),
               DELETECH(1),
+              GOTO(0,0),
               SETPEN,
               PRINT("Y"),
               GOTO(0,4) ],
@@ -115,9 +117,10 @@ is( $entry->text_splice( 3, 1, "low" ), "p", '$entry->text_splice grow' );
 is( $entry->text,     "Yellow", '$entry->text after ->text_splice grow' );
 is( $entry->position, 6,        '$entry->position after ->text_splice grow' );
 
-is_termlog( [ GOTO(0,3),
-              SETBG(undef),
+is_termlog( [ SETBG(undef),
+              GOTO(0,3),
               INSERTCH(2),
+              GOTO(0,3),
               SETPEN,
               PRINT("low") ],
             'Termlog after ->text_splice grow' );
@@ -187,7 +190,8 @@ $entry->text_insert( "And ", 0 );
 
 flush_tickit;
 
-is_termlog( [ GOTO(2,2),
+is_termlog( [ SETBG(undef),
+              GOTO(2,2),
               SETPEN,
               PRINT("And Different text"),
               SETBG(undef),
