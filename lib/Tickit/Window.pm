@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 use Carp;
 
@@ -249,6 +249,98 @@ sub _handle_mouse
    }
 
    return 0;
+}
+
+=head2 $win->set_on_expose( $on_expose )
+
+Set the callback to invoke whenever a region of the window is exposed by the
+C<expose> event.
+
+ $on_expose->( %args )
+
+Will be passed the following named parameters:
+
+=over 8
+
+=item top => INT
+
+=item left => INT
+
+Position of the top left corner of the exposed region, relative to the window
+
+=item lines => INT
+
+=item cols => INT
+
+Size of the exposed region.
+
+=back
+
+=cut
+
+sub set_on_expose
+{
+   my $self = shift;
+   ( $self->{on_expose} ) = @_;
+}
+
+sub _do_expose
+{
+   my $self = shift;
+
+   undef $self->{expose_pending};
+
+   if( my $on_expose = $self->{on_expose} ) {
+      $on_expose->( $self, 
+         top   => 0,
+         left  => 0,
+         lines => $self->lines,
+         cols  => $self->cols,
+      );
+   }
+
+   my $children = $self->{child_windows} or return;
+
+   foreach my $win ( sort { $a->top <=> $b->top || $a->left <=> $b->left } grep { defined } @$children ) {
+      $win->_do_expose;
+   }
+}
+
+=head2 $win->expose
+
+Marks the window as having been exposed, to invoke the C<on_expose> event
+handler on itself, and all its child windows. The window's own handler will be
+invoked first, followed by all the child windows, in screen order (top to
+bottom, then left to right).
+
+The C<on_expose> event handler isn't invoked immediately; instead, the
+C<Tickit> C<later> method is used to invoke it at the next round of IO event
+handling. Until then, any other window could be exposed. Duplicates are
+suppressed; so if a window and any of its ancestors are both queued for
+expose, the actual handler will only be invoked once.
+
+=cut
+
+sub expose
+{
+   my $self = shift;
+
+   return if $self->_expose_pending;
+
+   $self->{expose_pending} = 1;
+
+   $self->root->enqueue_redraw( sub {
+      return if $self->parent && $self->parent->_expose_pending;
+
+      $self->_do_expose;
+   } );
+}
+
+sub _expose_pending
+{
+   my $self = shift;
+   return $self->{expose_pending} ||
+          ( $self->parent && $self->parent->_expose_pending );
 }
 
 =head2 $parentwin = $win->parent
@@ -502,7 +594,11 @@ A deprecated synonym for C<print>.
 
 =cut
 
-*penprint = \&print;
+sub penprint
+{
+   warnings::warnif( deprecated => "Tickit::Window->penprint is deprecated; use ->print instead" );
+   goto &print;
+}
 
 =head2 $win->erasech( $count, $moveend, $pen )
 
@@ -552,6 +648,8 @@ sub insertch
    my $self = shift;
    my ( $count ) = @_;
 
+   warnings::warnif( deprecated => "Tickit::Window->insertch is deprecated; use ->scrollrect instead" );
+
    return 0 unless $self->left + $self->cols == $self->term->cols;
 
    $self->term->chpen( bg => $self->get_effective_penattr( 'bg' ) );
@@ -578,6 +676,8 @@ sub deletech
 {
    my $self = shift;
    my ( $count ) = @_;
+
+   warnings::warnif( deprecated => "Tickit::Window->deletech is deprecated; use ->scrollrect instead" );
 
    return 0 unless $self->left + $self->cols == $self->term->cols;
 

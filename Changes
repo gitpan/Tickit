@@ -1,5 +1,14 @@
 Revision history for Changes
 
+0.09    CHANGES:
+         * Move IO::Async-based code out of Tickit into Tickit::Async,
+           reimplement a simple IO framework in Tickit itself.
+         * Added Window on_expose event that cascades down the Window tree
+         * Implement Widget drawing using Window on_expose events rather than
+           cascading logic down th Widget tree
+         * Print proper deprecation warnings from deprecated Window methods
+           penprint, insertch, deletech
+
 0.08    CHANGES:
          * More efficient XS implementation of low-level string length
            handling utilities in Tickit::Util

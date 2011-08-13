@@ -8,15 +8,12 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 use Carp;
 use Scalar::Util qw( weaken );
 
 use Tickit::Pen;
-
-use constant REDRAW_SELF     => 0x01;
-use constant REDRAW_CHILDREN => 0x02;
 
 =head1 NAME
 
@@ -60,7 +57,6 @@ sub new
    }
 
    my $self = bless {
-      needs_redraw => 0,
    }, $class;
 
    $self->set_pen( Tickit::Pen->new_from_attrs( \%args ) );
@@ -106,16 +102,11 @@ sub set_window
    if( $window ) {
       $window->set_pen( $self->{pen} );
 
-      $self->reshape;
-      $self->redraw( 1 );
-
-      weaken( my $weakself = $self );
-      $window->set_on_geom_changed( sub {
-         $weakself->reshape;
-         $weakself->redraw if !$weakself->parent;
-      } );
-
       $self->window_gained( $self->{window} );
+
+      $self->reshape;
+
+      $window->expose;
    }
 }
 
@@ -123,15 +114,29 @@ sub window_gained
 {
    my $self = shift;
 
+   my $window = $self->window;
+
    weaken $self;
+
+   $window->set_on_geom_changed( sub {
+      $self->reshape;
+      $self->redraw if !$self->parent;
+   } );
+
+   $window->set_on_expose( sub {
+      my ( $win, %args ) = @_;
+      $self->_do_clear;
+      $self->render( %args );
+   } );
+
    if( $self->can( "on_key" ) ) {
-      $self->window->set_on_key( sub {
+      $window->set_on_key( sub {
          shift;
          $self->on_key( @_ );
       } );
    }
    if( $self->can( "on_mouse" ) ) {
-      $self->window->set_on_mouse( sub {
+      $window->set_on_mouse( sub {
          shift;
          $self->on_mouse( @_ );
       } );
@@ -142,8 +147,12 @@ sub window_lost
 {
    my $self = shift;
 
-   $self->window->set_on_key( undef );
-   $self->window->set_on_mouse( undef );
+   my $window = $self->window;
+
+   $window->set_on_geom_changed( undef );
+   $window->set_on_expose( undef );
+   $window->set_on_key( undef );
+   $window->set_on_mouse( undef );
 }
 
 =head2 $window = $widget->window
@@ -228,27 +237,7 @@ sub redraw
    my $self = shift;
 
    $self->window or return;
-
-   $self->_need_redraw( REDRAW_SELF );
-}
-
-sub _need_redraw
-{
-   my $self = shift;
-   my ( $flag ) = @_;
-
-   return if $self->{needs_redraw} & REDRAW_SELF;
-
-   $self->{needs_redraw} |= $flag;
-
-   if( my $parent = $self->parent ) {
-      $parent->_need_redraw( REDRAW_CHILDREN );
-   }
-   else {
-      $self->window->root->enqueue_redraw( sub {
-         $self->_do_redraw( @_ );
-      } );
-   }
+   $self->window->expose;
 }
 
 sub _do_clear
@@ -266,22 +255,6 @@ sub _do_clear
 
    $window->clear;
    return 1;
-}
-
-sub _do_redraw
-{
-   my $self = shift;
-   my ( $force ) = @_;
-
-   my $flag = $self->{needs_redraw};
-   $self->{needs_redraw} = 0;
-
-   my $window = $self->window or return;
-
-   if( $flag & REDRAW_SELF or $force ) {
-      $self->_do_clear;
-      $self->render( top => 0, left => 0, lines => $window->lines, cols => $window->cols );
-   }
 }
 
 =head2 $pen = $widget->pen

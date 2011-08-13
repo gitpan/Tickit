@@ -1,5 +1,6 @@
 Build.PL
 Changes
+examples/ClickAndDragWidget.pm
 examples/ClickerWidget.pm
 examples/ColourWidget.pm
 examples/demo-entry.pl
@@ -8,7 +9,6 @@ examples/demo-pen.pl
 examples/demo-xterm256.pl
 examples/HelloWorldWidget-1.pm
 examples/HelloWorldWidget-2.pm
-examples/SpinnerWidget.pm
 examples/testonewidget.pl
 lib/Tickit.pm
 lib/Tickit/Async.pm
@@ -50,6 +50,7 @@ t/11window.t
 t/12window-output.t
 t/13window-focus.t
 t/14window-input.t
+t/15window-expose.t
 t/20widget.t
 t/21widget-window.t
 t/22widget-parent.t

@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 39;
+use Test::More tests => 37;
 use Test::Identity;
 use Test::Refcount;
 
@@ -19,6 +19,9 @@ is_refcount( $win, 2, '$win has refcount 2 initially' );
 
 my $geom_changed = 0;
 $win->set_on_geom_changed( sub { $geom_changed++ } );
+
+my %exposed_args;
+$win->set_on_expose( sub { shift; %exposed_args = @_ } );
 
 is( $win->top,  0, '$win->top is 0' );
 is( $win->left, 0, '$win->left is 0' );
@@ -44,6 +47,16 @@ is_deeply( { $win->get_effective_penattrs },
            '$win->get_effective_penattrs has no attrs set' );
 
 is( $win->get_effective_penattr( 'fg' ), undef, '$win has effective pen fg undef' );
+
+$win->expose;
+
+ok( !scalar keys %exposed_args, 'on_expose not yet invoked' );
+
+flush_tickit;
+
+is_deeply( \%exposed_args, 
+           { top => 0, left => 0, lines => 25, cols => 80 },
+           '%exposed_args after exposure' );
 
 $win->goto( 2, 3 );
 $win->print( "Hello" );
@@ -125,18 +138,6 @@ $win->erasech( 15 );
 is_termlog( [ SETBG(undef),
               ERASECH(15) ],
             'Termlog chars erased' );
-
-ok( $win->insertch( 10 ), '$win can insertch' );
-
-is_termlog( [ SETBG(undef),
-              INSERTCH(10) ],
-           'Termlog chars inserted' );
-
-ok( $win->deletech( 8 ), '$win can deletech' );
-
-is_termlog( [ SETBG(undef),
-              DELETECH(8) ],
-            'Termlog chars deleted' );
 
 $win->clear;
 

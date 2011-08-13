@@ -8,6 +8,7 @@ my $build = Module::Build->new(
    requires => {
       'Exporter' => '5.57',
       'IO::Async' => 0.29,
+      'IO::Async::Notifier' => '0.43',
       'IO::Async::Stream' => '0.34',
       'IO::Async::Test' => 0,
       'List::MoreUtils' => 0,
@@ -24,7 +25,7 @@ my $build = Module::Build->new(
    },
    auto_configure_requires => 0, # Don't add M::B to configure_requires
    license => 'perl',
-   create_makefile_pl => 'traditional',
+   create_makefile_pl => 'small',
    create_license => 1,
    create_readme  => 1,
 );

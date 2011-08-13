@@ -86,10 +86,12 @@ sub window_gained
 {
    my $self = shift;
    ( $gained_window ) = @_;
+   $self->SUPER::window_gained( @_ );
 }
 
 sub window_lost
 {
    my $self = shift;
    ( $lost_window ) = @_;
+   $self->SUPER::window_lost( @_ );
 }

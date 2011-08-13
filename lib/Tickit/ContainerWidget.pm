@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 use Carp;
 
@@ -50,29 +50,6 @@ sub new
 =cut
 
 sub render { }
-
-sub _do_redraw
-{
-   my $self = shift;
-   my ( $force ) = @_;
-
-   my $flag = $self->{needs_redraw};
-   $self->{needs_redraw} = 0;
-
-   my $window = $self->window or return;
-
-   if( $flag & Tickit::Widget::REDRAW_SELF or $force ) {
-      # Force a redraw if we cleared
-      $self->_do_clear and $force = 1;
-      $self->render( top => 0, left => 0, lines => $window->lines, cols => $window->cols );
-   }
-
-   if( $flag & Tickit::Widget::REDRAW_CHILDREN or $force ) {
-      foreach my $child ( $self->children ) {
-         $child->_do_redraw( $force );
-      }
-   }
-}
 
 =head2 @children = $widget->children
 

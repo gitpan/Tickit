@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 26;
+use Test::More tests => 24;
 
 use Tickit::Test;
 
@@ -90,9 +90,6 @@ is_termlog( [ GOTO(3,10), SETBG(4), ERASECH(20),
               GOTO(5,10), SETBG(4), ERASECH(20),
               GOTO(6,10), SETBG(4), ERASECH(20) ],
             '$win->clear clears window lines' );
-
-ok( !$win->insertch( 5 ), '$win cannot insertch' );
-ok( !$win->deletech( 5 ), '$win cannot deletech' );
 
 my $subwin = $win->make_sub( 2, 2, 1, 10 );
 

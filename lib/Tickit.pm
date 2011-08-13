@@ -7,16 +7,12 @@ package Tickit;
 
 use strict;
 use warnings;
-use base qw( IO::Async::Notifier );
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
-use IO::Async::Loop;
-use IO::Async::Signal;
-use IO::Async::Stream;
-
+use IO::Handle;
 use Term::Size;
-use Term::TermKey::Async qw( FORMAT_ALTISMETA FLAG_UTF8 );
+use Term::TermKey qw( FORMAT_ALTISMETA FLAG_UTF8 RES_KEY RES_AGAIN );
 
 use Tickit::Term;
 use Tickit::RootWindow;
@@ -78,73 +74,30 @@ sub new
 
    my $term = delete $args{term};
 
-   my $self = $class->SUPER::new( %args );
+   my $self = bless {}, $class;
 
-   my $spacesym;
-
-   my $tka = Term::TermKey::Async->new(
-      term => $in,
-      on_key => $self->_capture_weakself( sub {
-         my $self = shift;
-         my ( $tka, $key ) = @_;
-
-         # libtermkey represents unmodified Space as a keysym, whereas we'd
-         # prefer to treat it as plain text
-         if( $key->type_is_unicode and !$key->modifiers ) {
-            $self->maybe_invoke_event( on_key => text => $key->utf8, $key );
-         }
-         elsif( $key->type_is_keysym  and !$key->modifiers and $key->sym == $spacesym ) {
-            $self->maybe_invoke_event( on_key => text => " ", $key );
-         }
-         elsif( $key->type_is_mouse ) {
-            my ( $ev, $button, $line, $col ) = $tka->interpret_mouse( $key );
-            my $evname = (qw( * press drag release ))[$ev];
-            $self->maybe_invoke_event( on_mouse => $evname, $button, $line - 1, $col - 1 );
-         }
-         else {
-            $self->maybe_invoke_event( on_key => key => $tka->format_key( $key, FORMAT_ALTISMETA ), $key );
-         }
-      } ),
-   );
-   $self->add_child( $tka );
-
-   $spacesym = $tka->keyname2sym( "Space" );
+   my $termkey = $self->_make_termkey( $in );
 
    unless( $term ) {
-      my $writer = IO::Async::Stream->new(
-         write_handle => $out,
-         autoflush => 1,
-      );
+      my $writer = $self->_make_writer( $out );
 
       $term = Tickit::Term->find_for_term(
          writer => $writer,
-         ( $tka->get_flags & FLAG_UTF8 ) ? ( encoding => "UTF-8" ) : (),
+         ( $termkey->get_flags & FLAG_UTF8 ) ? ( encoding => "UTF-8" ) : (),
       );
-
-      $self->add_child( $writer );
    }
 
    $self->{term} = $term;
+   $self->{term_in}  = $in;
    $self->{term_out} = $out;
+   $self->{termkey} = $termkey;
 
    $self->_recache_size;
-
-   $self->add_child( IO::Async::Signal->new( 
-      name => "WINCH",
-      on_receipt => $self->_capture_weakself( sub {
-         my $self = shift or return;
-
-         $self->_recache_size;
-         $self->rootwin->resize( $self->lines, $self->cols );
-      } ),
-   ) );
+   $term->set_size( $self->lines, $self->cols );
 
    $self->{rootwin} = Tickit::RootWindow->new( $self, $self->lines, $self->cols );
 
-   $self->bind_key( 'C-c' => $self->_capture_weakself( sub {
-      my $self = shift;
-      $self->get_loop->loop_stop;
-   } ) );
+   $self->bind_key( 'C-c' => $self->can( "_STOP" ) );
 
    return $self;
 }
@@ -153,21 +106,22 @@ sub new
 
 =cut
 
-sub _add_to_loop
+sub _make_termkey
 {
    my $self = shift;
+   my ( $in ) = @_;
 
-   if( ref $self eq __PACKAGE__ and not $self->{no_IO_Async_warning} ) {
-      # This ought only to be called on the Tickit::Async subclass
-      warn "Using Tickit as an IO::Async::Notifier subclass is deprecated; see Tickit::Async\n";
-   }
+   return Term::TermKey->new( $in );
+}
 
-   $self->SUPER::_add_to_loop( @_ );
+sub _make_writer
+{
+   my $self = shift;
+   my ( $out ) = @_;
 
-   if( $self->{todo_later} ) {
-      $self->get_loop->later( $_ ) for @{ $self->{todo_later} };
-      delete $self->{todo_later};
-   }
+   $out->autoflush( 1 );
+
+   return $out;
 }
 
 =head2 $tickit->later( $code )
@@ -178,17 +132,20 @@ events are processed.
 
 =cut
 
+sub _flush_later
+{
+   my $self = shift;
+
+   my $queue = $self->{todo_queue};
+   ( shift @$queue )->() while @$queue;
+}
+
 sub later
 {
    my $self = shift;
    my ( $code ) = @_;
 
-   if( my $loop = $self->get_loop ) {
-      $loop->later( $code );
-   }
-   else {
-      push @{ $self->{todo_later} }, $code;
-   }
+   push @{ $self->{todo_queue} }, $code;
 }
 
 =head2 $term = $tickit->term
@@ -216,11 +173,44 @@ sub _recache_size
 {
    my $self = shift;
    ( $self->{cols}, $self->{lines} ) = Term::Size::chars $self->{term_out};
-   $self->term->set_size( $self->{lines}, $self->{cols} );
 }
 
 sub lines { shift->{lines} }
 sub cols  { shift->{cols}  }
+
+sub _SIGWINCH
+{
+   my $self = shift;
+
+   $self->_recache_size;
+   $self->term->set_size( $self->lines, $self->cols );
+   $self->rootwin->resize( $self->lines, $self->cols );
+}
+
+sub _KEY
+{
+   my $self = shift;
+   my ( $tk, $key ) = @_;
+
+   my $spacesym = $self->{spacesym} ||= $tk->keyname2sym( "Space" );
+
+   # libtermkey represents unmodified Space as a keysym, whereas we'd
+   # prefer to treat it as plain text
+   if( $key->type_is_unicode and !$key->modifiers ) {
+      $self->on_key( text => $key->utf8, $key );
+   }
+   elsif( $key->type_is_keysym  and !$key->modifiers and $key->sym == $spacesym ) {
+      $self->on_key( text => " ", $key );
+   }
+   elsif( $key->type_is_mouse ) {
+      my ( $ev, $button, $line, $col ) = $tk->interpret_mouse( $key );
+      my $evname = (qw( * press drag release ))[$ev];
+      $self->on_mouse( $evname, $button, $line - 1, $col - 1 );
+   }
+   else {
+      $self->on_key( key => $tk->format_key( $key, FORMAT_ALTISMETA ), $key );
+   }
+}
 
 sub on_key
 {
@@ -230,7 +220,7 @@ sub on_key
    $self->rootwin->_handle_key( $type, $str, $key ) and return;
 
    if( exists $self->{key_binds}{$str} ) {
-      $self->{key_binds}{$str}->( $str ) and return;
+      $self->{key_binds}{$str}->( $self, $str ) and return;
    }
 }
 
@@ -239,14 +229,12 @@ sub on_key
 Installs a callback to invoke if the given key is pressed, overwriting any
 previous callback for the same key. The code block is invoked as
 
- $code->( $key )
+ $code->( $tickit, $key )
 
 If C<$code> is missing or C<undef>, any existing callback is removed.
 
 As a convenience for the common application use case, the C<Ctrl-C> key is
-bound to a callback that calls the C<loop_stop> method on the underlying
-C<IO::Async::Loop> object the C<Tickit> is a member of. This usually has the
-effect of cleanly stopping the application.
+bound to the C<_STOP> method.
 
 To remove this binding, simply bind another callback, or remove the binding
 entirely by setting C<undef>.
@@ -309,8 +297,6 @@ sub start
 {
    my $self = shift;
 
-   $SIG{INT} = $SIG{TERM} = sub { $self->get_loop->loop_stop };
-
    my $term = $self->term;
    $term->mode_altscreen( 1 );
    $term->mode_cursorvis( 0 );
@@ -344,25 +330,29 @@ sub stop
 
 =head2 $tickit->run
 
-A shortcut to the common usage pattern, combining the C<start> method with
-C<loop_forever> on the containing C<IO::Async::Loop> object. If the C<Tickit>
-object does not yet have a containing Loop, then one will be constructed using
-the C<IO::Async::Loop> magic constructor.
+Calls the C<start> method, then processes IO events until stopped, by the
+C<_STOP> method, C<SIGINT>, C<SIGTERM> or the C<Ctrl-C> key. Then runs the
+C<stop> method, and returns.
 
 =cut
+
+sub _STOP
+{
+   my $self = shift;
+   $self->{keep_running} = 0;
+}
 
 sub run
 {
    my $self = shift;
 
-   my $loop = $self->get_loop || do {
-      local $self->{no_IO_Async_warning} = 1;
-      my $newloop = IO::Async::Loop->new;
-      $newloop->add( $self );
-      $newloop;
-   };
-
    $self->start;
+
+   $SIG{INT} = $SIG{TERM} = sub { $self->_STOP };
+
+   $SIG{WINCH} = sub { 
+      $self->later( sub { $self->_SIGWINCH } )
+   };
 
    my $old_DIE = $SIG{__DIE__};
    local $SIG{__DIE__} = sub {
@@ -374,7 +364,48 @@ sub run
       die @_;
    };
 
-   $loop->loop_forever;
+   my $fileno_in = $self->{term_in}->fileno;
+   my $termkey = $self->{termkey};
+   my $queue   = $self->{todo_queue};
+
+   $self->_flush_later if @$queue;
+
+   my $key_pending = 0;
+
+   local $self->{keep_running} = 1;
+   while( $self->{keep_running} ) {
+      # libtermkey 0.8 / Term::TermKey 0.08 don't interrupt on signals. We'll
+      # have to implement our own micro async. wait mechanism
+
+      my $rin = '';
+      vec( $rin, $fileno_in, 1 ) = 1;
+
+      my $timeout = undef;
+      $key_pending and $timeout = $termkey->get_waittime / 1000;
+
+      my $ret = select my $rout = $rin, '', '', $timeout;
+
+      if( defined $ret and $ret == 0 ) {
+         # Timeout
+         if( $termkey->getkey_force( my $key ) == RES_KEY ) {
+            $self->_KEY( $termkey, $key );
+         }
+
+         $key_pending = 0;
+      }
+
+      if( vec( $rout, $fileno_in, 1 ) ) {
+         $termkey->advisereadable;
+         my $ret;
+         while( ( $ret = $termkey->getkey( my $key ) ) == RES_KEY ) {
+            $self->_KEY( $termkey, $key );
+         }
+         $key_pending = ( $ret == RES_AGAIN );
+      }
+
+      $self->_flush_later if @$queue;
+   }
+
    $self->stop;
 }
 
