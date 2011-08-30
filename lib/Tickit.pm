@@ -8,11 +8,12 @@ package Tickit;
 use strict;
 use warnings;
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use IO::Handle;
 use Term::Size;
-use Term::TermKey qw( FORMAT_ALTISMETA FLAG_UTF8 RES_KEY RES_AGAIN );
+use Term::TermKey qw( FORMAT_ALTISMETA FLAG_UTF8 FLAG_RAW FLAG_EINTR RES_KEY RES_AGAIN );
+use constant FLAGS_UTF8_RAW => FLAG_UTF8|FLAG_RAW;
 
 use Tickit::Term;
 use Tickit::RootWindow;
@@ -58,6 +59,12 @@ IO handle for terminal input. Will default to C<STDIN>.
 
 IO handle for terminal output. Will default to C<STDOUT>.
 
+=item UTF8 => BOOL
+
+If defined, overrides locale detection to enable or disable UTF-8 mode. If not
+defined then this will be detected from the locale by using Perl's
+C<${^UTF8LOCALE}> variable.
+
 =back
 
 =cut
@@ -74,16 +81,23 @@ sub new
 
    my $term = delete $args{term};
 
-   my $self = bless {}, $class;
+   my $is_utf8 = defined $args{UTF8} ? $args{UTF8} : ${^UTF8LOCALE};
+
+   my $self = bless {
+      UTF8 => $is_utf8,
+   }, $class;
 
    my $termkey = $self->_make_termkey( $in );
+
+   $termkey->set_flags( ( $termkey->get_flags & ~FLAGS_UTF8_RAW ) |
+                        ( $is_utf8 ? FLAG_UTF8 : FLAG_RAW ) );
 
    unless( $term ) {
       my $writer = $self->_make_writer( $out );
 
       $term = Tickit::Term->find_for_term(
          writer => $writer,
-         ( $termkey->get_flags & FLAG_UTF8 ) ? ( encoding => "UTF-8" ) : (),
+         $is_utf8 ? ( encoding => "UTF-8" ) : (),
       );
    }
 
@@ -111,7 +125,7 @@ sub _make_termkey
    my $self = shift;
    my ( $in ) = @_;
 
-   return Term::TermKey->new( $in );
+   return Term::TermKey->new( $in, FLAG_EINTR );
 }
 
 sub _make_writer
@@ -122,6 +136,20 @@ sub _make_writer
    $out->autoflush( 1 );
 
    return $out;
+}
+
+=head2 $tickit->is_utf8
+
+Returns true if running in UTF-8 mode; returned keypress events and displayed
+text will be Unicode aware. If false, then keypresses and displayed text will
+work in legacy 8-bit mode.
+
+=cut
+
+sub is_utf8
+{
+   my $self = shift;
+   return $self->{UTF8};
 }
 
 =head2 $tickit->later( $code )
@@ -374,33 +402,8 @@ sub run
 
    local $self->{keep_running} = 1;
    while( $self->{keep_running} ) {
-      # libtermkey 0.8 / Term::TermKey 0.08 don't interrupt on signals. We'll
-      # have to implement our own micro async. wait mechanism
-
-      my $rin = '';
-      vec( $rin, $fileno_in, 1 ) = 1;
-
-      my $timeout = undef;
-      $key_pending and $timeout = $termkey->get_waittime / 1000;
-
-      my $ret = select my $rout = $rin, '', '', $timeout;
-
-      if( defined $ret and $ret == 0 ) {
-         # Timeout
-         if( $termkey->getkey_force( my $key ) == RES_KEY ) {
-            $self->_KEY( $termkey, $key );
-         }
-
-         $key_pending = 0;
-      }
-
-      if( vec( $rout, $fileno_in, 1 ) ) {
-         $termkey->advisereadable;
-         my $ret;
-         while( ( $ret = $termkey->getkey( my $key ) ) == RES_KEY ) {
-            $self->_KEY( $termkey, $key );
-         }
-         $key_pending = ( $ret == RES_AGAIN );
+      if( $termkey->waitkey( my $key ) == RES_KEY ) {
+         $self->_KEY( $termkey, $key );
       }
 
       $self->_flush_later if @$queue;

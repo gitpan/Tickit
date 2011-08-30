@@ -1,5 +1,12 @@
 Revision history for Changes
 
+0.10    CHANGES:
+         * Use Perl's ${^UTF8LOCALE} to detect UTF-8ness rather than relying
+           on libtermkey's flags. Avoids fragile dependency
+         * Use Term::TermKey 0.09's EINTR ability to simplify the main run
+           loop
+         * Split Tickit::Async out into its own distribution
+
 0.09    CHANGES:
          * Move IO::Async-based code out of Tickit into Tickit::Async,
            reimplement a simple IO framework in Tickit itself.

@@ -19,80 +19,74 @@ name: Tickit
 provides:
   Tickit:
     file: lib/Tickit.pm
-    version: 0.09
-  Tickit::Async:
-    file: lib/Tickit/Async.pm
-    version: 0.09
+    version: 0.10
   Tickit::ContainerWidget:
     file: lib/Tickit/ContainerWidget.pm
-    version: 0.09
+    version: 0.10
   Tickit::OneLineWidget:
     file: lib/Tickit/OneLineWidget.pm
-    version: 0.09
+    version: 0.10
   Tickit::Pen:
     file: lib/Tickit/Pen.pm
-    version: 0.09
+    version: 0.10
   Tickit::RootWindow:
     file: lib/Tickit/RootWindow.pm
-    version: 0.09
+    version: 0.10
   Tickit::SingleChildWidget:
     file: lib/Tickit/SingleChildWidget.pm
-    version: 0.09
+    version: 0.10
   Tickit::Term:
     file: lib/Tickit/Term.pm
-    version: 0.09
+    version: 0.10
   Tickit::Term::xterm:
     file: lib/Tickit/Term/xterm.pm
-    version: 0.09
+    version: 0.10
   Tickit::Test:
     file: lib/Tickit/Test.pm
-    version: 0.09
+    version: 0.10
   Tickit::Test::MockTerm:
     file: lib/Tickit/Test/MockTerm.pm
-    version: 0.09
+    version: 0.10
   Tickit::Utils:
     file: lib/Tickit/Utils.pm
-    version: 0.09
+    version: 0.10
   Tickit::Widget:
     file: lib/Tickit/Widget.pm
-    version: 0.09
+    version: 0.10
   Tickit::Widget::Box:
     file: lib/Tickit/Widget/Box.pm
-    version: 0.09
+    version: 0.10
   Tickit::Widget::Entry:
     file: lib/Tickit/Widget/Entry.pm
-    version: 0.09
+    version: 0.10
   Tickit::Widget::Frame:
     file: lib/Tickit/Widget/Frame.pm
-    version: 0.09
+    version: 0.10
   Tickit::Widget::HBox:
     file: lib/Tickit/Widget/HBox.pm
-    version: 0.09
+    version: 0.10
   Tickit::Widget::LinearBox:
     file: lib/Tickit/Widget/LinearBox.pm
-    version: 0.09
+    version: 0.10
   Tickit::Widget::Static:
     file: lib/Tickit/Widget/Static.pm
-    version: 0.09
+    version: 0.10
   Tickit::Widget::VBox:
     file: lib/Tickit/Widget/VBox.pm
-    version: 0.09
+    version: 0.10
   Tickit::WidgetRole::Borderable:
     file: lib/Tickit/WidgetRole/Borderable.pm
-    version: 0.09
+    version: 0.10
   Tickit::Window:
     file: lib/Tickit/Window.pm
-    version: 0.09
+    version: 0.10
 requires:
   Exporter: 5.57
-  IO::Async: 0.29
-  IO::Async::Notifier: 0.43
-  IO::Async::Stream: 0.34
-  IO::Async::Test: 0
   List::MoreUtils: 0
   Term::Size: 0
+  Term::TermKey: 0.09
   Term::TermKey::Async: 0
   Term::Terminfo: 0
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.09
+version: 0.10

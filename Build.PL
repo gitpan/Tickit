@@ -7,13 +7,10 @@ my $build = Module::Build->new(
    module_name => 'Tickit',
    requires => {
       'Exporter' => '5.57',
-      'IO::Async' => 0.29,
-      'IO::Async::Notifier' => '0.43',
-      'IO::Async::Stream' => '0.34',
-      'IO::Async::Test' => 0,
       'List::MoreUtils' => 0,
       'Term::Terminfo' => 0,
       'Term::Size' => 0,
+      'Term::TermKey' => '0.09',
       'Term::TermKey::Async' => 0,
    },
    build_requires => {

@@ -26,7 +26,17 @@ CONSTRUCTOR
     term_out => IO
             IO handle for terminal output. Will default to "STDOUT".
 
+    UTF8 => BOOL
+            If defined, overrides locale detection to enable or disable
+            UTF-8 mode. If not defined then this will be detected from the
+            locale by using Perl's "${^UTF8LOCALE}" variable.
+
 METHODS
+  $tickit->is_utf8
+    Returns true if running in UTF-8 mode; returned keypress events and
+    displayed text will be Unicode aware. If false, then keypresses and
+    displayed text will work in legacy 8-bit mode.
+
   $tickit->later( $code )
     Runs the given CODE reference at some time soon in the future. It will
     not be invoked yet, but will be invoked at some point before the next

@@ -1,9 +1,8 @@
 #!/usr/bin/perl
 
-use Test::More tests => 15;
+use Test::More tests => 14;
 
 use_ok( 'Tickit' );
-use_ok( 'Tickit::Async' );
 
 use_ok( 'Tickit::Term' );
 use_ok( 'Tickit::Pen' );
