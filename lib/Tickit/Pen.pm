@@ -8,12 +8,12 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Carp;
 use Scalar::Util qw( weaken );
 
-our @ALL_ATTRS = qw( fg bg b u i rv af );
+our @ALL_ATTRS = qw( fg bg b u i rv strike af );
 
 =head1 NAME
 
@@ -46,7 +46,9 @@ cases.
 
 =item rv => BOOL
 
-Bold, underline, italics, reverse video.
+=item strike => BOOL
+
+Bold, underline, italics, reverse video, strikethrough.
 
 =item af => INT
 
@@ -54,8 +56,8 @@ Alternate font.
 
 =back
 
-Note that not all terminals can render the italics or alternate font
-attributes.
+Note that not all terminals can render the italics, strikethrough, or
+alternate font attributes.
 
 =cut
 
@@ -185,8 +187,10 @@ sub _canonicalise_colour
    croak "Unrecognised colour value $colour";
 }
 
-*_canonicalise_b = *_canonicalise_u = *_canonicalise_i = *_canonicalise_rv =
-   \&_canonicalise_bool;
+{
+   no strict 'refs';
+   *{"_canonicalise_$_"} = \&_canonicalise_bool for qw( b u i rv strike );
+}
 sub _canonicalise_bool
 {
    my ( undef, $val ) = @_;

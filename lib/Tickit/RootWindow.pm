@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Window );
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Carp;
 use Scalar::Util qw( weaken refaddr );
@@ -135,6 +135,8 @@ sub goto
 
    $line >= 0 and $line < $self->lines or croak '$line out of bounds';
    $col  >= 0 and $col  < $self->cols  or croak '$col out of bounds';
+
+   $self->{output_column} = $col;
 
    $self->term->goto( $line, $col );
 }

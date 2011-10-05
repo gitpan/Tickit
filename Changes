@@ -1,5 +1,15 @@
 Revision history for Changes
 
+0.11    CHANGES:
+         * Allow Windows to be created overlapping their parent boundaries;
+           clip output - Work In Progress, so far only handles ->print and
+           ->erasech, not the scrolling operations
+         * Represent on-screen rectangles as first-class Tickit::Rect object,
+           pass a 'rect' argument to Window on_expose event
+         * More diagnostic output from Tickit::Test::is_termlog failures
+         * Support (rarely-used) strikethrough pen attribute
+         * No longer depends on Term::TermKey::Async unnecessarily
+
 0.10    CHANGES:
          * Use Perl's ${^UTF8LOCALE} to detect UTF-8ness rather than relying
            on libtermkey's flags. Avoids fragile dependency

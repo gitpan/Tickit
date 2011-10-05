@@ -40,6 +40,8 @@ $vbox->add( Tickit::Widget::Static->new( text => "underline", u => 1 ) );
 
 $vbox->add( Tickit::Widget::Static->new( text => "italic", i => 1 ) );
 
+$vbox->add( Tickit::Widget::Static->new( text => "strikethrough", strike => 1 ) );
+
 $vbox->add( Tickit::Widget::Static->new( text => "reverse video", rv => 1 ) );
 
 $vbox->add( Tickit::Widget::Static->new( text => "alternate font", af => 1 ) );

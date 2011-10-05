@@ -26,15 +26,21 @@ MODULE = Tickit::Utils      PACKAGE = Tickit::Utils
 int textwidth(str)
     SV *str
   INIT:
-    char *s, *e;
+    STRLEN len;
+    const char *s, *e;
 
   CODE:
     RETVAL = 0;
-    s = SvPVutf8_nolen(str);
-    e = SvEND(str);
+
+    if(!SvUTF8(str)) {
+      str = sv_mortalcopy(str);
+      sv_utf8_upgrade(str);
+    }
+
+    s = SvPV_const(str, len);
+    e = s + len;
 
     while(s < e) {
-      STRLEN len;
       UV ord = utf8n_to_uvchr(s, e-s, &len, (UTF8_DISALLOW_SURROGATE
                                                |UTF8_WARN_SURROGATE
                                                |UTF8_DISALLOW_FE_FF
@@ -54,13 +60,19 @@ int textwidth(str)
 void chars2cols(str,...)
     SV *str;
   INIT:
-    char *s, *e;
-    char cp = 0, col = 0;
+    STRLEN len;
+    const char *s, *e;
+    int cp = 0, col = 0;
     int i;
 
   PPCODE:
-    s = SvPVutf8_nolen(str);
-    e = SvEND(str);
+    if(!SvUTF8(str)) {
+      str = sv_mortalcopy(str);
+      sv_utf8_upgrade(str);
+    }
+
+    s = SvPV_const(str, len);
+    e = s + len;
 
     EXTEND(SP, items - 1);
 
@@ -71,7 +83,6 @@ void chars2cols(str,...)
           thiscp, cp);
 
       while(s < e && cp < thiscp) {
-        STRLEN len;
         UV ord = utf8n_to_uvchr(s, e-s, &len, (UTF8_DISALLOW_SURROGATE
                                                  |UTF8_WARN_SURROGATE
                                                  |UTF8_DISALLOW_FE_FF
@@ -98,13 +109,19 @@ void chars2cols(str,...)
 void cols2chars(str,...)
     SV *str;
   INIT:
-    char *s, *e;
-    char cp = 0, col = 0;
+    STRLEN len;
+    const char *s, *e;
+    int cp = 0, col = 0;
     int i;
 
   PPCODE:
-    s = SvPVutf8_nolen(str);
-    e = SvEND(str);
+    if(!SvUTF8(str)) {
+      str = sv_mortalcopy(str);
+      sv_utf8_upgrade(str);
+    }
+
+    s = SvPV_const(str, len);
+    e = s + len;
 
     EXTEND(SP, items - 1);
 
@@ -115,7 +132,6 @@ void cols2chars(str,...)
           thiscol, col);
 
       while(s < e) {
-        STRLEN len;
         UV ord = utf8n_to_uvchr(s, e-s, &len, (UTF8_DISALLOW_SURROGATE
                                                  |UTF8_WARN_SURROGATE
                                                  |UTF8_DISALLOW_FE_FF

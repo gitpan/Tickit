@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 41;
+use Test::More tests => 43;
 use Test::Fatal;
 use Test::Identity;
 use Test::Refcount;
@@ -37,6 +37,12 @@ is( $win->abs_left, 10, '$win->abs_left' );
 is( $win->lines,  4, '$win->lines' );
 is( $win->cols,  20, '$win->cols' );
 
+isa_ok( my $rect = $win->rect, "Tickit::Rect", '$win->rect' );
+is( $rect->top,     3, '$win->rect->top' );
+is( $rect->left,   10, '$win->rect->left' );
+is( $rect->bottom,  7, '$win->rect->bottom' );
+is( $rect->right,  30, '$win->rect->right' );
+
 identical( $win->parent, $rootwin, '$win->parent' );
 identical( $win->root,   $rootwin, '$win->root' );
 
@@ -56,18 +62,6 @@ ok( exception { $win->goto( 6, 1 ) },
 
 ok( exception { $win->goto( 0, 50 ) },
    '$win->goto out of col bounds' );
-
-ok( exception { $win->make_sub( -1, 0, 1, 1 ) },
-   '$win->make_sub out of top bounds' );
-
-ok( exception { $win->make_sub( 0, 0, 100, 1 ) },
-   '$win->make_sub out of bottom bounds' );
-
-ok( exception { $win->make_sub( 0, -1, 1, 1 ) },
-   '$win->make_sub out of left bounds' );
-
-ok( exception { $win->make_sub( 0, 0, 1, 100 ) },
-   '$win->make_sub out of right bounds' );
 
 my $subwin = $win->make_sub( 2, 2, 1, 10 );
 
@@ -96,4 +90,9 @@ is( $win->abs_left, 15, '$win->abs_left after reposition' );
 is( $geom_changed, 2, '$reshaped is 2 after reposition' );
 
 is_refcount( $win, 2, '$win has refcount 2 at EOF' );
-is_refcount( $rootwin, 3, '$rootwin has refcount 3 at EOF' );
+is_refcount( $rootwin, 3, '$rootwin has refcount 3 before $win drop' );
+
+undef $subwin;
+undef $win;
+
+is_refcount( $rootwin, 2, '$rootwin has refcount 3 at EOF' );

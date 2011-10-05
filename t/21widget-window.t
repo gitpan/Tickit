@@ -32,6 +32,7 @@ is( $render_called, 1, 'render is called after set_window' );
 
 is_deeply( \%render_args,
    {
+      rect  => Tickit::Rect->new( top => 0, left => 0, lines => 25, cols => 80 ),
       top   => 0,
       left  => 0,
       lines => 25,

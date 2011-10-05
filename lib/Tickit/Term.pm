@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Encode qw( find_encoding );
 use Term::Terminfo;
@@ -275,11 +275,12 @@ sub _colspec_to_sgr
 # Methods to make SGRs out of attribute values
 sub _make_sgr_fg { defined $_[1] ? $_[0]->_colspec_to_sgr( $_[1], 0 ) : 39 }
 sub _make_sgr_bg { defined $_[1] ? $_[0]->_colspec_to_sgr( $_[1], 1 ) : 49 }
-sub _make_sgr_b  { $_[1] ? 1 : 22 }
-sub _make_sgr_u  { $_[1] ? 4 : 24 }
-sub _make_sgr_i  { $_[1] ? 3 : 23 }
-sub _make_sgr_rv { $_[1] ? 7 : 27 }
-sub _make_sgr_af { $_[1] ? $_[1]+10 : 10 }
+sub _make_sgr_b      { $_[1] ? 1 : 22 }
+sub _make_sgr_u      { $_[1] ? 4 : 24 }
+sub _make_sgr_i      { $_[1] ? 3 : 23 }
+sub _make_sgr_rv     { $_[1] ? 7 : 27 }
+sub _make_sgr_strike { $_[1] ? 9 : 29 }
+sub _make_sgr_af     { $_[1] ? $_[1]+10 : 10 }
 
 =head2 $term->chpen( %attrs )
 

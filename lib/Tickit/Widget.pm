@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -124,9 +124,15 @@ sub window_gained
    } );
 
    $window->set_on_expose( sub {
-      my ( $win, %args ) = @_;
+      my ( $win, $rect ) = @_;
       $self->_do_clear;
-      $self->render( %args );
+      $self->render(
+         rect => $rect,
+         top   => $rect->top,
+         left  => $rect->left,
+         lines => $rect->lines,
+         cols  => $rect->cols,
+      );
    } );
 
    if( $self->can( "on_key" ) ) {
@@ -316,6 +322,13 @@ method implementation may choose to use this information to restrict drawing,
 or it may ignore it entirely.
 
 =over 8
+
+=item rect => Tickit::Rect
+
+A L<Tickit::Rect> object representing the region of the screen that requires
+rendering, relative to the widget's window.
+
+Also provided by the following four named integers:
 
 =item top => INT
 

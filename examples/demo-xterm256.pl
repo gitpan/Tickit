@@ -29,7 +29,7 @@ foreach my $y ( 0 .. 5 ) {
    foreach my $x ( 0 .. 35 ) {
       my $col = $y * 36 + $x + 16;
       $hbox->add( Tickit::Widget::Static->new(
-         text => "X",
+         text => " ",
          bg   => $col,
       ) );
    }

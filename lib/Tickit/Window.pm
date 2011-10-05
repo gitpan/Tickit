@@ -8,13 +8,15 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Carp;
 
 use Scalar::Util qw( weaken );
 
 use Tickit::Pen;
+use Tickit::Rect;
+use Tickit::Utils qw( textwidth substrwidth );
 
 =head1 NAME
 
@@ -37,24 +39,79 @@ C<Tickit::RootWindow> associated with the terminal.
 
 =cut
 
-=head2 $cols = $win->cols
+=head2 $sub = $win->make_sub( $top, $left, $lines, $cols )
 
-=head2 $lines = $win->lines
-
-Obtain the size of the window
+Constructs a new sub-window starting at the given coordinates of this window.
+It will be sized to the given limits.
 
 =cut
 
-sub cols
+sub make_sub
 {
    my $self = shift;
-   return $self->{cols};
+   my ( $top, $left, $lines, $cols ) = @_;
+
+   my $sub = bless {
+      parent => $self,
+      pen    => Tickit::Pen->new,
+   }, __PACKAGE__; # not ref $self in case of RootWindow
+
+   $sub->change_geometry( $top, $left, $lines, $cols );
+
+   $self->_reap_dead_children;
+   push @{ $self->{child_windows} }, $sub;
+   weaken $self->{child_windows}[-1];
+
+   return $sub;
 }
 
-sub lines
+sub _reap_dead_children
 {
    my $self = shift;
-   return $self->{lines};
+   my $children = $self->{child_windows} or return;
+   for( my $i = 0; $i < @$children; ) {
+      $i++, next if defined $children->[$i];
+      splice @$children, $i, 1, ();
+   }
+}
+
+=head2 $parentwin = $win->parent
+
+Returns the parent window; i.e. the window on which C<make_sub> was called to
+create this one
+
+=cut
+
+sub parent
+{
+   my $self = shift;
+   return $self->{parent};
+}
+
+=head2 $rootwin = $win->root
+
+Returns the root window
+
+=cut
+
+sub root
+{
+   my $self = shift;
+   return $self->parent->root if $self->parent;
+   return $self;
+}
+
+=head2 $term = $win->term
+
+Returns the L<Tickit::Term> instance of the terminal on which this window
+lives.
+
+=cut
+
+sub term
+{
+   my $self = shift;
+   return $self->root->term;
 }
 
 =head2 $win->resize( $lines, $cols )
@@ -99,12 +156,6 @@ sub change_geometry
 {
    my $self = shift;
    my ( $top, $left, $lines, $cols ) = @_;
-
-   $top >= 0 or croak 'top out of bounds';
-   $left >= 0 or croak 'left out of bounds';
-
-   $top + $lines <= $self->parent->lines or croak 'bottom out of bounds';
-   $left + $cols <= $self->parent->cols or croak 'right out of bounds';
 
    $lines > 0 or croak 'lines zero or negative';
    $cols  > 0 or croak 'cols zero or negative';
@@ -256,25 +307,9 @@ sub _handle_mouse
 Set the callback to invoke whenever a region of the window is exposed by the
 C<expose> event.
 
- $on_expose->( %args )
+ $on_expose->( $rect )
 
-Will be passed the following named parameters:
-
-=over 8
-
-=item top => INT
-
-=item left => INT
-
-Position of the top left corner of the exposed region, relative to the window
-
-=item lines => INT
-
-=item cols => INT
-
-Size of the exposed region.
-
-=back
+Will be passed a L<Tickit::Rect> representing the exposed region.
 
 =cut
 
@@ -287,22 +322,19 @@ sub set_on_expose
 sub _do_expose
 {
    my $self = shift;
+   my ( $rect ) = @_;
 
    undef $self->{expose_pending};
 
    if( my $on_expose = $self->{on_expose} ) {
-      $on_expose->( $self, 
-         top   => 0,
-         left  => 0,
-         lines => $self->lines,
-         cols  => $self->cols,
-      );
+      $on_expose->( $self, $rect );
    }
 
    my $children = $self->{child_windows} or return;
 
    foreach my $win ( sort { $a->top <=> $b->top || $a->left <=> $b->left } grep { defined } @$children ) {
-      $win->_do_expose;
+      next unless my $winrect = $rect->intersect( $win->rect );
+      $win->_do_expose( $winrect->translate( -$win->left, -$win->top ) );
    }
 }
 
@@ -332,7 +364,14 @@ sub expose
    $self->root->enqueue_redraw( sub {
       return if $self->parent && $self->parent->_expose_pending;
 
-      $self->_do_expose;
+      undef $self->{expose_pending};
+
+      $self->_do_expose( Tickit::Rect->new(
+         top    => 0,
+         left   => 0,
+         bottom => $self->lines,
+         right  => $self->cols,
+      ) );
    } );
 }
 
@@ -341,45 +380,6 @@ sub _expose_pending
    my $self = shift;
    return $self->{expose_pending} ||
           ( $self->parent && $self->parent->_expose_pending );
-}
-
-=head2 $parentwin = $win->parent
-
-Returns the parent window; i.e. the window on which C<make_sub> was called to
-create this one
-
-=cut
-
-sub parent
-{
-   my $self = shift;
-   return $self->{parent};
-}
-
-=head2 $rootwin = $win->root
-
-Returns the root window
-
-=cut
-
-sub root
-{
-   my $self = shift;
-   return $self->parent->root if $self->parent;
-   return $self;
-}
-
-=head2 $term = $win->term
-
-Returns the L<Tickit::Term> instance of the terminal on which this window
-lives.
-
-=cut
-
-sub term
-{
-   my $self = shift;
-   return $self->root->term;
 }
 
 =head2 $top  = $win->top
@@ -422,6 +422,45 @@ sub abs_left
 {
    my $self = shift;
    return $self->parent->abs_left + $self->{left};
+}
+
+=head2 $cols = $win->cols
+
+=head2 $lines = $win->lines
+
+Obtain the size of the window
+
+=cut
+
+sub cols
+{
+   my $self = shift;
+   return $self->{cols};
+}
+
+sub lines
+{
+   my $self = shift;
+   return $self->{lines};
+}
+
+=head2 $rect = $win->rect
+
+Returns a L<Tickit::Rect> containing representing the window's extent relative
+to its parent
+
+=cut
+
+sub rect
+{
+   my $self = shift;
+   # TODO: Cache this, invalidate it in ->change_geometry
+   return Tickit::Rect->new(
+      top   => $self->top,
+      left  => $self->left,
+      lines => $self->lines,
+      cols  => $self->cols,
+   );
 }
 
 =head2 $pen = $win->pen
@@ -511,42 +550,6 @@ sub get_effective_penattrs
    return %epen;
 }
 
-=head2 $sub = $win->make_sub( $top, $left, $lines, $cols )
-
-Constructs a new sub-window starting at the given coordinates of this window.
-It will be sized to the given limits.
-
-=cut
-
-sub make_sub
-{
-   my $self = shift;
-   my ( $top, $left, $lines, $cols ) = @_;
-
-   my $sub = bless {
-      parent => $self,
-      pen    => Tickit::Pen->new,
-   }, __PACKAGE__; # not ref $self in case of RootWindow
-
-   $sub->change_geometry( $top, $left, $lines, $cols );
-
-   $self->_reap_dead_children;
-   push @{ $self->{child_windows} }, $sub;
-   weaken $self->{child_windows}[-1];
-
-   return $sub;
-}
-
-sub _reap_dead_children
-{
-   my $self = shift;
-   my $children = $self->{child_windows} or return;
-   for( my $i = 0; $i < @$children; ) {
-      $i++, next if defined $children->[$i];
-      splice @$children, $i, 1, ();
-   }
-}
-
 =head2 $win->goto( $line, $col )
 
 Moves the cursor to the given position within the window. Both C<$line> and
@@ -562,7 +565,22 @@ sub goto
    $line >= 0 and $line < $self->lines or croak '$line out of bounds';
    $col  >= 0 and $col  < $self->cols  or croak '$col out of bounds';
 
-   $self->parent->goto( $self->top + $line, $self->left + $col );
+   $self->{output_line}   = $line;
+   $self->{output_column} = $col;
+
+   $line += $self->top;
+   $col  += $self->left;
+
+   my $parent = $self->parent;
+
+   if( $line < 0 or $line >= $parent->lines ) {
+      $self->{output_clipped} = 1;
+   }
+   else {
+      undef $self->{output_clipped};
+      $parent->goto( $line, $col ) if $col >= 0;
+      $self->{output_left} = -$col if $col <  0;
+   }
 }
 
 =head2 $win->print( $text, $pen )
@@ -580,12 +598,52 @@ sub print
    my $self = shift;
    my $text = shift;
 
-   return unless length $text;
+   return if $self->{output_clipped};
+
+   return unless my $width = textwidth $text;
 
    my %attrs = ( @_ == 1 ) ? shift->getattrs : @_;
 
-   $self->term->setpen( $self->get_effective_penattrs, %attrs );
-   $self->term->print( $text );
+   $self->_rawprint( $text, $width, { $self->get_effective_penattrs, %attrs } );
+}
+
+sub _rawprint
+{
+   my $self = shift;
+   my ( $text, $width, $attrs ) = @_;
+
+   my $spare = $self->cols - $self->{output_column};
+   if( $spare <= 0 ) {
+      return;
+   }
+
+   if( $self->{output_left} ) {
+      if( $width <= $self->{output_left} ) {
+         $self->{output_left} -= $width;
+         return;
+      }
+
+      $width -= $self->{output_left};
+      $text = substrwidth $text, $self->{output_left};
+      undef $self->{output_left};
+
+      $self->goto( $self->{output_line}, -$self->left );
+   }
+
+   if( $spare < $width ) {
+      $width = $spare;
+      $text = substrwidth $text, 0, $width;
+   }
+
+   if( my $parent = $self->parent ) {
+      $parent->_rawprint( $text, $width, $attrs );
+   }
+   else {
+      $self->term->setpen( %$attrs );
+      $self->term->print( $text );
+   }
+
+   $self->{output_column} += $width;
 }
 
 =head2 $win->penprint( ... )
@@ -624,8 +682,47 @@ sub erasech
 
    my $bg = exists $attrs{bg} ? $attrs{bg} : $self->get_effective_penattr( 'bg' );
 
-   $self->term->chpen( bg => $bg );
-   $self->term->erasech( $count, $moveend );
+   $self->_rawerasech( $count, $moveend, $bg );
+}
+
+sub _rawerasech
+{
+   my $self = shift;
+   my ( $count, $moveend, $bg ) = @_;
+
+   return if $self->{output_clipped};
+
+   my $spare = $self->cols - $self->{output_column};
+   if( $spare <= 0 ) {
+      return;
+   }
+
+   if( $self->{output_left} ) {
+      if( $count <= $self->{output_left} ) {
+         $self->{output_left} -= $count;
+         return;
+      }
+
+      $count -= $self->{output_left};
+      undef $self->{output_left};
+
+      $self->goto( $self->{output_line}, -$self->left );
+   }
+
+   if( $spare < $count ) {
+      $count = $spare;
+   }
+
+   if( my $parent = $self->parent ) {
+      $self->parent->_rawerasech( $count, $moveend, $bg );
+   }
+   else {
+      $self->term->chpen( bg => $bg );
+      $self->term->erasech( $count, $moveend );
+   }
+
+   $self->{output_column} += $count if $moveend;
+   undef $self->{output_column} if !defined $moveend;
 }
 
 =head2 $success = $win->insertch( $count )
@@ -649,6 +746,8 @@ sub insertch
    my ( $count ) = @_;
 
    warnings::warnif( deprecated => "Tickit::Window->insertch is deprecated; use ->scrollrect instead" );
+
+   return if $self->{output_clipped};
 
    return 0 unless $self->left + $self->cols == $self->term->cols;
 
@@ -678,6 +777,8 @@ sub deletech
    my ( $count ) = @_;
 
    warnings::warnif( deprecated => "Tickit::Window->deletech is deprecated; use ->scrollrect instead" );
+
+   return if $self->{output_clipped};
 
    return 0 unless $self->left + $self->cols == $self->term->cols;
 

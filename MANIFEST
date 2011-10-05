@@ -3,6 +3,7 @@ Changes
 examples/ClickAndDragWidget.pm
 examples/ClickerWidget.pm
 examples/ColourWidget.pm
+examples/demo-allkeys.pl
 examples/demo-entry.pl
 examples/demo-frame.pl
 examples/demo-pen.pl
@@ -14,6 +15,7 @@ lib/Tickit.pm
 lib/Tickit/ContainerWidget.pm
 lib/Tickit/OneLineWidget.pm
 lib/Tickit/Pen.pm
+lib/Tickit/Rect.pm
 lib/Tickit/RootWindow.pm
 lib/Tickit/SingleChildWidget.pm
 lib/Tickit/Term.pm
@@ -41,6 +43,7 @@ README
 t/00use.t
 t/01term-output.t
 t/02term-outpen.t
+t/03rect.t
 t/05utils.t
 t/06mockterm.t
 t/07pen.t
@@ -50,6 +53,7 @@ t/12window-output.t
 t/13window-focus.t
 t/14window-input.t
 t/15window-expose.t
+t/16window-clipping.t
 t/20widget.t
 t/21widget-window.t
 t/22widget-parent.t

@@ -10,7 +10,7 @@ use Tickit::Pen;
 
 my $rootwin = mk_window;
 
-my $win = $rootwin->make_sub( 3, 10, 4, 20 );
+my $win = $rootwin->make_sub( 3, 10, 4, 30 );
 
 $win->goto( 2, 3 );
 $win->print( "Hello" );
@@ -60,19 +60,19 @@ is_termlog( [ SETPEN(b => 1, u => 1),
 
 $win->pen->chattr( bg => 4 );
 
-$win->erasech( 4 );
+$win->erasech( 4, 0 );
 
 is_termlog( [ SETBG(4),
               ERASECH(4) ],
             'Termlog after erasech' );
 
-$win->erasech( 4, undef, Tickit::Pen->new( bg => 2 ) );
+$win->erasech( 4, 0, Tickit::Pen->new( bg => 2 ) );
 
 is_termlog( [ SETBG(2),
               ERASECH(4) ],
             'Termlog after erasech with passed pen' );
 
-$win->erasech( 4, undef, bg => 6 );
+$win->erasech( 4, 0, bg => 6 );
 
 is_termlog( [ SETBG(6),
               ERASECH(4) ],
@@ -80,15 +80,15 @@ is_termlog( [ SETBG(6),
 
 $win->clearline( 0 );
 
-is_termlog( [ GOTO(3,10), SETBG(4), ERASECH(20) ],
+is_termlog( [ GOTO(3,10), SETBG(4), ERASECH(30) ],
             '$win->clearline clears one line' );
 
 $win->clear;
 
-is_termlog( [ GOTO(3,10), SETBG(4), ERASECH(20),
-              GOTO(4,10), SETBG(4), ERASECH(20),
-              GOTO(5,10), SETBG(4), ERASECH(20),
-              GOTO(6,10), SETBG(4), ERASECH(20) ],
+is_termlog( [ GOTO(3,10), SETBG(4), ERASECH(30),
+              GOTO(4,10), SETBG(4), ERASECH(30),
+              GOTO(5,10), SETBG(4), ERASECH(30),
+              GOTO(6,10), SETBG(4), ERASECH(30) ],
             '$win->clear clears window lines' );
 
 my $subwin = $win->make_sub( 2, 2, 1, 10 );

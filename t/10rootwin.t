@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 37;
+use Test::More tests => 40;
 use Test::Identity;
 use Test::Refcount;
 
@@ -20,8 +20,8 @@ is_refcount( $win, 2, '$win has refcount 2 initially' );
 my $geom_changed = 0;
 $win->set_on_geom_changed( sub { $geom_changed++ } );
 
-my %exposed_args;
-$win->set_on_expose( sub { shift; %exposed_args = @_ } );
+my $exposed_rect;
+$win->set_on_expose( sub { shift; ( $exposed_rect ) = @_ } );
 
 is( $win->top,  0, '$win->top is 0' );
 is( $win->left, 0, '$win->left is 0' );
@@ -50,13 +50,14 @@ is( $win->get_effective_penattr( 'fg' ), undef, '$win has effective pen fg undef
 
 $win->expose;
 
-ok( !scalar keys %exposed_args, 'on_expose not yet invoked' );
+ok( !$exposed_rect, 'on_expose not yet invoked' );
 
 flush_tickit;
 
-is_deeply( \%exposed_args, 
-           { top => 0, left => 0, lines => 25, cols => 80 },
-           '%exposed_args after exposure' );
+is( $exposed_rect->top,    0, '$exposed_rect->top after exposure' );
+is( $exposed_rect->left,   0, '$exposed_rect->left after exposure' );
+is( $exposed_rect->lines, 25, '$exposed_rect->lines after exposure' );
+is( $exposed_rect->cols,  80, '$exposed_rect->cols after exposure' );
 
 $win->goto( 2, 3 );
 $win->print( "Hello" );

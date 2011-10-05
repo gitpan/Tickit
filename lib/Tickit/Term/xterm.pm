@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Term );
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 sub _colspec_to_sgr
 {

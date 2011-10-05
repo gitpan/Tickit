@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget );
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Carp;
 
@@ -294,6 +294,7 @@ sub render
    my %args = @_;
 
    my $win = $self->window or return;
+   my $rect = $args{rect};
 
    my $cols  = $win->cols;
    my $lines = $win->lines;
@@ -302,7 +303,7 @@ sub render
 
    my $framepen = $self->frame_pen;
 
-   foreach my $line ( $args{top} .. $args{top} + $args{lines} - 1 ) {
+   foreach my $line ( $rect->top .. $rect->bottom - 1 ) {
       $win->goto( $line, 0 );
 
       if( $line == 0 ) {

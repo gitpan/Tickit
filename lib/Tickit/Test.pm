@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Exporter 'import';
 
@@ -235,9 +235,43 @@ sub is_termlog
 {
    my ( $log, $name ) = @_;
 
-   is_deeply( [ $term->methodlog ],
-              $log,
-              $name );
+   my $tb = Test::Builder->new;
+
+   my @want_log = @$log;
+   my @got_log  = $term->methodlog;
+
+   my $prev_line;
+
+   for( my $idx = 0; @want_log or @got_log; $idx++ ) {
+      my $want_line = shift @want_log;
+      my $got_line  = shift @got_log;
+
+      foreach ( $want_line, $got_line ) {
+         ( $_ = "none" ), next unless defined $_;
+
+         my ( $op, @args ) = @$_;
+
+         if( $op eq "chpen" ) {
+            my %pen = %{ $args[0] };
+            $_ = "$op({" . join( ",", map { defined $pen{$_} ? "$_=$pen{$_}" : "!$_" } sort keys %pen ) . "})";
+         }
+         else {
+            $_ = "$op(" . join( ",", map { $_ =~ m/^-?\d+$/ ? $_ : qq("$_") } @args ) . ")";
+         }
+      }
+
+      if( $want_line eq $got_line ) {
+         $prev_line = $want_line;
+         next;
+      }
+
+      local $" = ",";
+      $tb->diag( " Expected terminal operation $want_line, got $got_line at step $idx" );
+      $tb->diag( "   after $prev_line" ) if defined $prev_line;
+      return $tb->ok( 0, $name );
+   }
+
+   return $tb->ok( 1, $name );
 }
 
 =head2 is_display( $lines, $name )

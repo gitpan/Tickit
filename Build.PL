@@ -11,7 +11,6 @@ my $build = Module::Build->new(
       'Term::Terminfo' => 0,
       'Term::Size' => 0,
       'Term::TermKey' => '0.09',
-      'Term::TermKey::Async' => 0,
    },
    build_requires => {
       'Test::Fatal' => 0,
