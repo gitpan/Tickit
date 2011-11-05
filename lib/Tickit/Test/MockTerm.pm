@@ -3,7 +3,7 @@ package Tickit::Test::MockTerm;
 use strict;
 use warnings;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 sub new
 {
@@ -13,6 +13,7 @@ sub new
    my $self = bless {
       lines => $args{lines} || 25,
       cols  => $args{cols}  || 80,
+      pen   => { map { $_ => undef } @Tickit::Pen::ALL_ATTRS },
    }, $class;
 
    $self->clear;
@@ -39,11 +40,23 @@ sub is_changed
    return $self->{changed};
 }
 
-sub get_display
+sub get_display_text
 {
    my $self = shift;
+   my ( $line, $col, $width ) = @_;
 
-   return map { $self->{display}[$_] } 0 .. $#{ $self->{display} };
+   return join "", map { $_->[0] } @{ $self->{cells}[$line] }[$col .. $col + $width - 1];
+}
+
+sub get_display_pen
+{
+   my $self = shift;
+   my ( $line, $col ) = @_;
+
+   my $cell = $self->{cells}[$line][$col];
+   my %pen = @{$cell}[1..$#$cell];
+   defined $pen{$_} or delete $pen{$_} for keys %pen;
+   return \%pen;
 }
 
 sub get_position
@@ -92,9 +105,15 @@ sub resize
    my $self = shift;
    my ( $newlines, $newcols ) = @_;
 
-   # Extend the buffer
-   substr( $self->{display}[$_], $self->cols, 0 ) = " " x ( $newcols - $newcols ) for 0 .. $self->lines-1;
-   $self->{display}[$_] = " " x $newcols for $self->lines .. $newlines-1;
+   if( $newlines > $self->{lines} ) {
+      $self->_clearcells( $_, 0, $newcols ) for $self->{lines} .. $newlines - 1;
+   }
+
+   if( $newcols > $self->{cols} ) {
+      $self->_clearcells( $_, $self->{cols}, $newcols - $self->{cols} ) for 0 .. $self->{lines} - 1;
+   }
+
+   # TODO: handle shrinking
 
    $self->{lines} = $newlines;
    $self->{cols}  = $newcols;
@@ -108,13 +127,30 @@ sub set_size
 sub lines { $_[0]->{lines} }
 sub cols  { $_[0]->{cols} }
 
+sub _clearcells
+{
+   my $self = shift;
+   my ( $line, $col, $count ) = @_;
+
+   local $_;
+   $self->{cells}[$line][$_] = [ " ", %{ $self->{pen} } ] for $col .. $col+$count-1;
+}
+
+sub _clearline
+{
+   my $self = shift;
+   my ( $line ) = @_;
+   $self->_clearcells( $line, 0, $self->cols );
+}
+
 sub clear
 {
    my $self = shift;
 
    $self->_push_methodlog( clear => @_ );
 
-   $self->{display}[$_] = " " x $self->cols for 0 .. $self->lines-1;
+   local $_;
+   $self->_clearline( $_ ) for 0 .. $self->lines-1;
 
    $self->{changed}++;
 }
@@ -126,7 +162,7 @@ sub erasech
 
    $self->_push_methodlog( erasech => $count, $moveend || 0 );
 
-   substr( $self->{display}[$self->{line}], $self->{col}, $count ) = " " x $count;
+   $self->_clearcells( $self->{line}, $self->{col}, $count );
    $self->{col} += $count if $moveend;
 
    $self->{changed}++;
@@ -139,10 +175,10 @@ sub insertch
 
    $self->_push_methodlog( insertch => $count );
 
-   substr( $self->{display}[$self->{line}], $self->{col} + $count ) =
-      substr( $self->{display}[$self->{line}], $self->{col}, $self->cols - $self->{col} - $count );
+   splice @{ $self->{cells}[$self->{line}] }, $self->{col}, 0, (undef) x $count;
+   $self->_clearcells( $self->{line}, $self->{col}, $count );
 
-   substr( $self->{display}[$self->{line}], $self->{col}, $count ) = " " x $count;
+   splice @{ $self->{cells}[$self->{line}] }, $self->cols; # truncate
 
    $self->{changed}++;
 }
@@ -154,10 +190,9 @@ sub deletech
 
    $self->_push_methodlog( deletech => $count );
 
-   substr( $self->{display}[$self->{line}], $self->{col}, $self->cols - $self->{col} - $count ) =
-      substr( $self->{display}[$self->{line}], $self->{col} + $count );
+   splice @{ $self->{cells}[$self->{line}] }, $self->{col}, $count, ();
 
-   substr( $self->{display}[$self->{line}], $self->cols - $count, $count ) = " " x $count;
+   $self->_clearcells( $self->{line}, $self->cols - $count, $count );
 
    $self->{changed}++;
 }
@@ -179,9 +214,12 @@ sub print
 
    $self->_push_methodlog( print => @_ );
 
-   substr( $self->{display}[$self->{line}], $self->{col}, length $text ) = $text;
+   # TODO: This will only handle ASCII
+   foreach my $char ( split //, $text ) {
+      $self->{cells}[$self->{line}][$self->{col}] = [ $char, %{ $self->{pen} } ];
+      $self->{col}++;
+   }
 
-   $self->{col} += length $text;
    $self->{changed}++;
 }
 
@@ -198,20 +236,24 @@ sub _scroll_lines
    # Logic is simpler if $bottom is the first line -beyond- the scroll region
    $bottom++;
 
-   my $display = $self->{display};
+   $self->_push_methodlog( scrollrect => $top, 0, $bottom - $top, $self->cols, $downward, 0 );
+
+   my $cells = $self->{cells};
 
    if( $downward > 0 ) {
-      splice @$display, $top, $downward, ();
-      splice @$display, $bottom - $downward, 0, ( " " x $self->cols ) x $downward;
+      splice @$cells, $top, $downward, ();
+
+      splice @$cells, $bottom - $downward, 0, ( undef ) x $downward;
+      $self->_clearline( $_ ) for $bottom - $downward .. $bottom - 1;
    }
    elsif( $downward < 0 ) {
       my $upward = -$downward;
 
-      splice @$display, $bottom - $upward, $upward, ();
-      splice @$display, $top, 0, ( " " x $self->cols ) x $upward;
-   }
+      splice @$cells, $bottom - $upward, $upward, ();
 
-   $self->_push_methodlog( scrollrect => $top, 0, $bottom - $top, $self->cols, $downward, 0 );
+      splice @$cells, $top, 0, ( undef ) x $upward;
+      $self->_clearline( $_ ) for $top .. $top + $upward - 1;
+   }
 
    $self->{changed}++;
 
@@ -223,6 +265,8 @@ sub chpen
 {
    my $self = shift;
    my %attrs = @_;
+
+   $self->{pen}{$_} = $attrs{$_} for keys %attrs;
 
    $self->_push_methodlog( chpen => \%attrs );
 }

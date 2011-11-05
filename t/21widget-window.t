@@ -41,23 +41,15 @@ is_deeply( \%render_args,
 
 identical( $gained_window, $win, '$widget->window_gained called' );
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
-              SETPEN,
-              PRINT("Hello"), ],
-            'Termlog initially' );
+is_display( [ [TEXT("Hello")] ],
+            'Display initially' );
 
 $widget->pen->chattr( fg => 2 );
 
 flush_tickit;
 
-is_termlog( [ SETPEN(fg => 2),
-              CLEAR,
-              GOTO(0,0),
-              SETPEN(fg => 2),
-              PRINT("Hello"), ],
-            'Termlog with correct pen' );
+is_display( [ [TEXT("Hello",fg=>2), BLANK(75,fg=>2)] ],
+            'Display with correct pen' );
 
 $widget->set_window( undef );
 

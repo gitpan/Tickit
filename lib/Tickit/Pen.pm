@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -238,28 +238,31 @@ sub _changed
 {
    my $self = shift;
 
-   $_->on_pen_changed( $self ) for @{ $self->{_on_changed} };
+   $_->[0]->on_pen_changed( $self, $_->[1] ) for @{ $self->{_on_changed} };
 }
 
-=head2 $pen->add_on_changed( $observer )
+=head2 $pen->add_on_changed( $observer, $id )
 
 Add an observer to the list of objects which will be informed when the pen
 attributes change. The observer will be informed by invoking a method
+C<on_pen_changed>, passing in the pen reference and the opaque ID value given
+to this method.
 
- $observer->on_pen_changed( $pen )
+ $observer->on_pen_changed( $pen, $id )
 
 The observer object is stored weakly, so it is safe to add the
-C<Tickit::Widget> object that is using the pen as an observer.
+C<Tickit::Widget> object that is using the pen as an observer. The ID value is
+not weakened.
 
 =cut
 
 sub add_on_changed
 {
    my $self = shift;
-   my ( $observer ) = @_;
+   my ( $observer, $id ) = @_;
 
-   push @{ $self->{_on_changed} }, $observer;
-   weaken $self->{_on_changed}[-1];
+   push @{ $self->{_on_changed} }, [ $observer, $id ];
+   weaken $self->{_on_changed}[-1][0];
 }
 
 =head2 $pen->remove_on_changed( $observer )
@@ -276,7 +279,7 @@ sub remove_on_changed
    # Can't grep() because that would strengthen weakrefs
    my $on_changed = $self->{_on_changed};
    for( my $i = 0; $i < @$on_changed; ) {
-      $i++, next unless $on_changed->[$i] == $observer;
+      $i++, next unless $on_changed->[$i][0] == $observer;
       splice @$on_changed, $i, 1, ();
    }
 }

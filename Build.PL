@@ -13,6 +13,7 @@ my $build = Module::Build->new(
       'Term::TermKey' => '0.09',
    },
    build_requires => {
+      'Test::Builder::Tester' => 0,
       'Test::Fatal' => 0,
       'Test::HexString' => 0,
       'Test::Identity' => 0,

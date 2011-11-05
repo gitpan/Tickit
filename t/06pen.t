@@ -2,7 +2,8 @@
 
 use strict;
 
-use Test::More tests => 23;
+use Test::More tests => 27;
+use Test::Identity;
 use Test::Refcount;
 
 use Tickit::Pen;
@@ -10,13 +11,18 @@ use Tickit::Pen;
 my $pen = Tickit::Pen->new;
 
 my $changed = 0;
+my $changed_id;
 
 isa_ok( $pen, "Tickit::Pen", '$pen isa Tickit::Pen' );
 
+my $id = [];
+is_oneref( $id, 'Pen $id has refcount 1 before ->add_on_changed' );
+
 my $observer = bless {}, "PenObserver";
-$pen->add_on_changed( $observer );
+$pen->add_on_changed( $observer, $id );
 
 is_oneref( $observer, 'Pen observer does not increase refcount' );
+is_refcount( $id, 2, 'Pen $id has refcount 2 after ->add_on_changed' );
 
 is_deeply( { $pen->getattrs }, {}, '$pen initial attrs' );
 is( $pen->getattr( 'fg' ), undef, '$pen fg initially undef' );
@@ -29,6 +35,7 @@ is_deeply( { $pen->getattrs }, { fg => 3 }, '$pen attrs after chattr' );
 is( $pen->getattr( 'fg' ), 3, '$pen fg after chattr' );
 
 is( $changed, 1, '$changed after chattr' );
+identical( $changed_id, $id, '$changed_id after chattr' );
 
 $pen->chattr( fg => "blue" );
 
@@ -62,6 +69,9 @@ is_deeply( \%attrs, { na => 5 }, '%attrs after chattrs' );
 
 $pen->remove_on_changed( $observer );
 
+undef $changed_id;
+is_oneref( $id, 'Pen $id has refcount 1 after ->remove_on_changed' );
+
 $pen->chattr( fg => "red" );
 
 is( $changed, 5, '$changed unchanged after remove+chattr' );
@@ -73,4 +83,10 @@ is_deeply( { $pen->getattrs }, { fg => 1, bg => 2 }, '$pen initial attrs' );
 is( $pen->getattr( 'fg' ), 1, '$pen fg initially 1' );
 
 package PenObserver;
-sub on_pen_changed { $changed++ }
+
+sub on_pen_changed
+{
+   my $self = shift;
+   ( undef, $changed_id ) = @_;
+   $changed++;
+}

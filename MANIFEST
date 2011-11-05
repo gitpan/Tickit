@@ -45,8 +45,9 @@ t/01term-output.t
 t/02term-outpen.t
 t/03rect.t
 t/05utils.t
-t/06mockterm.t
-t/07pen.t
+t/06pen.t
+t/07mockterm.t
+t/08test.t
 t/10rootwin.t
 t/11window.t
 t/12window-output.t

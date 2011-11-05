@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget );
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 use Carp;
 
@@ -198,6 +198,19 @@ sub set_frame_pen
    $self->{frame_pen}->remove_on_changed( $self ) if $self->{frame_pen};
    $self->{frame_pen} = $newpen;
    $newpen->add_on_changed( $self );
+}
+
+sub on_pen_changed
+{
+   my $self = shift;
+   my ( $pen ) = @_;
+
+   if( $self->window and $pen == $self->{frame_pen} ) {
+      $self->redraw;
+   }
+   else {
+      $self->SUPER::on_pen_changed( @_ );
+   }
 }
 
 =head2 $title = $frame->title

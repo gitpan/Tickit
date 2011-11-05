@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 16;
+use Test::More tests => 12;
 use Test::Identity;
 
 use Tickit::Test;
@@ -34,34 +34,15 @@ ok( defined $static->window, '$static has window after $widget->set_window' );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
-              SETPEN,
-              PRINT("Widget"),
-              SETBG(undef),
-              ERASECH(74),
-              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ) ],
-            'Termlog initially' );
-
-is_display( [ "Widget" ],
+is_display( [ [TEXT("Widget")] ],
             'Display initially' );
 
 $widget->set_border( 2 );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(2,2),
-              SETPEN,
-              PRINT("Widget"),
-              SETBG(undef),
-              ERASECH(70),
-              ( map { GOTO($_,2), SETBG(undef), ERASECH(76) } 3 .. 22 ) ],
-            'Termlog after ->set_border' );
-
-is_display( [ "", "", "  Widget" ],
+is_display( [ BLANKLINES(2),
+              [BLANK(2), TEXT("Widget")] ],
             'Display after ->set_border' );
 
 $widget->set_window( undef );
@@ -73,26 +54,14 @@ $widget->set_window( $win );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR, ],
-            'Termlog before late adding of child' );
-
-is_display( [ ],
+is_display( [ BLANKLINES(25) ],
             'Display blank before late adding of child' );
 
 $widget->add( $static );
 
 flush_tickit;
 
-is_termlog( [ GOTO(0,0),
-              SETPEN,
-              PRINT("Widget"),
-              SETBG(undef),
-              ERASECH(74),
-              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ) ],
-            'Termlog after late adding of child' );
-
-is_display( [ "Widget" ],
+is_display( [ [TEXT("Widget")] ],
             'Display after late adding of child' );
 
 $widget->set_window( undef );

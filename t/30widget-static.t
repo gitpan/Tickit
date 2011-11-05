@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 23;
+use Test::More tests => 18;
 
 use Tickit::Test;
 
@@ -50,34 +50,14 @@ $static->set_window( $win );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
-              SETPEN,
-              PRINT("Another message"),
-              SETBG(undef),
-              ERASECH(65),
-              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ) ],
-            'Termlog initially' );
-
-is_display( [ "Another message" ],
+is_display( [ [TEXT("Another message")] ],
             'Display initially' );
 
 $static->set_text( "Changed message" );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
-              SETPEN,
-              PRINT("Changed message"),
-              SETBG(undef),
-              ERASECH(65),
-              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ) ],
-            'Termlog again after changed text' );
-
-is_display( [ "Changed message" ],
+is_display( [ [TEXT("Changed message")] ],
             'Display after changed text' );
 
 # Terminal is 80 columns wide. Text is 15 characters long. Therefore, right-
@@ -87,17 +67,7 @@ $static->set_align( 1.0 );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
-              SETBG(undef),
-              ERASECH(65,1),
-              SETPEN,
-              PRINT("Changed message"),
-              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ) ],
-            'Termlog in correct location for align' );
-
-is_display( [ (" " x 65) . "Changed message" ],
+is_display( [ [BLANK(65), TEXT("Changed message")] ],
             'Display in correct location for align' );
 
 # Terminal is 25 columns wide. Text is 1 line tall. Therefore, middle-
@@ -107,19 +77,8 @@ $static->set_valign( 0.5 );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 0 .. 11 ),
-              GOTO(12,0),
-              SETBG(undef),
-              ERASECH(65,1),
-              SETPEN,
-              PRINT("Changed message"),
-              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 13 .. 24 ) ],
-            'Termlog in correct location for valign' );
-
-is_display( [ ( "" ) x 12,
-              (" " x 65) . "Changed message" ],
+is_display( [ BLANKLINES(12),
+              [BLANK(65), TEXT("Changed message")] ],
             'Display in correct location for valign' );
 
 $static->set_valign( 0.0 );
@@ -129,29 +88,12 @@ resize_term( 30, 100 );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
-              SETBG(undef),
-              ERASECH(85,1),
-              SETPEN,
-              PRINT("Changed message"),
-              ( map { GOTO($_,0), SETBG(undef), ERASECH(100) } 1 .. 29 ) ],
-            'Termlog redrawn after resize' );
-
-is_display( [ (" " x 85) . "Changed message" ],
+is_display( [ [BLANK(85), TEXT("Changed message")] ],
             'Display after resize' );
 
 $static->pen->chattr( bg => 4 );
 
 flush_tickit;
 
-is_termlog( [ SETPEN(bg => 4),
-              CLEAR,
-              GOTO(0,0),
-              SETBG(4),
-              ERASECH(85,1),
-              SETPEN(bg => 4),
-              PRINT("Changed message"),
-              ( map { GOTO($_,0), SETBG(4), ERASECH(100) } 1 .. 29 ) ],
-            'Termlog redrawn after chpen bg' );
+is_display( [ [BLANK(85,bg=>4), TEXT("Changed message",bg=>4)] ],
+            'Display redrawn after chpen bg' );

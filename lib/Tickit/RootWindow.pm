@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Window );
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 use Carp;
 use Scalar::Util qw( weaken refaddr );
@@ -155,7 +155,7 @@ sub scrollrect
    my %attrs = ( @args == 1 ) ? $args[0]->getattrs : @args;
    exists $attrs{bg} or $attrs{bg} = $self->get_effective_penattr( 'bg' );
 
-   $self->term->chpen( bg => $attrs{bg} );
+   $self->term->setpen( bg => $attrs{bg} );
    return $self->term->scrollrect(
       $top, $left, $lines, $cols,
       $downward, $rightward

@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 use Exporter 'import';
 
@@ -27,6 +27,11 @@ our @EXPORT = qw(
    is_display
    is_cursorpos
 
+   TEXT
+   BLANK
+   BLANKLINE
+   BLANKLINES
+
    CLEAR
    GOTO
    ERASECH
@@ -42,7 +47,7 @@ use Tickit::Test::MockTerm;
 use Tickit::Pen;
 use Tickit;
 
-use Test::More;
+use Test::Builder;
 
 =head1 NAME
 
@@ -224,10 +229,20 @@ test scripts.
 
 =cut
 
+sub _pen2string
+{
+   my $pen = shift;
+   return "{" . join( ",", map { defined $pen->{$_} ? "$_=$pen->{$_}" : "!$_" } sort keys %$pen ) . "}";
+}
+
 =head2 is_termlog( $log, $name )
 
 Asserts that the mock terminal log contains exactly the given sequence of
 methods. See also the helper functions below.
+
+Because this test is quite fragile, relying on the exact nature and order of
+drawing methods invoked on the terminal, it should only be used rarely. Most
+normal cases of widget unit tests should instead only use C<is_display>.
 
 =cut
 
@@ -252,8 +267,7 @@ sub is_termlog
          my ( $op, @args ) = @$_;
 
          if( $op eq "chpen" ) {
-            my %pen = %{ $args[0] };
-            $_ = "$op({" . join( ",", map { defined $pen{$_} ? "$_=$pen{$_}" : "!$_" } sort keys %pen ) . "})";
+            $_ = "$op(" . _pen2string( $args[0] ) . ")";
          }
          else {
             $_ = "$op(" . join( ",", map { $_ =~ m/^-?\d+$/ ? $_ : qq("$_") } @args ) . ")";
@@ -266,9 +280,10 @@ sub is_termlog
       }
 
       local $" = ",";
-      $tb->diag( " Expected terminal operation $want_line, got $got_line at step $idx" );
-      $tb->diag( "   after $prev_line" ) if defined $prev_line;
-      return $tb->ok( 0, $name );
+      my $ok = $tb->ok( 0, $name );
+      $tb->diag( "Expected terminal operation $want_line, got $got_line at step $idx" );
+      $tb->diag( "  after $prev_line" ) if defined $prev_line;
+      return $ok;
    }
 
    return $tb->ok( 1, $name );
@@ -276,14 +291,40 @@ sub is_termlog
 
 =head2 is_display( $lines, $name )
 
-Asserts that the mock terminal display is exactly that given in C<$lines>,
-which must be an ARRAY reference of strings. These strings will be padded with
-spaces out to the terminal width, and the array itself extended with blank
-lines, so it is of the correct size.
+Asserts that the mock terminal display is exactly that as given by the content
+of C<$lines>, which must be an ARRAY reference containing one value for each
+line of the display. Each item may either be a plain string, or an ARRAY
+reference.
 
-The mock terminal display contains only the printed characters, it does not
-consider formatting. For formatting-aware unit tests, use the C<is_termlog>
-test.
+If a plain string is given, it asserts that the characters on display are
+those as given by the string (trailing blanks may be omitted). The pen
+attributes of the characters do not matter in this case.
+
+ is_display( [ "some lines of",
+               "content here" ] );
+
+If an ARRAY reference is given, it should contain chunks of content from the
+C<TEXT> function. Each chunk represents content on display for the
+corresponding columns.
+
+ is_display( [ [TEXT("some"), TEXT(" lines of")],
+               "content here" ] );
+
+The C<TEXT> function accepts pen attributes, to assert that the displayed
+characters have exactly the attributes given.
+
+ is_display( [ [TEXT("This is ",fg=>2), TEXT("bold",fg=>2,b=>1) ] ] );
+
+The C<BLANK> function is a shortcut to providing a number of blank cells
+
+ BLANK(20,bg=>1)  is   TEXT("                    ",bg=>1)
+
+The C<BLANKLINE> and C<BLANKLINES> functions are a shortcut to providing an
+entire line, or several lines, of blank content. They yield an array reference
+or list of array references directly.
+
+ BLANKLINE      is   [TEXT("")]
+ BLANKLINES(3)  is   [TEXT("")], [TEXT("")], [TEXT("")]
 
 =cut
 
@@ -291,12 +332,70 @@ sub is_display
 {
    my ( $lines, $name ) = @_;
 
-   my @lines = map { sprintf "% -*s", $term->cols, $_ } @$lines;
-   push @lines, " " x $term->cols while @lines < $term->lines;
+   my $tb = Test::Builder->new;
 
-   is_deeply( [ $term->get_display ],
-              \@lines,
-              $name );
+   foreach my $line ( 0 .. $term->lines - 1 ) {
+      my $want = $lines->[$line];
+      if( ref $want ) {
+         my @chunks = @$want;
+
+         my $col = 0;
+         while( $col < $term->cols ) {
+            my $chunk = shift @chunks;
+            my ( $want_text ) = ref $chunk ? @$chunk : ( $chunk );
+
+            $want_text .= " " x ( $term->cols - $col ) unless defined $want_text and length $want_text;
+
+            my $got_text = $term->get_display_text( $line, $col, length $want_text );
+            if( $got_text ne $want_text ) {
+               my $ok = $tb->ok( 0, $name );
+               $tb->diag( "Display differs on line $line at column $col" );
+               $tb->diag( "Got:      '$got_text'" );
+               $tb->diag( "Expected: '$want_text'" );
+               return $ok;
+            }
+
+            my $endcol = $col + length $want_text;
+            my $want_pen = _pen2string( $chunk->[1] );
+            while( $col < $endcol ) {
+               my $got_pen = _pen2string( $term->get_display_pen( $line, $col ) );
+               if( $got_pen ne $want_pen ) {
+                  my $ok = $tb->ok( 0, $name );
+                  $tb->diag( "Display differs on line $line at column $col" );
+                  $tb->diag( "Got pen:      $got_pen" );
+                  $tb->diag( "Expected pen: $want_pen" );
+                  return $ok;
+               }
+               $col++;
+            }
+         }
+      }
+      elsif( defined $want ) {
+         my $display_line = $term->get_display_text( $line, 0, $term->cols );
+         # pad blanks
+         $want = sprintf "% -*s", $term->cols, $want;
+
+         $want eq $display_line and next;
+
+         my $ok = $tb->ok( 0, $name );
+         $tb->diag( "Display differs on line $line" );
+         $tb->diag( "Got:      '$display_line'" );
+         $tb->diag( "Expected: '$want'" );
+         return $ok;
+      }
+      else {
+         my $display_line = $term->get_display_text( $line, 0, $term->cols );
+         $display_line eq " " x $term->cols and next;
+
+         my $ok = $tb->ok( 0, $name );
+         $tb->diag( "Display differs on line $line" );
+         $tb->diag( "Got:      '$display_line'" );
+         $tb->diag( "Expected: blank" );
+         return $ok;
+      }
+   }
+
+   return $tb->ok( 1, $name );
 }
 
 =head2 is_cursorpos( $line, $col, $name )
@@ -309,9 +408,40 @@ sub is_cursorpos
 {
    my ( $line, $col, $name ) = @_;
 
-   is_deeply( [ $term->get_position ],
-              [ $line, $col ],
-              $name );
+   my $tb = Test::Builder->new;
+
+   my ( $at_line, $at_col ) = $term->get_position;
+
+   my $ok = $tb->ok( $line == $at_line && $col == $at_col, $name );
+
+   $tb->diag( "Expected to be on line $line, actually on line $at_line"   ) if $line != $at_line;
+   $tb->diag( "Expected to be on column $col, actually on column $at_col" ) if $col != $at_col;
+
+   return $ok;
+}
+
+sub TEXT
+{
+   my $text = shift;
+   my %attrs = @_;
+   return [ $text, \%attrs ];
+}
+
+sub BLANK
+{
+   my $count = shift;
+   TEXT(" "x$count, @_);
+}
+
+sub BLANKLINE
+{
+   [ TEXT("", @_) ];
+}
+
+sub BLANKLINES
+{
+   my $count = shift;
+   ( BLANKLINE(@_) ) x $count;
 }
 
 use constant DEFAULTPEN => map { $_ => undef } @Tickit::Pen::ALL_ATTRS;
@@ -341,7 +471,7 @@ sub DELETECH   { [ deletech => $_[0] ] }
 sub SCROLLRECT { [ scrollrect => @_[0..5] ] }
 sub PRINT      { [ print => $_[0] ] }
 sub SETPEN     { [ chpen => { DEFAULTPEN, @_ } ] }
-sub SETBG      { [ chpen => { bg => $_[0] } ] }
+sub SETBG      { [ chpen => { DEFAULTPEN, bg => $_[0] } ] }
 
 =head1 AUTHOR
 

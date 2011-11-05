@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 24;
+use Test::More tests => 33;
 
 use Tickit::Test;
 
@@ -20,8 +20,8 @@ is_termlog( [ GOTO(5,13),
               PRINT("Hello"), ],
             'Termlog' );
 
-is_display( [ ( "" ) x 5,
-              "             Hello" ],
+is_display( [ BLANKLINES(5),
+              [BLANK(13), TEXT("Hello")] ],
             'Display' );
  
 $win->pen->chattr( b => 1 );
@@ -46,17 +46,29 @@ is_termlog( [ GOTO(5,13),
               PRINT("Hello"), ],
             'Termlog with correct pen' );
 
+is_display( [ BLANKLINES(5),
+              [BLANK(13), TEXT("Hello",b=>1)] ],
+            'Display with correct pen' );
+
 $win->print( "large", Tickit::Pen->new( fg => 'red' ) );
 
 is_termlog( [ SETPEN(b => 1, fg => 1),
               PRINT("large"), ],
             'Termlog with passed pen' );
 
+is_display( [ BLANKLINES(5),
+              [BLANK(13), TEXT("Hello",b=>1), TEXT("large",fg=>1,b=>1)] ],
+            'Display with passed pen' );
+
 $win->print( "world", u => 1 );
 
 is_termlog( [ SETPEN(b => 1, u => 1),
               PRINT("world"), ],
             'Termlog with pen attributes hash' );
+
+is_display( [ BLANKLINES(5),
+              [BLANK(13), TEXT("Hello",b=>1), TEXT("large",fg=>1,b=>1), TEXT("world",b=>1,u=>1)] ],
+            'Display with pen attributes hash' );
 
 $win->pen->chattr( bg => 4 );
 
@@ -66,11 +78,19 @@ is_termlog( [ SETBG(4),
               ERASECH(4) ],
             'Termlog after erasech' );
 
+is_display( [ BLANKLINES(5),
+              [BLANK(13), TEXT("Hello",b=>1), TEXT("large",fg=>1,b=>1), TEXT("world",b=>1,u=>1), BLANK(4,bg=>4)] ],
+            'Display after erasech' );
+
 $win->erasech( 4, 0, Tickit::Pen->new( bg => 2 ) );
 
 is_termlog( [ SETBG(2),
               ERASECH(4) ],
             'Termlog after erasech with passed pen' );
+
+is_display( [ BLANKLINES(5),
+              [BLANK(13), TEXT("Hello",b=>1), TEXT("large",fg=>1,b=>1), TEXT("world",b=>1,u=>1), BLANK(4,bg=>2)] ],
+            'Display after erasech with passed pen' );
 
 $win->erasech( 4, 0, bg => 6 );
 
@@ -78,10 +98,20 @@ is_termlog( [ SETBG(6),
               ERASECH(4) ],
             'Termlog after erasech with pen attributes hash' );
 
+is_display( [ BLANKLINES(5),
+              [BLANK(13), TEXT("Hello",b=>1), TEXT("large",fg=>1,b=>1), TEXT("world",b=>1,u=>1), BLANK(4,bg=>6)] ],
+            'Display after erasech with pen attributes hash' );
+
 $win->clearline( 0 );
 
 is_termlog( [ GOTO(3,10), SETBG(4), ERASECH(30) ],
-            '$win->clearline clears one line' );
+            'Termlog after $win->clearline' );
+
+is_display( [ BLANKLINES(3),
+              [BLANK(10), BLANK(30,bg=>4)],
+              BLANKLINE,
+              [BLANK(13), TEXT("Hello",b=>1), TEXT("large",fg=>1,b=>1), TEXT("world",b=>1,u=>1), BLANK(4,bg=>6)] ],
+            'Display after $win->clearline' );
 
 $win->clear;
 
@@ -89,7 +119,11 @@ is_termlog( [ GOTO(3,10), SETBG(4), ERASECH(30),
               GOTO(4,10), SETBG(4), ERASECH(30),
               GOTO(5,10), SETBG(4), ERASECH(30),
               GOTO(6,10), SETBG(4), ERASECH(30) ],
-            '$win->clear clears window lines' );
+            'Termlog after $win->clear' );
+
+is_display( [ BLANKLINES(3),
+              ( [BLANK(10), BLANK(30,bg=>4)] ) x 4 ],
+            'Display after $win->clear' );
 
 my $subwin = $win->make_sub( 2, 2, 1, 10 );
 
@@ -117,14 +151,22 @@ is_termlog( [ GOTO(5,12),
               PRINT("Foo"), ],
             'Termlog with correct pen' );
 
-is_display( [ ( "") x 5,
-              "            Foo" ],
-            'Display' );
+is_display( [ BLANKLINES(3),
+              ( [BLANK(10), BLANK(30,bg=>4)] ) x 2,
+              ( [BLANK(10), BLANK(2,bg=>4), TEXT("Foo",fg=>3,bg=>4,b=>1), BLANK(25,bg=>4)] ) x 1,
+              ( [BLANK(10), BLANK(30,bg=>4)] ) x 1 ],
+            'Display with correct pen' );
 
 $rootwin->scroll( 1, 0 );
 
 is_termlog( [ SETBG(undef),
               SCROLLRECT(0,0,25,80, 1,0) ],
-            'Termlog scrolled' );
+            'Termlog after ->scroll' );
+
+is_display( [ BLANKLINES(2),
+              ( [BLANK(10), BLANK(30,bg=>4)] ) x 2,
+              ( [BLANK(10), BLANK(2,bg=>4), TEXT("Foo",fg=>3,bg=>4,b=>1), BLANK(25,bg=>4)] ) x 1,
+              ( [BLANK(10), BLANK(30,bg=>4)] ) x 1 ],
+            'Display after ->scroll' );
 
 ok( !$win->scroll( 1, 0 ), '$win does not support scrolling' );

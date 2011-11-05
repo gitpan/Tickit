@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 9;
+use Test::More tests => 14;
 
 use Tickit::Test;
 
@@ -29,11 +29,19 @@ is_termlog( [ GOTO(0,0),
               PRINT("Window line 4") ],
             'Termlog for window clipping off top' );
 
+is_display( [ [TEXT("Window line 2")],
+              [TEXT("Window line 3")],
+              [TEXT("Window line 4")] ],
+            'Display for window clipping off top' );
+
 $win->goto( 0, 0 );
 $win->erasech( 10, 0 );
 
 is_termlog( [],
             'Termlog for window erasech off top' );
+
+$rootwin->clear;
+$term->methodlog;
 
 # Off the bottom
 $win = $rootwin->make_sub( 22, 0, 5, 80 );
@@ -54,11 +62,20 @@ is_termlog( [ GOTO(22,0),
               PRINT("Window line 2") ],
             'Termlog for window clipping off bottom' );
 
+is_display( [ BLANKLINES(22),
+              [TEXT("Window line 0")],
+              [TEXT("Window line 1")],
+              [TEXT("Window line 2")] ],
+            'Display for window clipping off bottom' );
+
 $win->goto( 4, 0 );
 $win->erasech( 10, 0 );
 
 is_termlog( [],
             'Termlog for window erasech off bottom' );
+
+$rootwin->clear;
+$term->methodlog;
 
 # Off the left
 $win = $rootwin->make_sub( 10, -5, 1, 10 );
@@ -73,6 +90,10 @@ is_termlog( [ GOTO(10,0),
               PRINT("HIJ") ],
             'Termlog for window clipping off left' );
 
+is_display( [ BLANKLINES(10),
+              [TEXT("FGHIJ")] ],
+            'Display for window clipping off left' );
+
 $win->goto( 0, 0 );
 $win->erasech( 10, 0 );
 
@@ -80,6 +101,9 @@ is_termlog( [ GOTO(10,0),
               SETBG(undef),
               ERASECH(5) ],
             'Termlog for window erasech off left' );
+
+$rootwin->clear;
+$term->methodlog;
 
 # Off the right
 $win = $rootwin->make_sub( 10, 75, 1, 10 );
@@ -94,6 +118,10 @@ is_termlog( [ GOTO(10,75),
               PRINT("DE") ],
             'Termlog for window clipping off right' );
 
+is_display( [ BLANKLINES(10),
+              [BLANK(75), TEXT("ABCDE")] ],
+            'Display for window clipping off right' );
+
 $win->goto( 0, 0 );
 $win->erasech( 10, 0 );
 
@@ -101,6 +129,9 @@ is_termlog( [ GOTO(10,75),
               SETBG(undef),
               ERASECH(5) ],
             'Termlog for window erasech off right' );
+
+$rootwin->clear;
+$term->methodlog;
 
 # Second-level nesting
 $win = $rootwin->make_sub( 10, 20, 5, 10 );
@@ -124,3 +155,11 @@ is_termlog( [ GOTO(10,20),
               SETPEN,
               PRINT("nt for lin") ],
             'Termlog for clipped nested window' );
+
+is_display( [ BLANKLINES(10),
+              [BLANK(20), TEXT("nt for lin") ],
+              [BLANK(20), TEXT("nt for lin") ],
+              [BLANK(20), TEXT("nt for lin") ],
+              [BLANK(20), TEXT("nt for lin") ],
+              [BLANK(20), TEXT("nt for lin") ] ],
+            'Display for clipped nested window' );

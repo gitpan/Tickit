@@ -1,5 +1,15 @@
 Revision history for Changes
 
+0.12    CHANGES:
+         * Pass an opaque 'id' value through Pen->add_on_changed into
+           $observer->on_pen_changed
+         * Extend is_display() unit testing function to allow asserting pen
+           attributes as well as text-on-display
+         * Rewrote many unit tests to use only is_display() and not
+           is_termlog()
+         * Deleted now-deprecated Window methods of ->penprint, ->insertch and
+           ->deletech
+
 0.11    CHANGES:
          * Allow Windows to be created overlapping their parent boundaries;
            clip output - Work In Progress, so far only handles ->print and

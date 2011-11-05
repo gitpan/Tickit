@@ -1,5 +1,5 @@
 NAME
-    "Tickit" - Terminal Interface Construction KIT
+    `Tickit' - Terminal Interface Construction KIT
 
 SYNOPSIS
      use Tickit;
@@ -16,20 +16,20 @@ SYNOPSIS
 DESCRIPTION
 CONSTRUCTOR
   $tickit = Tickit->new( %args )
-    Constructs a new "Tickit" framework container object.
+    Constructs a new `Tickit' framework container object.
 
     Takes the following named arguments at construction time:
 
     term_in => IO
-            IO handle for terminal input. Will default to "STDIN".
+            IO handle for terminal input. Will default to `STDIN'.
 
     term_out => IO
-            IO handle for terminal output. Will default to "STDOUT".
+            IO handle for terminal output. Will default to `STDOUT'.
 
     UTF8 => BOOL
             If defined, overrides locale detection to enable or disable
             UTF-8 mode. If not defined then this will be detected from the
-            locale by using Perl's "${^UTF8LOCALE}" variable.
+            locale by using Perl's `${^UTF8LOCALE}' variable.
 
 METHODS
   $tickit->is_utf8
@@ -48,7 +48,7 @@ METHODS
   $cols = $tickit->cols
   $lines = $tickit->lines
     Query the current size of the terminal. Will be cached and updated on
-    receipt of "SIGWINCH" signals.
+    receipt of `SIGWINCH' signals.
 
   $tickit->bind_key( $key, $code )
     Installs a callback to invoke if the given key is pressed, overwriting
@@ -56,13 +56,13 @@ METHODS
 
      $code->( $tickit, $key )
 
-    If $code is missing or "undef", any existing callback is removed.
+    If `$code' is missing or `undef', any existing callback is removed.
 
-    As a convenience for the common application use case, the "Ctrl-C" key
-    is bound to the "_STOP" method.
+    As a convenience for the common application use case, the `Ctrl-C' key
+    is bound to the `_STOP' method.
 
     To remove this binding, simply bind another callback, or remove the
-    binding entirely by setting "undef".
+    binding entirely by setting `undef'.
 
   $tickit->rootwin
     Returns the Tickit::RootWindow.
@@ -78,9 +78,9 @@ METHODS
     Shut down the screen after running
 
   $tickit->run
-    Calls the "start" method, then processes IO events until stopped, by the
-    "_STOP" method, "SIGINT", "SIGTERM" or the "Ctrl-C" key. Then runs the
-    "stop" method, and returns.
+    Calls the `start' method, then processes IO events until stopped, by the
+    `_STOP' method, `SIGINT', `SIGTERM' or the `Ctrl-C' key. Then runs the
+    `stop' method, and returns.
 
 AUTHOR
     Paul Evans <leonerd@leonerd.org.uk>

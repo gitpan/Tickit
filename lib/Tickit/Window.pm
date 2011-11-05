@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 use Carp;
 
@@ -646,18 +646,6 @@ sub _rawprint
    $self->{output_column} += $width;
 }
 
-=head2 $win->penprint( ... )
-
-A deprecated synonym for C<print>.
-
-=cut
-
-sub penprint
-{
-   warnings::warnif( deprecated => "Tickit::Window->penprint is deprecated; use ->print instead" );
-   goto &print;
-}
-
 =head2 $win->erasech( $count, $moveend, $pen )
 
 =head2 $win->erasech( $count, $moveend, %attrs )
@@ -717,74 +705,13 @@ sub _rawerasech
       $self->parent->_rawerasech( $count, $moveend, $bg );
    }
    else {
-      $self->term->chpen( bg => $bg );
+      # Also need to disable any remaining attributes that don't apply
+      $self->term->setpen( bg => $bg );
       $self->term->erasech( $count, $moveend );
    }
 
    $self->{output_column} += $count if $moveend;
    undef $self->{output_column} if !defined $moveend;
-}
-
-=head2 $success = $win->insertch( $count )
-
-Insert C<$count> blank characters, moving subsequent ones to the right. Note
-this can only be achieved if the window extends all the way to the righthand
-edge of the terminal, or else the operation would corrupt further windows
-beyond it.
-
-If this window does not extend to the righthand edge, then this method will
-simply return false. If it does, the characters are inserted and the method
-returns true.
-
-This method is deprecated; instead you should use the C<scrollrect> method.
-
-=cut
-
-sub insertch
-{
-   my $self = shift;
-   my ( $count ) = @_;
-
-   warnings::warnif( deprecated => "Tickit::Window->insertch is deprecated; use ->scrollrect instead" );
-
-   return if $self->{output_clipped};
-
-   return 0 unless $self->left + $self->cols == $self->term->cols;
-
-   $self->term->chpen( bg => $self->get_effective_penattr( 'bg' ) );
-   $self->term->insertch( $count );
-   return 1;
-}
-
-=head2 $success = $win->deletech( $count )
-
-Delete C<$count> characters, moving subsequent ones to the left, and inserting
-blanks at the end of the line. Note this can only be achieved if the window
-extends all the way to the righthand edge of the terminal, or else the
-operation would corrupt further windows beyond it.
-
-If this window does not extend to the righthand edge, then this method will
-simply return false. If it does, the characters are inserted and the method
-returns true.
-
-This method is deprecated; instead you should use the C<scrollrect> method.
-
-=cut
-
-sub deletech
-{
-   my $self = shift;
-   my ( $count ) = @_;
-
-   warnings::warnif( deprecated => "Tickit::Window->deletech is deprecated; use ->scrollrect instead" );
-
-   return if $self->{output_clipped};
-
-   return 0 unless $self->left + $self->cols == $self->term->cols;
-
-   $self->term->chpen( bg => $self->get_effective_penattr( 'bg' ) );
-   $self->term->deletech( $count );
-   return 1;
 }
 
 =head2 $success = $win->scrollrect( $top, $left, $lines, $cols, $downward, $rightward )

@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -298,8 +298,9 @@ sub set_pen
 sub on_pen_changed
 {
    my $self = shift;
+   my ( $pen ) = @_;
 
-   if( $self->window ) {
+   if( $self->window and $pen == $self->{pen} ) {
       $self->redraw;
    }
 }
