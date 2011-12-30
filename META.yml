@@ -20,70 +20,70 @@ name: Tickit
 provides:
   Tickit:
     file: lib/Tickit.pm
-    version: 0.12
+    version: 0.13
   Tickit::ContainerWidget:
     file: lib/Tickit/ContainerWidget.pm
-    version: 0.12
+    version: 0.13
   Tickit::OneLineWidget:
     file: lib/Tickit/OneLineWidget.pm
-    version: 0.12
+    version: 0.13
   Tickit::Pen:
     file: lib/Tickit/Pen.pm
-    version: 0.12
+    version: 0.13
   Tickit::Rect:
     file: lib/Tickit/Rect.pm
-    version: 0.12
+    version: 0.13
   Tickit::RootWindow:
     file: lib/Tickit/RootWindow.pm
-    version: 0.12
+    version: 0.13
   Tickit::SingleChildWidget:
     file: lib/Tickit/SingleChildWidget.pm
-    version: 0.12
+    version: 0.13
   Tickit::Term:
     file: lib/Tickit/Term.pm
-    version: 0.12
+    version: 0.13
   Tickit::Term::xterm:
     file: lib/Tickit/Term/xterm.pm
-    version: 0.12
+    version: 0.13
   Tickit::Test:
     file: lib/Tickit/Test.pm
-    version: 0.12
+    version: 0.13
   Tickit::Test::MockTerm:
     file: lib/Tickit/Test/MockTerm.pm
-    version: 0.12
+    version: 0.13
   Tickit::Utils:
     file: lib/Tickit/Utils.pm
-    version: 0.12
+    version: 0.13
   Tickit::Widget:
     file: lib/Tickit/Widget.pm
-    version: 0.12
+    version: 0.13
   Tickit::Widget::Box:
     file: lib/Tickit/Widget/Box.pm
-    version: 0.12
+    version: 0.13
   Tickit::Widget::Entry:
     file: lib/Tickit/Widget/Entry.pm
-    version: 0.12
+    version: 0.13
   Tickit::Widget::Frame:
     file: lib/Tickit/Widget/Frame.pm
-    version: 0.12
+    version: 0.13
   Tickit::Widget::HBox:
     file: lib/Tickit/Widget/HBox.pm
-    version: 0.12
+    version: 0.13
   Tickit::Widget::LinearBox:
     file: lib/Tickit/Widget/LinearBox.pm
-    version: 0.12
+    version: 0.13
   Tickit::Widget::Static:
     file: lib/Tickit/Widget/Static.pm
-    version: 0.12
+    version: 0.13
   Tickit::Widget::VBox:
     file: lib/Tickit/Widget/VBox.pm
-    version: 0.12
+    version: 0.13
   Tickit::WidgetRole::Borderable:
     file: lib/Tickit/WidgetRole/Borderable.pm
-    version: 0.12
+    version: 0.13
   Tickit::Window:
     file: lib/Tickit/Window.pm
-    version: 0.12
+    version: 0.13
 requires:
   Exporter: 5.57
   List::MoreUtils: 0
@@ -92,4 +92,4 @@ requires:
   Term::Terminfo: 0
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.12
+version: 0.13

@@ -22,13 +22,12 @@ $entry->set_window( $win );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
+is_termlog( [ GOTO(0,0),
               SETPEN,
               PRINT("Initial"),
               SETBG(undef),
               ERASECH(73),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ),
               GOTO(0,0) ],
             'Termlog initially' );
 

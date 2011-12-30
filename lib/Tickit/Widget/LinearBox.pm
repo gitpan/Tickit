@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 use List::Util qw( sum );
 

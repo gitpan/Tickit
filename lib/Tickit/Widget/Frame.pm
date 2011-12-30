@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget );
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 use Carp;
 
@@ -300,6 +300,8 @@ sub set_child_window
       }
    }
 }
+
+use constant CLEAR_BEFORE_RENDER => 0;
 
 sub render
 {

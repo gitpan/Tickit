@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -110,6 +110,8 @@ sub set_window
    }
 }
 
+use constant CLEAR_BEFORE_RENDER => 1;
+
 sub window_gained
 {
    my $self = shift;
@@ -125,7 +127,7 @@ sub window_gained
 
    $window->set_on_expose( sub {
       my ( $win, $rect ) = @_;
-      $self->_do_clear;
+      $self->_do_clear if $self->CLEAR_BEFORE_RENDER;
       $self->render(
          rect => $rect,
          top   => $rect->top,
@@ -321,6 +323,14 @@ the contained L<Tickit::Window> object obtained from C<< $widget->window >>.
 Will be passed hints on the region of the window that requires rendering; the
 method implementation may choose to use this information to restrict drawing,
 or it may ignore it entirely.
+
+Before this method is called, the window area will be cleared if the
+(optional) object method C<CLEAR_BEFORE_RENDER> returns true. Subclasses may
+wish to override this and return false if their C<render> method will
+completely redraw the window expose area anyway, for better performance and
+less display flicker.
+
+ use constant CLEAR_BEFORE_RENDER => 0;
 
 =over 8
 

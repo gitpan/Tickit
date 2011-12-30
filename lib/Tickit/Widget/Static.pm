@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::OneLineWidget );
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 use Tickit::Utils qw( textwidth substrwidth ); # 'align'
 
@@ -155,6 +155,8 @@ sub set_align
 
    $self->redraw;
 }
+
+use constant CLEAR_BEFORE_RENDER => 0;
 
 sub render_line
 {

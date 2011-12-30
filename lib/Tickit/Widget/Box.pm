@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget Tickit::WidgetRole::Borderable );
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 =head1 NAME
 
@@ -79,6 +79,48 @@ sub set_child_window
       if( $child->window ) {
          $child->set_window( undef );
       }
+   }
+}
+
+use constant CLEAR_BEFORE_RENDER => 0;
+
+sub render
+{
+   my $self = shift;
+   my %args = @_;
+
+   my $win = $self->window or return;
+   my $rect = $args{rect};
+
+   foreach my $line ( $rect->top .. $self->top_border - 1 ) {
+      $win->clearline( $line );
+   }
+   
+   my $left_border  = $self->left_border;
+   my $right_border = $self->right_border;
+   my $right_border_at = $win->cols - $right_border;
+
+   if( $self->child and $left_border + $right_border < $win->cols ) {
+      foreach my $line ( $self->top_border .. $win->lines - $self->bottom_border ) {
+         if( $left_border > 0 ) {
+            $win->goto( $line, 0 );
+            $win->erasech( $left_border );
+         }
+
+         if( $right_border > 0 ) {
+            $win->goto( $line, $right_border_at );
+            $win->erasech( $right_border );
+         }
+      }
+   }
+   else {
+      foreach my $line ( $self->top_border .. $win->lines - $self->bottom_border - 1 ) {
+         $win->clearline( $line );
+      }
+   }
+
+   foreach my $line ( $win->lines - $self->bottom_border .. $rect->bottom - 1 ) {
+      $win->clearline( $line );
    }
 }
 

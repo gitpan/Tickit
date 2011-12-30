@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -279,7 +279,8 @@ sub remove_on_changed
    # Can't grep() because that would strengthen weakrefs
    my $on_changed = $self->{_on_changed};
    for( my $i = 0; $i < @$on_changed; ) {
-      $i++, next unless $on_changed->[$i][0] == $observer;
+      # Be well-behaved at global destruction time
+      $i++, next unless !defined $on_changed->[$i][0] or $on_changed->[$i][0] == $observer;
       splice @$on_changed, $i, 1, ();
    }
 }

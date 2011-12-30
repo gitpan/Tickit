@@ -21,11 +21,10 @@ $entry->set_window( $win );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
+is_termlog( [ GOTO(0,0),
               SETBG(undef),
               ERASECH(80),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ),
               GOTO(0,0) ],
             'Termlog initially' );
 
@@ -148,13 +147,12 @@ is( $entry->text, "Different text", '$entry->text after ->set_text' );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
+is_termlog( [ GOTO(0,0),
               SETPEN,
               PRINT("Different text"),
               SETBG(undef),
               ERASECH(66),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ),
               GOTO(0,3) ],
             'Termlog after ->set_text' );
 
@@ -173,13 +171,14 @@ $entry->set_window( $subwin );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
+is_termlog( [ SETBG(undef),
               CLEAR,
               GOTO(2,2),
               SETPEN,
               PRINT("Different text"),
               SETBG(undef),
               ERASECH(62),
+              ( map { GOTO($_,2), SETBG(undef), ERASECH(76) } 3 .. 22 ),
               GOTO(2,5) ],
             'Termlog in subwindow' );
 
@@ -218,13 +217,12 @@ $entry->set_window( $win );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
+is_termlog( [ GOTO(0,0),
               SETPEN,
               PRINT("Some initial text"),
               SETBG(undef),
               ERASECH(63),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ),
               GOTO(0,5) ],
            'Termlog written to for initialised' );
 

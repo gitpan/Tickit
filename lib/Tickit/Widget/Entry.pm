@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 use Tickit::Utils qw( textwidth chars2cols cols2chars substrwidth );
 
@@ -215,30 +215,40 @@ sub posttext_render
    $win->print( $self->{more_markers}[1], $self->{more_pen} );
 }
 
+use constant CLEAR_BEFORE_RENDER => 0;
+
 sub render
 {
    my $self = shift;
+   my %args = @_;
 
    my $win = $self->window or return;
+   my $rect = $args{rect};
 
-   $win->goto( 0, 0 );
+   if( $rect->top == 0 ) {
+      $win->goto( 0, 0 );
 
-   my $width = $win->cols;
+      my $width = $win->cols;
 
-   my $text = substrwidth( $self->text, $self->{scrolloffs_co}, $width );
-   my $textlen_co = textwidth $text;
+      my $text = substrwidth( $self->text, $self->{scrolloffs_co}, $width );
+      my $textlen_co = textwidth $text;
 
-   my $pretext_width  = $self->pretext_width;
-   my $posttext_width = $self->posttext_width;
+      my $pretext_width  = $self->pretext_width;
+      my $posttext_width = $self->posttext_width;
 
-   $self->pretext_render( $win ) if $pretext_width;
+      $self->pretext_render( $win ) if $pretext_width;
 
-   $win->print( substrwidth( $text, $pretext_width, $width - $pretext_width - $posttext_width ) );
-   if( $textlen_co < $width - $posttext_width ) {
-      $win->erasech( $width - $posttext_width - $textlen_co );
+      $win->print( substrwidth( $text, $pretext_width, $width - $pretext_width - $posttext_width ) );
+      if( $textlen_co < $width - $posttext_width ) {
+         $win->erasech( $width - $posttext_width - $textlen_co );
+      }
+
+      $self->posttext_render( $win ) if $posttext_width;
    }
 
-   $self->posttext_render( $win ) if $posttext_width;
+   foreach my $line ( $rect->top + 1 .. $win->lines - 1 ) {
+      $win->clearline( $line );
+   }
 
    $self->reposition_cursor;
 }

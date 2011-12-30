@@ -1,5 +1,14 @@
 Revision history for Changes
 
+0.13    CHANGES:
+         * Allow Widget subclasses to disable the clear-before-render
+           behaviour
+         * Avoid harmless warning about undef during global destruction
+
+        BUGFIXES:
+         * Skip Unicode-requiring tests unless we know we have a Unicode-aware
+           locale
+
 0.12    CHANGES:
          * Pass an opaque 'id' value through Pen->add_on_changed into
            $observer->on_pen_changed

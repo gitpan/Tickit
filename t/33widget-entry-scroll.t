@@ -19,13 +19,12 @@ $entry->set_window( $win );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
+is_termlog( [ GOTO(0,0),
               SETPEN,
               PRINT("A"x70),
               SETBG(undef),
               ERASECH(10),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ),
               GOTO(0,70) ],
             'Termlog initially' );
 
@@ -38,15 +37,14 @@ $entry->text_insert( "B"x20, $entry->position );
 
 flush_tickit;
 
-is_termlog( [ SETPEN,
-              CLEAR,
-              GOTO(0,0),
+is_termlog( [ GOTO(0,0),
               SETPEN(fg => 6),
               PRINT("<.."),
               SETPEN,
               PRINT(("A"x27).("B"x20)),
               SETBG(undef),
               ERASECH(30),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ),
               GOTO(0,50) ],
             'Termlog after append to scroll' );
 
@@ -60,13 +58,12 @@ $entry->set_position( 0 );
 flush_tickit;
 
 is_termlog( [ GOTO(0,0),
-              SETPEN,
-              CLEAR,
               GOTO(0,0),
               SETPEN,
               PRINT(("A"x70).("B"x7)),
               SETPEN(fg => 6),
               PRINT("..>"),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ),
               GOTO(0,0) ],
             'Termlog after ->set_position 0' );
 
@@ -80,8 +77,6 @@ $entry->set_position( 90 );
 flush_tickit;
 
 is_termlog( [ GOTO(0,50),
-              SETPEN,
-              CLEAR,
               GOTO(0,0),
               SETPEN(fg => 6),
               PRINT("<.."),
@@ -89,6 +84,7 @@ is_termlog( [ GOTO(0,50),
               PRINT(("A"x27).("B"x20)),
               SETBG(undef),
               ERASECH(30),
+              ( map { GOTO($_,0), SETBG(undef), ERASECH(80) } 1 .. 24 ),
               GOTO(0,50) ],
             'Termlog after ->set_position 90' );
 
