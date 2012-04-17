@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Window );
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 use Carp;
 use Scalar::Util qw( weaken refaddr );

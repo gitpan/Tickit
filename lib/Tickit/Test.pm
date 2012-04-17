@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 use Exporter 'import';
 
@@ -131,9 +131,9 @@ sub mk_window
 
    my $win = $tickit->rootwin;
 
-   $tickit->start;
+   $tickit->setup_term;
 
-   # Clear the method log from ->start
+   # Clear the method log from ->setup_term
    $term->methodlog;
 
    return $win;

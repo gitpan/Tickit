@@ -3,7 +3,7 @@ package Tickit::Test::MockTerm;
 use strict;
 use warnings;
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 sub new
 {
@@ -16,6 +16,8 @@ sub new
       pen   => { map { $_ => undef } @Tickit::Pen::ALL_ATTRS },
    }, $class;
 
+   $self->set_on_resize( $args{on_resize} ) if $args{on_resize};
+
    $self->clear;
 
    # Clear the method log
@@ -24,14 +26,22 @@ sub new
    return $self;
 }
 
-sub configure
+sub set_on_resize
 {
    my $self = shift;
-   my %args = @_;
+   ( $self->{on_resize} ) = @_;
+}
 
-   $self->{on_resize} = delete $args{on_resize} if exists $args{on_resize};
-   $self->{on_key}    = delete $args{on_key}    if exists $args{on_key};
-   $self->{on_mouse}  = delete $args{on_mouse}  if exists $args{on_mouse};
+sub set_on_key
+{
+   my $self = shift;
+   ( $self->{on_key} ) = @_;
+}
+
+sub set_on_mouse
+{
+   my $self = shift;
+   ( $self->{on_mouse} ) = @_;
 }
 
 sub is_changed
@@ -115,8 +125,12 @@ sub resize
 
    # TODO: handle shrinking
 
-   $self->{lines} = $newlines;
-   $self->{cols}  = $newcols;
+   if( $newlines != $self->{lines} or $newcols != $self->{cols} ) {
+      $self->{lines} = $newlines;
+      $self->{cols}  = $newcols;
+
+      $self->{on_resize}->( $self, $newlines, $newcols ) if $self->{on_resize};
+   }
 }
 
 sub set_size

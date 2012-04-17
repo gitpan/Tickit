@@ -1,5 +1,11 @@
 Revision history for Changes
 
+0.14    CHANGES:
+         * $term->insertch and ->deletech are now removed
+         * Move key input behaviours into Tickit::Term; many other
+           refactorings between Tickit and Tickit::Term
+         * Renamed $tickit->start / ->stop to ->setup_term / ->teardown_term
+
 0.13    CHANGES:
          * Allow Widget subclasses to disable the clear-before-render
            behaviour

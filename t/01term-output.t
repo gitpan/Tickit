@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 24;
+use Test::More tests => 22;
 use Test::HexString;
 
 use Tickit::Term;
@@ -93,14 +93,6 @@ stream_is( "\e[K", '$term->eraseinline' );
 $stream = "";
 $term->erasech( 23 );
 stream_is( "\e[23X", '$term->erasech( 23 )' );
-
-$stream = "";
-$term->insertch( 8 );
-stream_is( "\e[8@", '$term->insertch( 8 )' );
-
-$stream = "";
-$term->deletech( 17 );
-stream_is( "\e[17P", '$term->deletech( 17 )' );
 
 $stream = "";
 $term->mode_altscreen( 1 );

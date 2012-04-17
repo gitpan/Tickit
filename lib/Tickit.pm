@@ -1,22 +1,21 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
 
 package Tickit;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 use IO::Handle;
-use Term::Size;
-use Term::TermKey qw( FORMAT_ALTISMETA FLAG_UTF8 FLAG_RAW FLAG_EINTR RES_KEY RES_AGAIN );
-use constant FLAGS_UTF8_RAW => FLAG_UTF8|FLAG_RAW;
 
 use Tickit::Term;
 use Tickit::RootWindow;
+
+use Scalar::Util qw( weaken );
 
 =head1 NAME
 
@@ -81,37 +80,46 @@ sub new
 
    my $term = delete $args{term};
 
-   my $is_utf8 = defined $args{UTF8} ? $args{UTF8} : ${^UTF8LOCALE};
-
    my $self = bless {
-      UTF8 => $is_utf8,
    }, $class;
-
-   my $termkey = $self->_make_termkey( $in );
-
-   $termkey->set_flags( ( $termkey->get_flags & ~FLAGS_UTF8_RAW ) |
-                        ( $is_utf8 ? FLAG_UTF8 : FLAG_RAW ) );
 
    unless( $term ) {
       my $writer = $self->_make_writer( $out );
 
       $term = Tickit::Term->find_for_term(
-         writer => $writer,
-         $is_utf8 ? ( encoding => "UTF-8" ) : (),
+         writer        => $writer,
+         input_handle  => $in,
+         output_handle => $out,
       );
    }
 
    $self->{term} = $term;
    $self->{term_in}  = $in;
    $self->{term_out} = $out;
-   $self->{termkey} = $termkey;
 
-   $self->_recache_size;
-   $term->set_size( $self->lines, $self->cols );
-
-   $self->{rootwin} = Tickit::RootWindow->new( $self, $self->lines, $self->cols );
+   my $rootwin = $self->{rootwin} = Tickit::RootWindow->new( $self, $self->lines, $self->cols );
 
    $self->bind_key( 'C-c' => $self->can( "_STOP" ) );
+
+   weaken( my $weakself = $self );
+
+   $term->set_on_resize( sub {
+      $weakself or return;
+      my ( $term, $lines, $cols ) = @_;
+      $weakself->rootwin->resize( $lines, $cols );
+   } );
+
+   $term->set_on_key( sub {
+      $weakself or return;
+      my ( $term, $type, $str, $key ) = @_;
+      $weakself->on_key( $type, $str, $key );
+   } );
+
+   $term->set_on_mouse( sub {
+      $weakself or return;
+      my ( $term, $ev, $button, $line, $col ) = @_;
+      $weakself->on_mouse( $ev, $button, $line, $col );
+   } );
 
    return $self;
 }
@@ -119,14 +127,6 @@ sub new
 =head1 METHODS
 
 =cut
-
-sub _make_termkey
-{
-   my $self = shift;
-   my ( $in ) = @_;
-
-   return Term::TermKey->new( $in, FLAG_EINTR );
-}
 
 sub _make_writer
 {
@@ -136,20 +136,6 @@ sub _make_writer
    $out->autoflush( 1 );
 
    return $out;
-}
-
-=head2 $tickit->is_utf8
-
-Returns true if running in UTF-8 mode; returned keypress events and displayed
-text will be Unicode aware. If false, then keypresses and displayed text will
-work in legacy 8-bit mode.
-
-=cut
-
-sub is_utf8
-{
-   my $self = shift;
-   return $self->{UTF8};
 }
 
 =head2 $tickit->later( $code )
@@ -197,47 +183,14 @@ of C<SIGWINCH> signals.
 
 =cut
 
-sub _recache_size
-{
-   my $self = shift;
-   ( $self->{cols}, $self->{lines} ) = Term::Size::chars $self->{term_out};
-}
-
-sub lines { shift->{lines} }
-sub cols  { shift->{cols}  }
+sub lines { shift->term->lines }
+sub cols  { shift->term->cols  }
 
 sub _SIGWINCH
 {
    my $self = shift;
 
-   $self->_recache_size;
-   $self->term->set_size( $self->lines, $self->cols );
-   $self->rootwin->resize( $self->lines, $self->cols );
-}
-
-sub _KEY
-{
-   my $self = shift;
-   my ( $tk, $key ) = @_;
-
-   my $spacesym = $self->{spacesym} ||= $tk->keyname2sym( "Space" );
-
-   # libtermkey represents unmodified Space as a keysym, whereas we'd
-   # prefer to treat it as plain text
-   if( $key->type_is_unicode and !$key->modifiers ) {
-      $self->on_key( text => $key->utf8, $key );
-   }
-   elsif( $key->type_is_keysym  and !$key->modifiers and $key->sym == $spacesym ) {
-      $self->on_key( text => " ", $key );
-   }
-   elsif( $key->type_is_mouse ) {
-      my ( $ev, $button, $line, $col ) = $tk->interpret_mouse( $key );
-      my $evname = (qw( * press drag release ))[$ev];
-      $self->on_mouse( $evname, $button, $line - 1, $col - 1 );
-   }
-   else {
-      $self->on_key( key => $tk->format_key( $key, FORMAT_ALTISMETA ), $key );
-   }
+   $self->term->refresh_size;
 }
 
 sub on_key
@@ -315,13 +268,13 @@ sub set_root_widget
    ( $self->{root_widget} ) = @_;
 }
 
-=head2 $tickit->start
+=head2 $tickit->setup_term
 
 Set up the screen and generally prepare to start running
 
 =cut
 
-sub start
+sub setup_term
 {
    my $self = shift;
 
@@ -336,13 +289,13 @@ sub start
    }
 }
 
-=head2 $tickit->stop
+=head2 $tickit->teardown_term
 
 Shut down the screen after running
 
 =cut
 
-sub stop
+sub teardown_term
 {
    my $self = shift;
 
@@ -358,9 +311,9 @@ sub stop
 
 =head2 $tickit->run
 
-Calls the C<start> method, then processes IO events until stopped, by the
+Calls the C<setup_term> method, then processes IO events until stopped, by the
 C<_STOP> method, C<SIGINT>, C<SIGTERM> or the C<Ctrl-C> key. Then runs the
-C<stop> method, and returns.
+C<teardown_term> method, and returns.
 
 =cut
 
@@ -374,7 +327,7 @@ sub run
 {
    my $self = shift;
 
-   $self->start;
+   $self->setup_term;
 
    $SIG{INT} = $SIG{TERM} = sub { $self->_STOP };
 
@@ -388,13 +341,13 @@ sub run
 
       die @_ if $^S;
 
-      $self->stop;
+      $self->teardown_term;
       die @_;
    };
 
    my $fileno_in = $self->{term_in}->fileno;
-   my $termkey = $self->{termkey};
-   my $queue   = $self->{todo_queue};
+   my $term      = $self->{term};
+   my $queue     = $self->{todo_queue};
 
    $self->_flush_later if @$queue;
 
@@ -402,14 +355,12 @@ sub run
 
    local $self->{keep_running} = 1;
    while( $self->{keep_running} ) {
-      if( $termkey->waitkey( my $key ) == RES_KEY ) {
-         $self->_KEY( $termkey, $key );
-      }
+      $term->input_wait;
 
       $self->_flush_later if @$queue;
    }
 
-   $self->stop;
+   $self->teardown_term;
 }
 
 =head1 AUTHOR

@@ -8,8 +8,10 @@ examples/demo-entry.pl
 examples/demo-frame.pl
 examples/demo-pen.pl
 examples/demo-xterm256.pl
+examples/hello-world.pl
 examples/HelloWorldWidget-1.pm
 examples/HelloWorldWidget-2.pm
+examples/ShowKeyWidget.pm
 examples/testonewidget.pl
 lib/Tickit.pm
 lib/Tickit/ContainerWidget.pm
@@ -43,7 +45,8 @@ README
 t/00use.t
 t/01term-output.t
 t/02term-outpen.t
-t/03rect.t
+t/03term-input.t
+t/04rect.t
 t/05utils.t
 t/06pen.t
 t/07mockterm.t
@@ -59,6 +62,7 @@ t/20widget.t
 t/21widget-window.t
 t/22widget-parent.t
 t/23widget-input.t
+t/24widget-clear.t
 t/30widget-static.t
 t/31widget-entry-model.t
 t/32widget-entry-input.t
@@ -67,4 +71,5 @@ t/40widget-box.t
 t/41widget-hbox.t
 t/41widget-vbox.t
 t/42widget-frame.t
+t/80tickit.t
 t/99pod.t

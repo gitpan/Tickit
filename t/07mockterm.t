@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 19;
+use Test::More tests => 17;
 use Tickit::Test;
 
 my $term = mk_term lines => 3, cols => 10;
@@ -67,13 +67,3 @@ $term->goto( 0, 3 );
 $term->erasech( 5 );
 is_display( [ "ABC     IJ", "ABCDEFGHIJ", "ABCDEFGHIJ" ],
             'Display after ->erasech' );
-
-$term->goto( 1, 3 );
-$term->deletech( 5 );
-is_display( [ "ABC     IJ", "ABCIJ     ", "ABCDEFGHIJ" ],
-            'Display after ->deletech' );
-
-$term->goto( 2, 3 );
-$term->insertch( 5 );
-is_display( [ "ABC     IJ", "ABCIJ     ", "ABC     DE" ],
-            'Display after ->insertch' );

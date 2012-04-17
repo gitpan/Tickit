@@ -32,11 +32,6 @@ CONSTRUCTOR
             locale by using Perl's `${^UTF8LOCALE}' variable.
 
 METHODS
-  $tickit->is_utf8
-    Returns true if running in UTF-8 mode; returned keypress events and
-    displayed text will be Unicode aware. If false, then keypresses and
-    displayed text will work in legacy 8-bit mode.
-
   $tickit->later( $code )
     Runs the given CODE reference at some time soon in the future. It will
     not be invoked yet, but will be invoked at some point before the next
@@ -71,16 +66,16 @@ METHODS
     Sets the root widget for the application's display. This must be a
     subclass of Tickit::Widget.
 
-  $tickit->start
+  $tickit->setup_term
     Set up the screen and generally prepare to start running
 
-  $tickit->stop
+  $tickit->teardown_term
     Shut down the screen after running
 
   $tickit->run
-    Calls the `start' method, then processes IO events until stopped, by the
-    `_STOP' method, `SIGINT', `SIGTERM' or the `Ctrl-C' key. Then runs the
-    `stop' method, and returns.
+    Calls the `setup_term' method, then processes IO events until stopped,
+    by the `_STOP' method, `SIGINT', `SIGTERM' or the `Ctrl-C' key. Then
+    runs the `teardown_term' method, and returns.
 
 AUTHOR
     Paul Evans <leonerd@leonerd.org.uk>

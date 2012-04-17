@@ -10,7 +10,8 @@ my $build = Module::Build->new(
       'List::MoreUtils' => 0,
       'Term::Terminfo' => 0,
       'Term::Size' => 0,
-      'Term::TermKey' => '0.09',
+      'Term::TermKey' => '0.11',
+      'Time::HiRes' => 0,
    },
    build_requires => {
       'Test::Builder::Tester' => 0,
