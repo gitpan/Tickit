@@ -12,7 +12,7 @@ use Tickit::Widget::HBox;
 
 my $tickit = Tickit->new();
 
-my @basekeys = qw( a i Space Tab Enter Up Insert );
+my @basekeys = qw( a i Space Tab Enter Up Escape );
 
 my $vbox = Tickit::Widget::VBox->new( spacing => 1 );
 my $hbox;
@@ -36,33 +36,23 @@ foreach my $mbits ( 0 .. 7 ) {
    foreach ( @basekeys ) {
       my $basekey = $_; # avoid alias
 
-      my $static;
+      my $static = Tickit::Widget::Static->new( text => "--    " );
 
-      if( $modifier =~ m/S-/ && $basekey eq "Insert" ) {
-         $static = Tickit::Widget::Static->new(
-            text => "XX    ",
-            fg   => "red",
-         );
+      my $thismod = $modifier;
+      # Keybindings are weirder
+      if( length( $basekey ) == 1 ) {
+         $thismod =~ s/S-// and $basekey = uc $basekey;
       }
-      else {
-         $static = Tickit::Widget::Static->new( text => "--    " );
-
-         my $thismod = $modifier;
-         # Keybindings are weirder
-         if( length( $basekey ) == 1 ) {
-            $thismod =~ s/S-// and $basekey = uc $basekey;
-         }
-         elsif( $basekey eq "Space" ) {
-            $basekey = " ";
-         }
-
-         $tickit->bind_key(
-            "$thismod$basekey" => sub {
-               $static->pen->chattr( fg => "green" );
-               $static->set_text( "OK    " );
-            }
-         );
+      elsif( $basekey eq "Space" ) {
+         $basekey = " ";
       }
+
+      $tickit->bind_key(
+         "$thismod$basekey" => sub {
+            $static->pen->chattr( fg => "green" );
+            $static->set_text( "OK    " );
+         }
+      );
 
       $hbox->add( $static );
    }

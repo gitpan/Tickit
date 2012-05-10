@@ -21,6 +21,9 @@ my $term = $tickit->term;
 
 isa_ok( $term, "Tickit::Term", '$tickit->term' );
 
+# For unit-test purposes force the size of the terminal to 80x24
+$term->set_size( 24, 80 );
+
 # There might be some terminal setup code here... Flush it
 $my_rd->blocking( 0 );
 sysread( $my_rd, my $buffer, 8192 );
@@ -30,7 +33,9 @@ sub stream_is
    my ( $expect, $name ) = @_;
 
    my $stream = "";
-   sysread( $my_rd, $stream, 8192, length $stream ) while length $stream < length $expect;
+   do { 
+      sysread( $my_rd, $stream, 8192, length $stream );
+   } while length $stream < length $expect and $stream eq substr( $expect, 0, length $stream );
 
    is_hexstr( substr( $stream, 0, length $expect, "" ), $expect, $name );
 }

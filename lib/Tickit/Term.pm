@@ -1,14 +1,14 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::Term;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 use Encode qw( find_encoding );
 use Term::Size;
@@ -513,12 +513,6 @@ sub clear
    my $self = shift;
    $self->write( "${CSI}2J" );
 }
-
-=head2 $term->eraseinline
-
-Clear the current line from the cursor onwards.
-
-=cut
 
 sub eraseinline
 {

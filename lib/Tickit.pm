@@ -8,12 +8,12 @@ package Tickit;
 use strict;
 use warnings;
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 use IO::Handle;
 
 use Tickit::Term;
-use Tickit::RootWindow;
+use Tickit::Window;
 
 use Scalar::Util qw( weaken );
 
@@ -81,6 +81,8 @@ sub new
    my $term = delete $args{term};
 
    my $self = bless {
+      todo_queue => [],
+      redraw_queue => [],
    }, $class;
 
    unless( $term ) {
@@ -97,7 +99,7 @@ sub new
    $self->{term_in}  = $in;
    $self->{term_out} = $out;
 
-   my $rootwin = $self->{rootwin} = Tickit::RootWindow->new( $self, $self->lines, $self->cols );
+   my $rootwin = $self->{rootwin} = Tickit::Window->new( $self, $term->lines, $term->cols );
 
    $self->bind_key( 'C-c' => $self->can( "_STOP" ) );
 
@@ -160,6 +162,32 @@ sub later
    my ( $code ) = @_;
 
    push @{ $self->{todo_queue} }, $code;
+}
+
+sub enqueue_redraw
+{
+   my $self = shift;
+   my ( $code ) = @_;
+
+   my $queue = $self->{redraw_queue};
+   push @$queue, $code if $code;
+
+   return if $self->{redraw_queued};
+
+   weaken( my $weakself = $self );
+
+   $self->{redraw_queued} = 1;
+   $self->later( sub {
+      $weakself->term->mode_cursorvis( 0 );
+
+      my @queue = @$queue;
+      @$queue = ();
+
+      $_->() for @queue;
+
+      $weakself->rootwin->restore;
+      $weakself->{redraw_queued} = 0;
+   } );
 }
 
 =head2 $term = $tickit->term
@@ -245,7 +273,7 @@ sub on_mouse
 
 =head2 $tickit->rootwin
 
-Returns the L<Tickit::RootWindow>.
+Returns the root L<Tickit::Window>.
 
 =cut
 
@@ -309,6 +337,45 @@ sub teardown_term
    $term->mode_mouse( 0 );
 }
 
+sub _STOP
+{
+   my $self = shift;
+   $self->{keep_running} = 0;
+}
+
+=head2 $tickit->tick
+
+Run a single round of IO events. Does not call C<setup_term> or
+C<teardown_term>.
+
+=cut
+
+sub _tick
+{
+   my $self = shift;
+
+   $self->{term}->input_wait;
+
+   $self->_flush_later if @{ $self->{todo_queue} };
+}
+
+sub tick
+{
+   my $self = shift;
+
+   my $old_DIE = $SIG{__DIE__};
+   local $SIG{__DIE__} = sub {
+      local $SIG{__DIE__} = $old_DIE;
+
+      die @_ if $^S;
+
+      $self->teardown_term;
+      die @_;
+   };
+
+   $self->_tick;
+}
+
 =head2 $tickit->run
 
 Calls the C<setup_term> method, then processes IO events until stopped, by the
@@ -316,12 +383,6 @@ C<_STOP> method, C<SIGINT>, C<SIGTERM> or the C<Ctrl-C> key. Then runs the
 C<teardown_term> method, and returns.
 
 =cut
-
-sub _STOP
-{
-   my $self = shift;
-   $self->{keep_running} = 0;
-}
 
 sub run
 {
@@ -345,20 +406,10 @@ sub run
       die @_;
    };
 
-   my $fileno_in = $self->{term_in}->fileno;
-   my $term      = $self->{term};
-   my $queue     = $self->{todo_queue};
-
-   $self->_flush_later if @$queue;
-
-   my $key_pending = 0;
+   $self->_flush_later if @{ $self->{todo_queue} };
 
    local $self->{keep_running} = 1;
-   while( $self->{keep_running} ) {
-      $term->input_wait;
-
-      $self->_flush_later if @$queue;
-   }
+   $self->_tick while( $self->{keep_running} );
 
    $self->teardown_term;
 }

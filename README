@@ -60,7 +60,7 @@ METHODS
     binding entirely by setting `undef'.
 
   $tickit->rootwin
-    Returns the Tickit::RootWindow.
+    Returns the root Tickit::Window.
 
   $tickit->set_root_widget( $widget )
     Sets the root widget for the application's display. This must be a
@@ -71,6 +71,10 @@ METHODS
 
   $tickit->teardown_term
     Shut down the screen after running
+
+  $tickit->tick
+    Run a single round of IO events. Does not call `setup_term' or
+    `teardown_term'.
 
   $tickit->run
     Calls the `setup_term' method, then processes IO events until stopped,

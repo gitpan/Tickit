@@ -1,5 +1,15 @@
 Revision history for Changes
 
+0.15    CHANGES:
+         * $term->eraseline is now removed
+         * Provide a $tickit->tick method to finer-grained event handling
+         * Removed Tickit::RootWindow; the root window is now a regular
+           Tickit::Window
+
+        BUGFIXES:
+         * Force terminal size in t/80tickit.t so it doesn't cause failures on
+           oddly-sized terminals
+
 0.14    CHANGES:
          * $term->insertch and ->deletech are now removed
          * Move key input behaviours into Tickit::Term; many other

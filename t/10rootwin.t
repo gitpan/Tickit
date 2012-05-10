@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 42;
+use Test::More tests => 41;
 use Test::Identity;
 use Test::Refcount;
 
@@ -10,7 +10,6 @@ use Tickit::Test;
 
 my ( $term, $win ) = mk_term_and_window;
 
-isa_ok( $win, "Tickit::RootWindow", '$win isa Tickit::RootWindow' );
 isa_ok( $win, "Tickit::Window", '$win isa Tickit::Window' );
 
 # Already 2 references; Tickit object keeps a permanent one, and we have one

@@ -18,7 +18,6 @@ lib/Tickit/ContainerWidget.pm
 lib/Tickit/OneLineWidget.pm
 lib/Tickit/Pen.pm
 lib/Tickit/Rect.pm
-lib/Tickit/RootWindow.pm
 lib/Tickit/SingleChildWidget.pm
 lib/Tickit/Term.pm
 lib/Tickit/Term/xterm.pm
@@ -44,7 +43,7 @@ META.yml
 README
 t/00use.t
 t/01term-output.t
-t/02term-outpen.t
+t/02term-resize.t
 t/03term-input.t
 t/04rect.t
 t/05utils.t
@@ -72,4 +71,5 @@ t/41widget-hbox.t
 t/41widget-vbox.t
 t/42widget-frame.t
 t/80tickit.t
+t/81tickit-input.t
 t/99pod.t

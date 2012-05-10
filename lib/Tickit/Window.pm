@@ -1,14 +1,14 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::Window;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 use Carp;
 
@@ -31,9 +31,32 @@ region of the screen that a widget occupies.
 
 Windows cannot directly be constructed. Instead they are obtained by
 sub-division of other windows, ultimately coming from the
-C<Tickit::RootWindow> associated with the terminal.
+root window associated with the terminal.
 
 =cut
+
+# Internal constructor
+sub new
+{
+   my $class = shift;
+   my ( $tickit, $lines, $cols ) = @_;
+
+   my $term = $tickit->term;
+
+   my $self = bless {
+      tickit  => $tickit,
+      term    => $term,
+      top     => 0,
+      left    => 0,
+      cols    => $cols,
+      lines   => $lines,
+      pen     => Tickit::Pen->new,
+   }, $class;
+
+   weaken( $self->{tickit} );
+
+   return $self;
+}
 
 =head1 METHODS
 
@@ -54,7 +77,7 @@ sub make_sub
    my $sub = bless {
       parent => $self,
       pen    => Tickit::Pen->new,
-   }, __PACKAGE__; # not ref $self in case of RootWindow
+   }, ref $self;
 
    $sub->change_geometry( $top, $left, $lines, $cols );
 
@@ -96,9 +119,11 @@ Returns the root window
 
 sub root
 {
-   my $self = shift;
-   return $self->parent->root if $self->parent;
-   return $self;
+   my $win = shift;
+   while( my $parent = $win->{parent} ) {
+      $win = $parent;
+   }
+   return $win;
 }
 
 =head2 $term = $win->term
@@ -111,7 +136,19 @@ lives.
 sub term
 {
    my $self = shift;
-   return $self->root->term;
+   return $self->root->{term};
+}
+
+=head2
+
+Returns the L<Tickit> instance with which this window is associated.
+
+=cut
+
+sub tickit
+{
+   my $self = shift;
+   return $self->root->{tickit};
 }
 
 =head2 $win->resize( $lines, $cols )
@@ -361,7 +398,7 @@ sub expose
 
    $self->{expose_pending} = 1;
 
-   $self->root->enqueue_redraw( sub {
+   $self->tickit->enqueue_redraw( sub {
       return if $self->parent && $self->parent->_expose_pending;
 
       undef $self->{expose_pending};
@@ -414,14 +451,22 @@ window.
 
 sub abs_top
 {
-   my $self = shift;
-   return $self->parent->abs_top + $self->{top};
+   my $win = shift;
+   my $top = $win->{top};
+   while( $win = $win->{parent} ) {
+      $top += $win->{top};
+   }
+   return $top;
 }
 
 sub abs_left
 {
-   my $self = shift;
-   return $self->parent->abs_left + $self->{left};
+   my $win = shift;
+   my $left = $win->{left};
+   while( $win = $win->{parent} ) {
+      $left += $win->{left};
+   }
+   return $left;
 }
 
 =head2 $cols = $win->cols
@@ -530,7 +575,9 @@ sub get_effective_penattr
    my $self = shift;
    my ( $attr ) = @_;
 
-   return $self->{pen}->getattr( $attr ) // $self->parent->get_effective_penattr( $attr );
+   my $value = $self->{pen}->getattr( $attr );
+   return $value if defined $value or !defined $self->parent;
+   return $self->parent->get_effective_penattr( $attr );
 }
 
 =head2 %attrs = $win->get_effective_penattrs
@@ -544,7 +591,7 @@ sub get_effective_penattrs
 {
    my $self = shift;
 
-   my %epen = ( $self->parent->get_effective_penattrs,
+   my %epen = ( $self->parent ? ( $self->parent->get_effective_penattrs ) : (),
                 $self->{pen}->getattrs );
 
    return %epen;
@@ -571,15 +618,18 @@ sub goto
    $line += $self->top;
    $col  += $self->left;
 
-   my $parent = $self->parent;
-
-   if( $line < 0 or $line >= $parent->lines ) {
-      $self->{output_clipped} = 1;
+   if( my $parent = $self->parent ) {
+      if( $line < 0 or $line >= $parent->lines ) {
+         $self->{output_clipped} = 1;
+      }
+      else {
+         undef $self->{output_clipped};
+         $parent->goto( $line, $col ) if $col >= 0;
+         $self->{output_left} = -$col if $col <  0;
+      }
    }
    else {
-      undef $self->{output_clipped};
-      $parent->goto( $line, $col ) if $col >= 0;
-      $self->{output_left} = -$col if $col <  0;
+      $self->term->goto( $line, $col );
    }
 }
 
@@ -751,11 +801,20 @@ sub scrollrect
    my %attrs = ( @args == 1 ) ? $args[0]->getattrs : @args;
    exists $attrs{bg} or $attrs{bg} = $self->get_effective_penattr( 'bg' );
 
-   return $self->parent->scrollrect(
-      $self->top  + $top, $self->left + $left, $lines, $cols,
-      $downward, $rightward,
-      bg => $attrs{bg},
-   );
+   if( my $parent = $self->parent ) {
+      return $parent->scrollrect(
+         $self->top  + $top, $self->left + $left, $lines, $cols,
+         $downward, $rightward,
+         bg => $attrs{bg},
+      );
+   }
+   else {
+      $self->term->setpen( bg => $attrs{bg} );
+      return $self->term->scrollrect(
+         $top, $left, $lines, $cols,
+         $downward, $rightward
+      );
+   }
 }
 
 =head2 $success = $win->scroll( $downward, $rightward )
@@ -803,13 +862,13 @@ sub _requeue_focus
    }
 
    weaken( $self->{focus_child} = $focuswin );
-   $self->_requeue_focus_parent;
-}
 
-sub _requeue_focus_parent
-{
-   my $self = shift;
-   $self->parent->_requeue_focus( $self );
+   if( my $parent = $self->parent ) {
+      $parent->_requeue_focus( $self );
+   }
+   else {
+      $self->tickit->enqueue_redraw;
+   }
 }
 
 sub _gain_focus
@@ -842,7 +901,16 @@ at the focus position, and restores the pen.
 sub restore
 {
    my $self = shift;
-   $self->root->restore;
+   my $root = $self->root;
+
+   if( my $focus_child = $root->{focus_child} ) {
+      $root->term->mode_cursorvis( 1 );
+      $focus_child->_gain_focus;
+   }
+   elsif( defined $root->{focus_line} ) {
+      $root->term->mode_cursorvis( 1 );
+      $root->_gain_focus;
+   }
 }
 
 =head2 $win->clearline( $line )
@@ -871,23 +939,13 @@ sub clear
 {
    my $self = shift;
 
-   $self->clearline( $_ ) for 0 .. $self->lines - 1;
-}
-
-sub _flush_line
-{
-   my $self = shift;
-   my ( $line, $term, $athome ) = @_;
-
-   my $lineupdates = delete $self->{updates}[$line] or return;
-
-   foreach my $col ( 0 .. $#$lineupdates ) {
-      my $update = $lineupdates->[$col] or next;
-      my ( $code, $penattrs ) = @$update;
-
-      $term->goto( $self->abs_top + $line, $self->abs_left + $col ) if !$athome or $col > 0;
-      $term->setpen( %$penattrs );
-      $code->( $term );
+   if( $self->parent ) {
+      $self->clearline( $_ ) for 0 .. $self->lines - 1;
+   }
+   else {
+      my $term = $self->term;
+      $term->setpen( $self->getpenattrs );
+      $term->clear;
    }
 }
 
