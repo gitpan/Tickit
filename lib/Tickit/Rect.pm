@@ -10,7 +10,7 @@ use warnings;
 
 use List::Util qw( min max );
 
-our $VERSION = '0.15';
+our $VERSION = '0.15_001';
 
 =head1 NAME
 
@@ -80,21 +80,21 @@ sub intersect
    return (ref $self)->new( top => $top, left => $left, bottom => $bottom, right => $right );
 }
 
-=head2 $rect = $existing_rect->translate( $rightward, $downward )
+=head2 $rect = $existing_rect->translate( $downward, $rightward )
 
-Returns a new rectangle of the same size as the given one, moved right and
-down by the given argmuents (which may be negative)
+Returns a new rectangle of the same size as the given one, moved down and to
+the right by the given argmuents (which may be negative)
 
 =cut
 
 sub translate
 {
    my $self = shift;
-   my ( $leftward, $downward ) = @_;
+   my ( $downward, $rightward ) = @_;
 
    return (ref $self)->new(
       top   => $self->top  + $downward,
-      left  => $self->left + $leftward,
+      left  => $self->left + $rightward,
       lines => $self->lines,
       cols  => $self->cols,
    );

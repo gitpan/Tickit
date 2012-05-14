@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.15';
+our $VERSION = '0.15_001';
 
 use Carp;
 
@@ -371,7 +371,7 @@ sub _do_expose
 
    foreach my $win ( sort { $a->top <=> $b->top || $a->left <=> $b->left } grep { defined } @$children ) {
       next unless my $winrect = $rect->intersect( $win->rect );
-      $win->_do_expose( $winrect->translate( -$win->left, -$win->top ) );
+      $win->_do_expose( $winrect->translate( -$win->top, -$win->left ) );
    }
 }
 

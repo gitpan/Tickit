@@ -1,5 +1,9 @@
 Revision history for Changes
 
+0.15_001 CHANGES:
+         * Complete reimplementation of Tickit::Term layer based on (bundled)
+           libtickit C library.
+
 0.15    CHANGES:
          * $term->eraseline is now removed
          * Provide a $tickit->tick method to finer-grained event handling

@@ -14,6 +14,13 @@ SYNOPSIS
      $tickit->run;
 
 DESCRIPTION
+    This DEVELOPMENT version of `Tickit' bundles a snapshot copy of the
+    libtickit C library, and builds and links against it. It exists largely
+    as an experiment over the (mostly) pure-perl stable release version of
+    `Tickit'. Unless you specifically want to test the C library or XS
+    wrapping, you should instead stick to the stable release version at
+    present.
+
 CONSTRUCTOR
   $tickit = Tickit->new( %args )
     Constructs a new `Tickit' framework container object.

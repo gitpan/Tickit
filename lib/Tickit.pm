@@ -8,7 +8,7 @@ package Tickit;
 use strict;
 use warnings;
 
-our $VERSION = '0.15';
+our $VERSION = '0.15_001';
 
 use IO::Handle;
 
@@ -16,6 +16,9 @@ use Tickit::Term;
 use Tickit::Window;
 
 use Scalar::Util qw( weaken );
+
+require XSLoader;
+XSLoader::load( __PACKAGE__, $VERSION );
 
 =head1 NAME
 
@@ -35,6 +38,12 @@ C<Tickit> - Terminal Interface Construction KIT
  $tickit->run;
 
 =head1 DESCRIPTION
+
+This B<DEVELOPMENT> version of C<Tickit> bundles a snapshot copy of the
+F<libtickit> C library, and builds and links against it. It exists largely as
+an experiment over the (mostly) pure-perl stable release version of C<Tickit>.
+Unless you specifically want to test the C library or XS wrapping, you should
+instead stick to the stable release version at present.
 
 =cut
 

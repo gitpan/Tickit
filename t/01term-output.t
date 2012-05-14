@@ -29,11 +29,11 @@ stream_is( "Hello", '$term->print' );
 
 $stream = "";
 $term->goto( 0, 0 );
-stream_is( "\e[1;1H", '$term->goto( 0, 0 )' );
+stream_is( "\e[1H", '$term->goto( 0, 0 )' );
 
 $stream = "";
-$term->goto( 1 );
-stream_is( "\e[2H", '$term->goto( 1 )' );
+$term->goto( 1, undef );
+stream_is( "\e[2d", '$term->goto( 1 )' );
 
 $stream = "";
 $term->goto( undef, 2 );
@@ -49,17 +49,17 @@ stream_is( "\e[7C", '$term->move( 4, undef )' );
 
 $stream = "";
 $term->scrollrect( 3, 0, 7, 80, 3, 0 );
-stream_is( "\e[4;10r\e[10H\n\n\n\e[r", '$term->scrollrect( 3,0,7,80, 3,0 )' );
+stream_is( "\e[4;10r\e[10d\n\n\n\e[r", '$term->scrollrect( 3,0,7,80, 3,0 )' );
 
 $stream = "";
 $term->scrollrect( 3, 0, 7, 80, -3, 0 );
-stream_is( "\e[4;10r\e[4H\eM\eM\eM\e[r", '$term->scrollrect( 3,0,7,80, -3,0 )' );
+stream_is( "\e[4;10r\e[4d\e[3S\e[r", '$term->scrollrect( 3,0,7,80, -3,0 )' );
 
 # Horizontal scroll using ICH/DCH
 $stream = "";
 $term->scrollrect( 5, 0, 1, 80, 0, 3 );
 #           CPA    ICH
-stream_is( "\e[6;1H\e[3@", '$term->scrollrect( 5,0,1,80, 0,3 ) using ICH' );
+stream_is( "\e[6H\e[3@", '$term->scrollrect( 5,0,1,80, 0,3 ) using ICH' );
 $stream = "";
 $term->scrollrect( 6, 10, 2, 70, 0, 5 );
 #           CPA    ICH
@@ -68,7 +68,7 @@ stream_is( "\e[7;11H\e[5@\e[8;11H\e[5@", '$term->scrollrect( 6,10,2,70, 0,5 ) us
 $stream = "";
 $term->scrollrect( 5, 0, 1, 80, 0, -3 );
 #           CPA    DCH
-stream_is( "\e[6;1H\e[3P", '$term->scrollrect( 5,0,1,80, 0,-3 ) using DCH' );
+stream_is( "\e[6H\e[3P", '$term->scrollrect( 5,0,1,80, 0,-3 ) using DCH' );
 $stream = "";
 $term->scrollrect( 6, 10, 2, 70, 0, -5 );
 #           CPA    DCH
@@ -87,7 +87,7 @@ $term->clear;
 stream_is( "\e[2J", '$term->clear' );
 
 $stream = "";
-$term->erasech( 23 );
+$term->erasech( 23, undef );
 stream_is( "\e[23X", '$term->erasech( 23 )' );
 
 $stream = "";

@@ -8,7 +8,7 @@ package Tickit::WidgetRole::Borderable;
 use strict;
 use warnings;
 
-our $VERSION = '0.15';
+our $VERSION = '0.15_001';
 
 =head1 NAME
 

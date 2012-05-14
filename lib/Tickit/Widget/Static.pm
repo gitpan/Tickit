@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::OneLineWidget );
 
-our $VERSION = '0.15';
+our $VERSION = '0.15_001';
 
 use Tickit::Utils qw( textwidth substrwidth ); # 'align'
 
