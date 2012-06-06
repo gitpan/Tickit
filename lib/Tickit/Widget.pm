@@ -1,14 +1,14 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -267,8 +267,9 @@ sub _do_clear
 
 =head2 $pen = $widget->pen
 
-Returns the current widget pen. Modifying an attribute of the returned object
-results in the widget being redrawn if the widget has a window associated.
+Returns the widget's L<Tickit::Pen>. Modifying an attribute of the returned
+object results in the widget being redrawn if the widget has a window
+associated.
 
 =cut
 

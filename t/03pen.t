@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 27;
+use Test::More tests => 30;
 use Test::Identity;
 use Test::Refcount;
 
@@ -33,6 +33,8 @@ $pen->chattr( fg => 3 );
 
 is_deeply( { $pen->getattrs }, { fg => 3 }, '$pen attrs after chattr' );
 is( $pen->getattr( 'fg' ), 3, '$pen fg after chattr' );
+
+is_deeply( { $pen->clone->getattrs }, { $pen->getattrs }, '$pen->clone attrs' );
 
 is( $changed, 1, '$changed after chattr' );
 identical( $changed_id, $id, '$changed_id after chattr' );
@@ -81,6 +83,16 @@ $pen = Tickit::Pen->new( fg => 1, bg => 2 );
 is_deeply( { $pen->getattrs }, { fg => 1, bg => 2 }, '$pen initial attrs' );
 
 is( $pen->getattr( 'fg' ), 1, '$pen fg initially 1' );
+
+my $bluepen = Tickit::Pen->new( fg => 4 );
+
+is_deeply( { $bluepen->clone->copy_from( $pen )->getattrs },
+           { fg => 1, bg => 2 },
+           'pen ->copy_from overwrites attributes' );
+
+is_deeply( { $bluepen->clone->default_from( $pen )->getattrs },
+           { fg => 4, bg => 2 },
+           'pen ->default_from does not overwrite attributes' );
 
 package PenObserver;
 

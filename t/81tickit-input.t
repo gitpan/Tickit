@@ -11,7 +11,7 @@ BEGIN {
    $ENV{TERM} = "xterm";
 }
 
-use Test::More tests => 3;
+use Test::More tests => 4;
 
 use Tickit;
 
@@ -46,6 +46,18 @@ syswrite( $my_wr, "A" );
 $tickit->tick;
 
 is_deeply( \@key_events, [ [ text => "A" ] ], 'on_key A' );
+
+# We'll test with a Unicode character outside of Latin-1, to ensure it
+# roundtrips correctly
+#
+# 'ĉ' [U+0109] - LATIN SMALL LETTER C WITH CIRCUMFLEX
+#  UTF-8: 0xc4 0x89
+
+undef @key_events;
+syswrite( $my_wr, "\xc4\x89" );
+$tickit->tick;
+
+is_deeply( \@key_events, [ [ text => "\x{109}" ] ], 'on_key UTF-8' );
 
 syswrite( $my_wr, "\e[M !!" );
 $tickit->tick;

@@ -38,7 +38,8 @@ $entry->text_insert( "Hello", 0 );
 is( $entry->text,     "Hello", '$entry->text after ->text_insert' );
 is( $entry->position, 5,       '$entry->position after ->text_insert' );
 
-is_termlog( [ SETPEN,
+is_termlog( [ GOTO(0,0),
+              SETPEN,
               PRINT("Hello") ],
             'Termlog after ->text_insert' );
 

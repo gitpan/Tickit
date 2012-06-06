@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 use Tickit::Utils qw( textwidth chars2cols cols2chars substrwidth );
 
@@ -337,7 +337,7 @@ sub _text_spliced
       # here
       my $right_co = $self->{scrolloffs_co} + $width;
 
-      $win->goto( 0, $pos_x ) if $pos_ch != $self->position;
+      $win->goto( 0, $pos_x );
       $win->print( substrwidth( $self->text, $pos_co, $right_co - $pos_co ) );
 
       my $trailing_blank_co = $right_co - length($self->text);
@@ -356,7 +356,7 @@ sub _text_spliced
          substrwidth( $inserted, $right_co - $pos_co, "" );
       }
 
-      $win->goto( 0, $pos_x ) if $pos_ch != $self->position;
+      $win->goto( 0, $pos_x );
       $win->print( $inserted );
    }
 

@@ -35,15 +35,15 @@ identical( $win->term, $term, '$win->term returns $term' );
 
 isa_ok( $win->pen, "Tickit::Pen", '$win->pen isa Tickit::Pen' );
 
-is_deeply( { $win->getpenattrs },
+is_deeply( { $win->pen->getattrs },
            {},
-           '$win has no attrs set' );
+           '$win->pen has no attrs set' );
 
 is( $win->getpenattr( 'fg' ), undef, '$win has pen fg undef' );
 
-is_deeply( { $win->get_effective_penattrs },
+is_deeply( { $win->get_effective_pen->getattrs },
            {},
-           '$win->get_effective_penattrs has no attrs set' );
+           '$win->get_effective_pen has no attrs set' );
 
 is( $win->get_effective_penattr( 'fg' ), undef, '$win has effective pen fg undef' );
 
@@ -73,15 +73,15 @@ is_display( [ BLANKLINE,
 
 $win->pen->chattr( fg => 3 );
 
-is_deeply( { $win->getpenattrs },
+is_deeply( { $win->pen->getattrs },
            { fg => 3 },
-           '$win->getpenattrs has fg => 3' );
+           '$win->pen->getattrs has fg => 3' );
 
 is( $win->getpenattr( 'fg' ), 3, '$win has pen fg 3' );
 
-is_deeply( { $win->get_effective_penattrs },
+is_deeply( { $win->get_effective_pen->getattrs },
            { fg => 3 },
-           '$win->get_effective_penattrs has fg => 3' );
+           '$win->get_effective_pen has fg => 3' );
 
 is( $win->get_effective_penattr( 'fg' ), 3, '$win has effective pen fg 3' );
 
@@ -91,7 +91,7 @@ $newpen->chattr( u => 1 );
 
 $win->set_pen( $newpen );
 
-is_deeply( { $win->getpenattrs },
+is_deeply( { $win->pen->getattrs },
            { fg => 3, u => 1 },
            '$win->set_pen replaces window pen' );
 

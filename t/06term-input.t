@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 16;
+use Test::More tests => 18;
 
 use Tickit::Term;
 
@@ -20,6 +20,18 @@ is( $type, "text", '$type after push_bytes A' );
 is( $str,  "A",    '$str after push_bytes A' );
 
 is( $term->check_timeout, undef, '$term has no timeout after A' );
+
+# We'll test with a Unicode character outside of Latin-1, to ensure it
+# roundtrips correctly
+#
+# 'ĉ' [U+0109] - LATIN SMALL LETTER C WITH CIRCUMFLEX
+#  UTF-8: 0xc4 0x89
+
+undef $type; undef $str;
+$term->input_push_bytes( "\xc4\x89" );
+
+is( $type, "text",    '$type after push_bytes for UTF-8' );
+is( $str,  "\x{109}", '$str after push_bytes for UTF-8' );
 
 $term->input_push_bytes( "\e[A" );
 

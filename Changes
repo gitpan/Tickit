@@ -1,8 +1,16 @@
 Revision history for Changes
 
-0.15_001 CHANGES:
-         * Complete reimplementation of Tickit::Term layer based on (bundled)
-           libtickit C library.
+0.16    CHANGES:
+         * Represent mouse wheel events as 'wheel'/'up' or 'wheel'/'down'
+         * Fix argument order for Tickit::Rect->translate
+         * Allow $term->chpen/->setpen to take a Tickit::Pen object
+         * Added Pen->clone, ->copy_from and ->default_from methods
+         * Deprecated the pen attribute list returning methods of
+           Tickit::Window
+
+        BUGFIXES:
+         * Account for inter-child spacing when calculating minimum size
+           requirements for Tickit::Widget::{H,V}Box
 
 0.15    CHANGES:
          * $term->eraseline is now removed

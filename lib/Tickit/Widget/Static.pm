@@ -1,17 +1,18 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::Static;
 
 use strict;
 use warnings;
 use base qw( Tickit::OneLineWidget );
+use Tickit::WidgetRole::Alignable;
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
-use Tickit::Utils qw( textwidth substrwidth ); # 'align'
+use Tickit::Utils qw( textwidth substrwidth );
 
 =head1 NAME
 
@@ -119,14 +120,6 @@ sub set_text
 
 =head2 $align = $static->align
 
-=cut
-
-sub align
-{
-   my $self = shift;
-   return $self->{align};
-}
-
 =head2 $static->set_align( $align )
 
 Accessor for horizontal alignment value.
@@ -136,25 +129,9 @@ within the window. If the window is larger than the width of the text, it will
 be aligned according to this value; with C<0.0> on the left, C<1.0> on the
 right, and other values inbetween.
 
-The symbolic values C<left>, C<centre> and C<right> can be supplied instead of
-C<0.0>, C<0.5> and C<1.0> respectively.
+See also L<Tickit::WidgetRole::Alignable>.
 
 =cut
-
-sub set_align
-{
-   my $self = shift;
-   my ( $align ) = @_;
-
-   # Convert symbolics
-   $align = 0.0 if $align eq "left";
-   $align = 0.5 if $align eq "centre";
-   $align = 1.0 if $align eq "right";
-
-   $self->{align} = $align;
-
-   $self->redraw;
-}
 
 use constant CLEAR_BEFORE_RENDER => 0;
 
@@ -164,8 +141,7 @@ sub render_line
    my $window = $self->window;
 
    my $text = $self->{text};
-   my ( $left, $textwidth, $right ) = 
-      Tickit::Utils::align( textwidth( $text ), $window->cols, $self->{align} );
+   my ( $left, $textwidth, $right ) = $self->_align_allocation( textwidth( $text ), $window->cols );
 
    $window->erasech( $left, 1 ) if $left;
    $window->print( substrwidth $text, 0, $textwidth );

@@ -26,15 +26,15 @@ is_display( [ BLANKLINES(5),
  
 $win->pen->chattr( b => 1 );
 
-is_deeply( { $win->getpenattrs },
+is_deeply( { $win->pen->getattrs },
            { b => 1 },
-           '$win has b => 1' );
+           '$win->pen->getattrs has b => 1' );
 
 is( $win->getpenattr( 'b' ), 1, '$win has pen b 1' );
 
-is_deeply( { $win->get_effective_penattrs },
+is_deeply( { $win->get_effective_pen->getattrs },
            { b => 1 },
-           '$win->get_effective_penattrs has all attrs' );
+           '$win->get_effective_pen has b => 1' );
 
 is( $win->get_effective_penattr( 'b' ), 1, '$win has effective pen b 1' );
 
@@ -129,16 +129,16 @@ my $subwin = $win->make_sub( 2, 2, 1, 10 );
 
 $subwin->pen->chattr( fg => 3 );
 
-is_deeply( { $subwin->getpenattrs },
+is_deeply( { $subwin->pen->getattrs },
            { fg => 3 },
            '$subwin has fg => 3' );
 
 is( $subwin->getpenattr( 'b' ),  undef, '$win has pen b undef' );
 is( $subwin->getpenattr( 'fg' ), 3,     '$win has pen fg 1' );
 
-is_deeply( { $subwin->get_effective_penattrs },
+is_deeply( { $subwin->get_effective_pen->getattrs },
            { b => 1, bg => 4, fg => 3 },
-           '$subwin->get_effective_penattrs has all attrs' );
+           '$subwin->get_effective_pen has all attrs' );
 
 is( $subwin->get_effective_penattr( 'b' ),  1, '$win has effective pen b 1' );
 is( $subwin->get_effective_penattr( 'fg' ), 3, '$win has effective pen fg 1' );

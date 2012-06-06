@@ -26,7 +26,7 @@ $widget->add( $_ ) for @statics;
 is( scalar $widget->children, 3, '$widget has 3 children after adding' );
 
 is( $widget->lines, 1, '$widget->lines is 1' );
-is( $widget->cols, 3*8, '$widget->cols is 3*8' );
+is( $widget->cols, 3*8 + 2*2, '$widget->cols is 3*8 + 2*2' );
 
 $widget->set_window( $win );
 

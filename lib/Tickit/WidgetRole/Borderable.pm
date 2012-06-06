@@ -1,14 +1,14 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::WidgetRole::Borderable;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 =head1 NAME
 
@@ -24,7 +24,23 @@ border around the widget's contents.
 
 =head1 METHODS
 
+The following methods are provided on the caller package when this module is
+imported by
+
+ use Tickit::WidgetRole::Borderable;
+
 =cut
+
+sub import
+{
+   my $pkg = caller;
+
+   no strict 'refs';
+   foreach ( qw( _border_init set_v_border set_h_border set_border get_border_geom ),
+             map { $_, "set_$_" } qw( top_border bottom_border left_border right_border ) ) {
+      *{"${pkg}::$_"} = \&$_;
+   }
+}
 
 =head2 $widget->_border_init( $argsref )
 

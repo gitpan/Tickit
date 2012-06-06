@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::HBox;
 
@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget::LinearBox );
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 use List::Util qw( sum max );
 
@@ -57,7 +57,8 @@ sub lines
 sub cols
 {
    my $self = shift;
-   return sum( map { $_->cols } $self->children ) || 1;
+   return ( sum( map { $_->cols } $self->children ) || 1 ) +
+          $self->{spacing} * ( $self->children - 1 );
 }
 
 sub get_total_quota

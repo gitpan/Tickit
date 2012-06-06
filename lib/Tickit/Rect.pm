@@ -10,7 +10,7 @@ use warnings;
 
 use List::Util qw( min max );
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 =head1 NAME
 

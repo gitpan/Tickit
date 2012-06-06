@@ -1,19 +1,18 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::OneLineWidget;
 
 use strict;
 use warnings;
 use base qw( Tickit::Widget );
+use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 use Carp;
-
-use Tickit::Utils qw( align );
 
 =head1 NAME
 
@@ -57,14 +56,6 @@ sub lines
 
 =head2 $valign = $widget->valign
 
-=cut
-
-sub valign
-{
-   my $self = shift;
-   return $self->{valign};
-}
-
 =head2 $widget->set_valign( $valign )
 
 Accessor for vertical alignment value.
@@ -74,25 +65,9 @@ within the window. If the window is taller than one line, it will be aligned
 according to this value; with C<0.0> at the top, C<1.0> at the bottom, and
 other values inbetween.
 
-The symbolic values C<top>, C<middle> and C<bottom> can be supplied instead of
-C<0.0>, C<0.5> and C<1.0> respectively.
+See also L<Tickit::WidgetRole::Alignable>
 
 =cut
-
-sub set_valign
-{
-   my $self = shift;
-   my ( $valign ) = @_;
-
-   # Convert symbolics
-   $valign = 0.0 if $valign eq "top";
-   $valign = 0.5 if $valign eq "middle";
-   $valign = 1.0 if $valign eq "bottom";
-
-   $self->{valign} = $valign;
-
-   $self->redraw;
-}
 
 sub render
 {
@@ -102,8 +77,7 @@ sub render
    my $win = $self->window or return;
    my $rect = $args{rect};
 
-   my ( $above ) =
-      Tickit::Utils::align( 1, $win->lines, $self->valign );
+   my ( $above ) = $self->_valign_allocation( 1, $win->lines );
 
    my $cols = $win->cols;
 

@@ -80,6 +80,7 @@ is( $entry->position, 1,          '$entry->position after X' );
 is_termlog( [ SETBG(undef),
               GOTO(0,0),
               INSERTCH(1),
+              GOTO(0,0),
               SETPEN,
               PRINT("X") ],
             'Termlog after X' );

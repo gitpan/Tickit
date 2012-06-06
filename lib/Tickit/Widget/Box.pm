@@ -1,15 +1,16 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::Box;
 
 use strict;
 use warnings;
-use base qw( Tickit::SingleChildWidget Tickit::WidgetRole::Borderable );
+use base qw( Tickit::SingleChildWidget );
+use Tickit::WidgetRole::Borderable;
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 =head1 NAME
 

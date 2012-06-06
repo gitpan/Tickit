@@ -1,20 +1,21 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::Frame;
 
 use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget );
+use Tickit::WidgetRole::Alignable name => "title_align";
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 use Carp;
 
 use Tickit::Pen;
-use Tickit::Utils qw( textwidth substrwidth align );
+use Tickit::Utils qw( textwidth substrwidth );
 
 =head1 NAME
 
@@ -57,7 +58,7 @@ This container widget draws a frame around a single child widget.
 Constructs a new C<Tickit::Widget::Static> object.
 
 Takes the following named arguments in addition to those taken by the base
-L<Tickit::Widget::SingleChildWidget> constructor:
+L<Tickit::SingleChildWidget> constructor:
 
 =over 8
 
@@ -239,38 +240,14 @@ sub set_title
 
 =head2 $title_align = $frame->title_align
 
-=cut
-
-sub title_align
-{
-   my $self = shift;
-   return $self->{title_align};
-}
-
 =head2 $frame->set_title_align( $title_align )
 
 Accessor for the C<title_align> property. Gives a vlaue in the range C<0.0> to
 C<1.0> to align the title in the top of the frame.
 
-The symbolic values C<left>, C<centre> and C<right> can be supplied instead of
-C<0.0>, C<0.5> and C<1.0> respectively.
+See also L<Tickit::WidgetRole::Alignable>.
 
 =cut
-
-sub set_title_align
-{
-   my $self = shift;
-   my ( $align ) = @_;
-
-   # Convert symbolics
-   $align = 0.0 if $align eq "left";
-   $align = 0.5 if $align eq "centre";
-   $align = 1.0 if $align eq "right";
-
-   $self->{title_align} = $align;
-
-   $self->redraw;
-}
 
 sub children_changed { shift->set_child_window }
 sub reshape          { shift->set_child_window }
@@ -325,7 +302,7 @@ sub render
          # Top line
          if( defined( my $title = $self->title ) ) {
             # At most we can fit $cols-4 columns of title
-            my ( $left, $titlewidth, $right ) = align( textwidth( $title ), $cols - 4, $self->{title_align} );
+            my ( $left, $titlewidth, $right ) = $self->_title_align_allocation( textwidth( $title ), $cols - 4 );
 
             $win->print( $style->[CORNER_TL] . ( $style->[TOP] x $left ) . " ", $framepen );
             $win->print( $title, $framepen );

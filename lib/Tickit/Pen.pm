@@ -1,14 +1,14 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::Pen;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -99,6 +99,18 @@ sub new_from_attrs
    $self->chattrs( $attrs );
 
    return $self;
+}
+
+=head2 $pen = $orig->clone
+
+Returns a new pen, initialised by copying the attributes of the original.
+
+=cut
+
+sub clone
+{
+   my $orig = shift;
+   return (ref $orig)->new( $orig->getattrs );
 }
 
 =head1 METHODS
@@ -232,6 +244,50 @@ sub delattr
 
    delete $self->{$attr};
    $self->_changed;
+}
+
+=head2 $pen->copy_from( $other )
+
+=head2 $pen->default_from( $other )
+
+Copy attributes from the given pen. C<copy_from> will override attributes
+already defined by C<$pen>; C<default_from> will only copy attributes that are
+not yet defined by C<$pen>.
+
+As a convenience both methods return C<$pen>.
+
+=cut
+
+sub copy_from
+{
+   my $self = shift;
+   my ( $other ) = @_;
+
+   my $changed;
+   my %other = $other->getattrs;
+   foreach my $attr ( keys %other ) {
+      ( !exists $self->{$attr} or $self->{$attr} != $other{$attr} ) and
+         $self->{$attr} = $other{$attr}, $changed = 1;
+   }
+
+   $self->_changed if $changed;
+   return $self;
+}
+
+sub default_from
+{
+   my $self = shift;
+   my ( $other ) = @_;
+
+   my $changed;
+   my %other = $other->getattrs;
+   foreach my $attr ( keys %other ) {
+      !exists $self->{$attr} and
+         $self->{$attr} = $other{$attr}, $changed = 1;
+   }
+
+   $self->_changed if $changed;
+   return $self;
 }
 
 sub _changed

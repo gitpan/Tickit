@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 use Carp;
 
@@ -553,6 +553,10 @@ sub getpenattr
 
 Retrieve the current pen settings for the window.
 
+This method is now deprecated and should not be used; instead use
+
+ $win->pen->getattrs
+
 =cut
 
 sub getpenattrs
@@ -560,6 +564,25 @@ sub getpenattrs
    my $self = shift;
 
    return $self->{pen}->getattrs;
+}
+
+=head2 $pen = $win->get_effective_pen
+
+Returns a new L<Tickit::Pen> containing the effective pen attributes for the
+window, combined by those of all its parents.
+
+=cut
+
+sub get_effective_pen
+{
+   my $win = shift;
+
+   my $pen = $win->pen->clone;
+   for( my $parent = $win->parent; $parent; $parent = $parent->parent ) {
+      $pen->default_from( $parent->pen );
+   }
+
+   return $pen;
 }
 
 =head2 $val = $win->get_effective_penattr( $attr )
@@ -572,12 +595,15 @@ parent.
 
 sub get_effective_penattr
 {
-   my $self = shift;
+   my $win = shift;
    my ( $attr ) = @_;
 
-   my $value = $self->{pen}->getattr( $attr );
-   return $value if defined $value or !defined $self->parent;
-   return $self->parent->get_effective_penattr( $attr );
+   for( ; $win; $win = $win->parent ) {
+      my $value = $win->pen->getattr( $attr );
+      return $value if defined $value;
+   }
+
+   return undef;
 }
 
 =head2 %attrs = $win->get_effective_penattrs
@@ -585,16 +611,16 @@ sub get_effective_penattr
 Retrieve the effective pen settings for the window. This will be the settings
 of the window and all its parents down to the root window, merged together.
 
+This method is now deprecated and should not be used; instead use
+
+ $win->get_effective_pen->getattrs
+
 =cut
 
 sub get_effective_penattrs
 {
    my $self = shift;
-
-   my %epen = ( $self->parent ? ( $self->parent->get_effective_penattrs ) : (),
-                $self->{pen}->getattrs );
-
-   return %epen;
+   return $self->get_effective_pen->getattrs;
 }
 
 =head2 $win->goto( $line, $col )
@@ -652,15 +678,17 @@ sub print
 
    return unless my $width = textwidth $text;
 
-   my %attrs = ( @_ == 1 ) ? shift->getattrs : @_;
+   my $pen = ( @_ == 1 ) ? shift : Tickit::Pen->new( @_ );
 
-   $self->_rawprint( $text, $width, { $self->get_effective_penattrs, %attrs } );
+   $self->_rawprint( $text, $width, $pen );
 }
 
 sub _rawprint
 {
    my $self = shift;
-   my ( $text, $width, $attrs ) = @_;
+   my ( $text, $width, $pen ) = @_;
+
+   $pen->default_from( $self->pen );
 
    my $spare = $self->cols - $self->{output_column};
    if( $spare <= 0 ) {
@@ -686,10 +714,10 @@ sub _rawprint
    }
 
    if( my $parent = $self->parent ) {
-      $parent->_rawprint( $text, $width, $attrs );
+      $parent->_rawprint( $text, $width, $pen );
    }
    else {
-      $self->term->setpen( %$attrs );
+      $self->term->setpen( $pen );
       $self->term->print( $text );
    }
 
@@ -716,11 +744,9 @@ sub erasech
    my $count = shift;
    my $moveend = shift;
 
-   my %attrs = ( @_ == 1 ) ? shift->getattrs : @_;
+   my $pen = ( @_ == 1 ) ? shift : Tickit::Pen->new( @_ );
 
-   my $bg = exists $attrs{bg} ? $attrs{bg} : $self->get_effective_penattr( 'bg' );
-
-   $self->_rawerasech( $count, $moveend, $bg );
+   $self->_rawerasech( $count, $moveend, $pen->getattr( 'bg' ) );
 }
 
 sub _rawerasech
@@ -729,6 +755,8 @@ sub _rawerasech
    my ( $count, $moveend, $bg ) = @_;
 
    return if $self->{output_clipped};
+
+   defined $bg or $bg = $self->pen->getattr( 'bg' );
 
    my $spare = $self->cols - $self->{output_column};
    if( $spare <= 0 ) {
@@ -798,18 +826,19 @@ sub scrollrect
    $lines > 0 and $top + $lines <= $self->lines or croak '$lines out of bounds';
    $cols  > 0 and $left + $cols <= $self->cols  or croak '$cols out of bounds';
 
-   my %attrs = ( @args == 1 ) ? $args[0]->getattrs : @args;
-   exists $attrs{bg} or $attrs{bg} = $self->get_effective_penattr( 'bg' );
+   my $pen = ( @args == 1 ) ? $args[0] : Tickit::Pen->new( @args );
+
+   $pen->default_from( $self->pen );
 
    if( my $parent = $self->parent ) {
       return $parent->scrollrect(
          $self->top  + $top, $self->left + $left, $lines, $cols,
          $downward, $rightward,
-         bg => $attrs{bg},
+         $pen,
       );
    }
    else {
-      $self->term->setpen( bg => $attrs{bg} );
+      $self->term->setpen( bg => $pen->getattr( 'bg' ) );
       return $self->term->scrollrect(
          $top, $left, $lines, $cols,
          $downward, $rightward
@@ -944,7 +973,7 @@ sub clear
    }
    else {
       my $term = $self->term;
-      $term->setpen( $self->getpenattrs );
+      $term->setpen( $self->get_effective_pen );
       $term->clear;
    }
 }

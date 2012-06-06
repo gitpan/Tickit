@@ -3,7 +3,7 @@ package Tickit::Test::MockTerm;
 use strict;
 use warnings;
 
-our $VERSION = '0.15_001';
+our $VERSION = '0.16';
 
 sub new
 {
@@ -182,6 +182,35 @@ sub erasech
    $self->{changed}++;
 }
 
+sub insertch
+{
+   my $self = shift;
+   my ( $count ) = @_;
+
+   $self->_push_methodlog( insertch => $count );
+
+   splice @{ $self->{cells}[$self->{line}] }, $self->{col}, 0, (undef) x $count;
+   $self->_clearcells( $self->{line}, $self->{col}, $count );
+
+   splice @{ $self->{cells}[$self->{line}] }, $self->cols; # truncate
+
+   $self->{changed}++;
+}
+
+sub deletech
+{
+   my $self = shift;
+   my ( $count ) = @_;
+
+   $self->_push_methodlog( deletech => $count );
+
+   splice @{ $self->{cells}[$self->{line}] }, $self->{col}, $count, ();
+
+   $self->_clearcells( $self->{line}, $self->cols - $count, $count );
+
+   $self->{changed}++;
+}
+
 sub goto
 {
    my $self = shift;
@@ -208,29 +237,10 @@ sub print
    $self->{changed}++;
 }
 
-sub scrollrect
-{
-   my $self = shift;
-   my ( $top, $left, $lines, $cols, $downward, $rightward ) = @_;
-
-   return 1 if !$downward and !$rightward;
-
-   if( $left == 0 and $cols == $self->cols and $rightward == 0 ) {
-      $self->_scroll_lines( $top, $top + $lines - 1, $downward );
-      return 1;
-   }
-
-   if( $left + $cols == $self->cols and $downward == 0 ) {
-      foreach my $line ( $top .. $top + $lines - 1 ) {
-         $self->goto( $line, $left );
-         $rightward > 0 ? $self->_insertch(  $rightward )
-                        : $self->_deletech( -$rightward );
-      }
-      return 1;
-   }
-
-   return 0;
-}
+# Tickit::Term::scrollrect is implemented using _scroll_lines or
+# goto/insertch/deletech. Either way, we can use it here
+require Tickit::Term;
+*scrollrect = \&Tickit::Term::scrollrect;
 
 sub _scroll_lines
 {
@@ -264,40 +274,11 @@ sub _scroll_lines
    return 1;
 }
 
-sub _insertch
-{
-   my $self = shift;
-   my ( $count ) = @_;
-
-   $self->_push_methodlog( insertch => $count );
-
-   splice @{ $self->{cells}[$self->{line}] }, $self->{col}, 0, (undef) x $count;
-   $self->_clearcells( $self->{line}, $self->{col}, $count );
-
-   splice @{ $self->{cells}[$self->{line}] }, $self->cols; # truncate
-
-   $self->{changed}++;
-}
-
-sub _deletech
-{
-   my $self = shift;
-   my ( $count ) = @_;
-
-   $self->_push_methodlog( deletech => $count );
-
-   splice @{ $self->{cells}[$self->{line}] }, $self->{col}, $count, ();
-
-   $self->_clearcells( $self->{line}, $self->cols - $count, $count );
-
-   $self->{changed}++;
-}
-
 # For testing purposes we'll store this in a hash instead
 sub chpen
 {
    my $self = shift;
-   my %attrs = @_;
+   my %attrs = ( @_ == 1 ) ? shift->getattrs : @_;
 
    $self->{pen}{$_} = $attrs{$_} for keys %attrs;
 
@@ -307,7 +288,7 @@ sub chpen
 sub setpen
 {
    my $self = shift;
-   my %attrs = @_;
+   my %attrs = ( @_ == 1 ) ? shift->getattrs : @_;
    $self->chpen( map { $_ => $attrs{$_} } @Tickit::Pen::ALL_ATTRS );
 }
 
