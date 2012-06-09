@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::OneLineWidget );
 use Tickit::WidgetRole::Alignable;
 
-our $VERSION = '0.16';
+our $VERSION = '0.16_001';
 
 use Tickit::Utils qw( textwidth substrwidth );
 

@@ -8,7 +8,7 @@ package Tickit;
 use strict;
 use warnings;
 
-our $VERSION = '0.16';
+our $VERSION = '0.16_001';
 
 use IO::Handle;
 
@@ -16,6 +16,9 @@ use Tickit::Term;
 use Tickit::Window;
 
 use Scalar::Util qw( weaken );
+
+require XSLoader;
+XSLoader::load( __PACKAGE__, $VERSION );
 
 =head1 NAME
 
@@ -58,12 +61,11 @@ via F<libtermkey> (all of these will require a supporting terminal as well).
 It also supports having multiple instances and non-blocking or asynchronous
 control.
 
-At the current version, this is a Perl distribution which contains some XS
-utility code, and depends on a number of other XS modules to provide the
-remaining terminal behaviours. Work is in progress at porting the lower level
-parts into a standalone C library, with the intention being that eventually
-this distribution will become an XS wrapper for that C library. Development
-releases may appear on CPAN that include the C library and XS wrappings of it.
+This B<DEVELOPMENT> version of C<Tickit> bundles a snapshot copy of the
+F<libtickit> C library, and builds and links against it. It exists largely as
+an experiment over the (mostly) pure-perl stable release version of C<Tickit>.
+Unless you specifically want to test the C library or XS wrapping, you should
+instead stick to the stable release version at present.
 
 =cut
 

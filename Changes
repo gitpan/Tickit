@@ -1,5 +1,9 @@
 Revision history for Changes
 
+0.16_001 CHANGES:
+         * Complete reimplementation of Tickit::Term layer based on (bundled)
+           libtickit C library.
+
 0.16    CHANGES:
          * Represent mouse wheel events as 'wheel'/'up' or 'wheel'/'down'
          * Fix argument order for Tickit::Rect->translate

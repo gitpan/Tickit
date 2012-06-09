@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.16';
+our $VERSION = '0.16_001';
 
 use Carp;
 
