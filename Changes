@@ -1,8 +1,18 @@
 Revision history for Changes
 
-0.16_001 CHANGES:
-         * Complete reimplementation of Tickit::Term layer based on (bundled)
-           libtickit C library.
+0.17    CHANGES:
+         * $win->hide, $win->show and the concept of hidden windows
+         * $win->make_float and the concept of floating windows
+         * A better clipping model to handle the above
+         * $pen->hasattr
+         * Tickit::Test::drain_termlog()
+         * Set the CANON_DELBS termkey flag in case of misconfigured terminals
+         * Make $tickit->stop a user-visible method
+
+        BUGFIXES:
+         * Ensure Tickit::Widget::Entry keybindings consume key press events
+         * Ensure Tickit::Widget::Static->set_text actually calls ->redraw
+         * Pass UTF8 => 1 to unit tests that test Unicode functionality
 
 0.16    CHANGES:
          * Represent mouse wheel events as 'wheel'/'up' or 'wheel'/'down'

@@ -127,8 +127,7 @@ is_termlog( [ SETBG(undef),
             'Termlog after scrollrect' );
 
 ok( !$win->scrollrect( 5,20,10,40, 3,0 ), '$win does not support partial line scrolling' );
-# Flush a SETBG that might have happened
-$term->methodlog;
+drain_termlog;
 
 $win->scrollrect( 20,0,1,80, 0,1 );
 

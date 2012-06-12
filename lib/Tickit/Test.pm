@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.16_001';
+our $VERSION = '0.17';
 
 use Exporter 'import';
 
@@ -17,6 +17,7 @@ our @EXPORT = qw(
    mk_window
    mk_term_and_window
    flush_tickit
+   drain_termlog
 
    resize_term
 
@@ -178,6 +179,18 @@ sub flush_tickit
       my @queue = @later; @later = ();
       $_->() for @queue;
    }
+}
+
+=head2 drain_termlog
+
+Drains any pending events from the method log used by the C<is_termlog> test.
+Useful to clear up non-tested events before running a test.
+
+=cut
+
+sub drain_termlog
+{
+   $term->methodlog;
 }
 
 =head2 resize_term( $lines, $cols )

@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::SingleChildWidget );
 use Tickit::WidgetRole::Borderable;
 
-our $VERSION = '0.16_001';
+our $VERSION = '0.17';
 
 =head1 NAME
 
@@ -18,11 +18,30 @@ C<Tickit::Widget::Box> - contain a single child widget
 
 =head1 SYNOPSIS
 
- TODO
+ use Tickit;
+ use Tickit::Widget::Box;
+ use Tickit::Widget::Static;
+ 
+ my $tickit = Tickit->new;
+ 
+ my $hello = Tickit::Widget::Static->new(
+    text   => "Hello, world",
+    align  => "centre",
+    valign => "middle",
+ );
+
+ my $box = Tickit::Widget::Box->new;
+
+ $box->add( $hello );
+ 
+ $tickit->set_root_widget( $box );
+ 
+ $tickit->run;
 
 =head1 DESCRIPTION
 
-TODO
+This container widget holds a single child widget and implements a border by
+using L<Tickit::WidgetRole::Borderable>.
 
 =cut
 
@@ -91,6 +110,7 @@ sub render
    my %args = @_;
 
    my $win = $self->window or return;
+   $win->is_visible or return;
    my $rect = $args{rect};
 
    foreach my $line ( $rect->top .. $self->top_border - 1 ) {

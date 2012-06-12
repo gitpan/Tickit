@@ -2,16 +2,21 @@
 
 use strict;
 
-use Test::More tests => 14;
+use Test::More tests => 28;
 
 use Tickit::Test;
 
-my ( $term, $rootwin ) = mk_term_and_window;
+my $rootwin = mk_window;
 
 my $win;
 
 # Off the top
 $win = $rootwin->make_sub( -2, 0, 5, 80 );
+
+is_deeply( [ $win->_get_span_visibility( 0, 0 ) ],
+           [ 0, undef ], '$win off top 0,0 invisible indefinitely' );
+is_deeply( [ $win->_get_span_visibility( 3, 0 ) ],
+           [ 1, 80 ], '$win off top 5,0 visible for 80 columns' );
 
 foreach my $line ( 0 .. 4 ) {
    $win->goto( $line, 0 );
@@ -41,10 +46,15 @@ is_termlog( [],
             'Termlog for window erasech off top' );
 
 $rootwin->clear;
-$term->methodlog;
+drain_termlog;
 
 # Off the bottom
 $win = $rootwin->make_sub( 22, 0, 5, 80 );
+
+is_deeply( [ $win->_get_span_visibility( 0, 0 ) ],
+           [ 1, 80 ], '$win off bottom 0,0 visible for 80 columns' );
+is_deeply( [ $win->_get_span_visibility( 3, 0 ) ],
+           [ 0, undef ], '$win off bottom 5,0 invisible indefinitely' );
 
 foreach my $line ( 0 .. 4 ) {
    $win->goto( $line, 0 );
@@ -75,10 +85,17 @@ is_termlog( [],
             'Termlog for window erasech off bottom' );
 
 $rootwin->clear;
-$term->methodlog;
+drain_termlog;
 
 # Off the left
 $win = $rootwin->make_sub( 10, -5, 1, 10 );
+
+is_deeply( [ $win->_get_span_visibility( 0, 0 ) ],
+           [ 0, 5 ], '$win off left 0,0 invisible for 5 columns' );
+is_deeply( [ $win->_get_span_visibility( 0, 5 ) ],
+           [ 1, 5 ], '$win off left 0,5 visible for 5 columns' );
+is_deeply( [ $win->_get_span_visibility( 0, -3 ) ],
+           [ 0, 8 ], '$win off left 0,-3 invisible for 8 columns' );
 
 $win->goto( 0, 0 );
 $win->print( $_ ) for qw( ABC DEFG HIJ );
@@ -103,10 +120,17 @@ is_termlog( [ GOTO(10,0),
             'Termlog for window erasech off left' );
 
 $rootwin->clear;
-$term->methodlog;
+drain_termlog;
 
 # Off the right
 $win = $rootwin->make_sub( 10, 75, 1, 10 );
+
+is_deeply( [ $win->_get_span_visibility( 0, 0 ) ],
+           [ 1, 5 ], '$win off right 0,0 visible for 5 columns' );
+is_deeply( [ $win->_get_span_visibility( 0, 5 ) ],
+           [ 0, undef ], '$win off right 0,5 invisible indefinitely' );
+is_deeply( [ $win->_get_span_visibility( 0, -3 ) ],
+           [ 0, 3 ], '$win off right 0,-3 invisible for 3 columns' );
 
 $win->goto( 0, 0 );
 $win->print( $_ ) for qw( ABC DEFG HIJ );
@@ -131,13 +155,22 @@ is_termlog( [ GOTO(10,75),
             'Termlog for window erasech off right' );
 
 $rootwin->clear;
-$term->methodlog;
+drain_termlog;
 
 # Second-level nesting
 $win = $rootwin->make_sub( 10, 20, 5, 10 );
 my $subwin = $win->make_sub( -5, -5, 15, 20 );
 
-$subwin->goto( $_, 0 ) and $subwin->print( "Content for line $_ here" ) for 0 .. 14;
+is_deeply( [ $subwin->_get_span_visibility( 0, 0 ) ],
+           [ 0, undef ], '$subwin 0,0 invisible indefinitely' );
+is_deeply( [ $subwin->_get_span_visibility( 5, 0 ) ],
+           [ 0, 5 ], '$subwin 5,0 invisible for 5 columns' );
+is_deeply( [ $subwin->_get_span_visibility( 5, 5 ) ],
+           [ 1, 10 ], '$subwin 5,5 visible for 10 columns' );
+is_deeply( [ $subwin->_get_span_visibility( 5, 15 ) ],
+           [ 0, undef ], '$subwin 5,15 invisible indefinitely' );
+
+$subwin->goto( $_, 0 ), $subwin->print( "Content for line $_ here" ) for 0 .. 14;
 
 is_termlog( [ GOTO(10,20),
               SETPEN,

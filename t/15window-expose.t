@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 17;
+use Test::More tests => 19;
 
 use Tickit::Test;
 
@@ -56,3 +56,11 @@ flush_tickit;
 
 is( $root_exposed, 3, '$root expose count 3 after win-then-root' );
 is( $win_exposed, 4, '$win expose count 4 after win-then-root' );
+
+$win->hide;
+$win->show;
+
+flush_tickit;
+
+is( $root_exposed, 3, '$root expose count 3 after hide+show' );
+is( $win_exposed, 5, '$win expose count 5 after hide+show' );

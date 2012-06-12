@@ -8,7 +8,7 @@ use Tickit::Test;
 
 use Tickit::Widget::Entry;
 
-my ( $term, $win ) = mk_term_and_window;
+my $win = mk_window;
 
 my $entry = Tickit::Widget::Entry->new(
    text => "A"x70,
@@ -96,7 +96,7 @@ is_cursorpos( 0, 50, 'Position after ->set_position 90' );
 $entry->set_position( 0 );
 
 flush_tickit;
-$term->methodlog; # drain methods
+drain_termlog;
 
 $entry->text_delete( 0, 1 );
 

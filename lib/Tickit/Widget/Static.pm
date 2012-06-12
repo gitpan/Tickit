@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::OneLineWidget );
 use Tickit::WidgetRole::Alignable;
 
-our $VERSION = '0.16_001';
+our $VERSION = '0.17';
 
 use Tickit::Utils qw( textwidth substrwidth );
 
@@ -116,6 +116,7 @@ sub set_text
    my $self = shift;
    ( $self->{text} ) = @_;
    $self->resized;
+   $self->redraw;
 }
 
 =head2 $align = $static->align

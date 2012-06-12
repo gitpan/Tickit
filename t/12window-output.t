@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 33;
+use Test::More tests => 50;
 
 use Tickit::Test;
 
@@ -11,6 +11,21 @@ use Tickit::Pen;
 my $rootwin = mk_window;
 
 my $win = $rootwin->make_sub( 3, 10, 4, 30 );
+
+is_deeply( [ $win->_get_span_visibility( 0, 0 ) ],
+           [ 1, 30 ], '$win 0,0 visible for 30 columns' );
+is_deeply( [ $win->_get_span_visibility( 0, 5 ) ],
+           [ 1, 25 ], '$win 0,5 visible for 25 columns' );
+is_deeply( [ $win->_get_span_visibility( 0, -3 ) ],
+           [ 0, 3 ], '$win 0,-3 invisible for 3 columns' );
+is_deeply( [ $win->_get_span_visibility( 0, 30 ) ],
+           [ 0, undef ], '$win 0,30 invisible indefinitely' );
+is_deeply( [ $win->_get_span_visibility( 0, 50 ) ],
+           [ 0, undef ], '$win 0,50 invisible indefinitely' );
+is_deeply( [ $win->_get_span_visibility( -2, 0 ) ],
+           [ 0, undef ], '$win -2,0 invisible indefinitely' );
+is_deeply( [ $win->_get_span_visibility( 5, 0 ) ],
+           [ 0, undef ], '$win 5,0 invisible indefinitely' );
 
 $win->goto( 2, 3 );
 $win->print( "Hello" );
@@ -127,6 +142,11 @@ is_display( [ BLANKLINES(3),
 
 my $subwin = $win->make_sub( 2, 2, 1, 10 );
 
+is_deeply( [ $subwin->_get_span_visibility( 0, 0 ) ],
+           [ 1, 10 ], '$subwin 0,0 visible for 10 columns' );
+is_deeply( [ $subwin->_get_span_visibility( 0, 7 ) ],
+           [ 1, 3 ], '$subwin 0,7 visible for 3 columns' );
+
 $subwin->pen->chattr( fg => 3 );
 
 is_deeply( { $subwin->pen->getattrs },
@@ -170,3 +190,56 @@ is_display( [ BLANKLINES(2),
             'Display after ->scroll' );
 
 ok( !$win->scroll( 1, 0 ), '$win does not support scrolling' );
+
+# Hidden windows
+{
+   $rootwin->clear;
+   drain_termlog;
+
+   my $win1 = $win;
+   my $win2 = $rootwin->make_sub( 3, 10, 4, 30 );
+   $win2->hide;
+
+   ok(  $win1->is_visible, '$win1 is visible' );
+   ok( !$win2->is_visible, '$win2 is hidden' );
+
+   $win1->goto( 0, 0 );
+   $win1->print( "Content from Window 1" );
+
+   $win2->goto( 1, 0 );
+   $win2->print( "Content from Window 2" );
+
+   is_termlog( [ GOTO(3,10),
+                 SETPEN(bg => 4, b => 1),
+                 PRINT("Content from Window 1" ) ],
+              'Termlog after print with $win2 hidden' );
+
+   is_display( [ BLANKLINES(3),
+                 [BLANK(10), TEXT("Content from Window 1",bg=>4,b=>1)] ],
+              'Display after print with $win2 hidden' );
+
+   $win1->hide;
+
+   $rootwin->clear;
+   drain_termlog;
+
+   $win2->show;
+
+   ok( !$win1->is_visible, '$win1 is now hidden' );
+   ok(  $win2->is_visible, '$win2 is now visible' );
+
+   $win1->goto( 0, 0 );
+   $win1->print( "Content from Window 1" );
+
+   $win2->goto( 1, 0 );
+   $win2->print( "Content from Window 2" );
+
+   is_termlog( [ GOTO(4,10),
+                 SETPEN,
+                 PRINT("Content from Window 2" ) ],
+              'Termlog after print with $win1 hidden' );
+
+   is_display( [ BLANKLINES(4),
+                 [BLANK(10), TEXT("Content from Window 2")] ],
+              'Display after print with $win1 hidden' );
+}

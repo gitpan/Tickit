@@ -8,7 +8,7 @@ use Tickit::Test;
 
 use Tickit::Widget::Static;
 
-my ( $term, $win ) = mk_term_and_window;
+my $win = mk_window;
 
 my $static = Tickit::Widget::Static->new(
    text => "Your message here",
@@ -82,7 +82,7 @@ is_display( [ BLANKLINES(12),
             'Display in correct location for valign' );
 
 $static->set_valign( 0.0 );
-$term->methodlog; # clear the log
+drain_termlog;
 
 resize_term( 30, 100 );
 

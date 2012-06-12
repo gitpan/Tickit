@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 9;
+use Test::More tests => 13;
 use Test::Refcount;
 
 use Tickit::Test;
@@ -35,6 +35,22 @@ flush_tickit;
 
 is_termlog( [ GOTO(5,15), ],
             'Termlog after window reposition' );
+
+$win->hide;
+flush_tickit;
+
+ok( !$term->{cursorvis}, 'Cursor is invisible after focus window hide' );
+
+is_termlog( [ ],
+            'Termlog empty after focus window hide' );
+
+$win->show;
+flush_tickit;
+
+ok( $term->{cursorvis}, 'Cursor is visible after focus window show' );
+
+is_termlog( [ GOTO(5,15), ],
+            'Termlog after focus window show' );
 
 is_oneref( $win, '$win has refcount 1 at EOF' );
 is_refcount( $rootwin, 3, '$rootwin has refcount 3 at EOF' );

@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 12;
+use Test::More tests => 13;
 use Test::Identity;
 
 use Tickit::Test;
@@ -45,8 +45,17 @@ is_display( [ BLANKLINES(2),
               [BLANK(2), TEXT("Widget")] ],
             'Display after ->set_border' );
 
+$static->set_text( "New text" );
+
+flush_tickit;
+
+is_display( [ BLANKLINES(2),
+              [BLANK(2), TEXT("New text")] ],
+           'Display after $static->set_text' );
+
 $widget->set_window( undef );
 $static->set_window( undef );
+$static->set_text( "Widget" );
 
 $widget = Tickit::Widget::Box->new;
 

@@ -2,16 +2,14 @@
 
 use strict;
 
-use Test::More tests => 21;
+use Test::More tests => 18;
 
 use Tickit::Term;
 
 use Time::HiRes qw( sleep );
 
-my $term = Tickit::Term->new;
+my $term = Tickit::Term->new( UTF8 => 1 );
 $term->set_size( 25, 80 );
-
-is( $term->get_input_handle, undef, '$term->get_input_handle undef' );
 
 my ( $type, $str );
 $term->set_on_key( sub { ( undef, $type, $str ) = @_; } );
@@ -69,12 +67,3 @@ is( $term->check_timeout, undef, '$term has no timeout after timedout' );
 
 is( $type, "key",    '$type after push_bytes after timedout' );
 is( $str,  "Escape", '$str after push_bytes after timedout' );
-
-{
-   pipe( my $rd, my $wr ) or die "pipe() - $!";
-
-   my $term = Tickit::Term->new( input_handle => $rd );
-
-   isa_ok( $term, "Tickit::Term", '$term isa Tickit::Term' );
-   is( $term->get_input_handle, $rd, '$term->get_input_handle is $rd' );
-}

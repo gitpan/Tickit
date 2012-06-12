@@ -35,7 +35,7 @@ is_display( [ "", "", "" ],
 
 # Now some test content for scrolling
 for my $l ( 0 .. 2 ) { $term->goto( $l, 0 ); $term->print( $l x 10 ) }
-$term->methodlog; # flush log
+drain_termlog;
 
 is_display( [ "0000000000", "1111111111", "2222222222" ],
             'Display after scroll fill' );
@@ -49,7 +49,7 @@ is_display( [ "", "1111111111", "2222222222" ],
             'Display after scroll 1 up' );
 
 for my $l ( 0 .. 2 ) { $term->goto( $l, 0 ); $term->print( $l x 10 ) }
-$term->methodlog; # flush log
+drain_termlog;
 
 $term->scrollrect( 0,0,2,10, +1,0 );
 is_display( [ "1111111111", "", "2222222222" ],
@@ -61,7 +61,7 @@ is_display( [ "", "1111111111", "2222222222" ],
 
 # Now some test content for mangling
 for my $l ( 0 .. 2 ) { $term->goto( $l, 0 ); $term->print( "ABCDEFGHIJ" ) }
-$term->methodlog; # flush log
+drain_termlog;
 
 $term->goto( 0, 3 );
 $term->erasech( 5 );

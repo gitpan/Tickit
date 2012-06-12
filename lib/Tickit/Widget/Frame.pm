@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::SingleChildWidget );
 use Tickit::WidgetRole::Alignable name => "title_align";
 
-our $VERSION = '0.16_001';
+our $VERSION = '0.17';
 
 use Carp;
 
@@ -286,6 +286,7 @@ sub render
    my %args = @_;
 
    my $win = $self->window or return;
+   $win->is_visible or return;
    my $rect = $args{rect};
 
    my $cols  = $win->cols;

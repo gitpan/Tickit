@@ -5,6 +5,7 @@ examples/ClickerWidget.pm
 examples/ColourWidget.pm
 examples/demo-allkeys.pl
 examples/demo-entry.pl
+examples/demo-float.pl
 examples/demo-frame.pl
 examples/demo-input.pl
 examples/demo-pen.pl
@@ -14,19 +15,18 @@ examples/HelloWorldWidget-1.pm
 examples/HelloWorldWidget-2.pm
 examples/ShowKeyWidget.pm
 examples/testonewidget.pl
-include/hooklists.h
-include/tickit.h
 lib/Tickit.pm
-lib/Tickit.xs
 lib/Tickit/ContainerWidget.pm
 lib/Tickit/OneLineWidget.pm
 lib/Tickit/Pen.pm
 lib/Tickit/Rect.pm
 lib/Tickit/SingleChildWidget.pm
 lib/Tickit/Term.pm
+lib/Tickit/Term/xterm.pm
 lib/Tickit/Test.pm
 lib/Tickit/Test/MockTerm.pm
 lib/Tickit/Utils.pm
+lib/Tickit/Utils.xs
 lib/Tickit/Widget.pm
 lib/Tickit/Widget/Box.pm
 lib/Tickit/Widget/Entry.pm
@@ -44,11 +44,6 @@ MANIFEST			This list of files
 META.json
 META.yml
 README
-src/hooklists.c
-src/pen.c
-src/string.c
-src/term.c
-src/unicode.inc
 t/00use.t
 t/01rect.t
 t/02utils.t
@@ -65,6 +60,7 @@ t/13window-focus.t
 t/14window-input.t
 t/15window-expose.t
 t/16window-clipping.t
+t/17window-float.t
 t/20widget.t
 t/21widget-window.t
 t/22widget-parent.t
@@ -81,4 +77,3 @@ t/42widget-frame.t
 t/80tickit.t
 t/81tickit-input.t
 t/99pod.t
-typemap

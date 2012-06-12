@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.16_001';
+our $VERSION = '0.17';
 
 use List::Util qw( sum );
 
@@ -147,7 +147,7 @@ sub redistribute_child_windows
 
       if( $current >= $total ) {
          $self->set_child_window( $child, undef, undef, undef );
-         next;
+         return; # next
       }
 
       my $extra = $expand_total ? ( $spare * $opts{expand} / $expand_total ) : 0;

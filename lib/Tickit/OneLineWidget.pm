@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::Widget );
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.16_001';
+our $VERSION = '0.17';
 
 use Carp;
 
@@ -75,6 +75,7 @@ sub render
    my %args = @_;
 
    my $win = $self->window or return;
+   $win->is_visible or return;
    my $rect = $args{rect};
 
    my ( $above ) = $self->_valign_allocation( 1, $win->lines );

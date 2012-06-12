@@ -36,12 +36,13 @@ DESCRIPTION
     supporting terminal as well). It also supports having multiple instances
     and non-blocking or asynchronous control.
 
-    This DEVELOPMENT version of `Tickit' bundles a snapshot copy of the
-    libtickit C library, and builds and links against it. It exists largely
-    as an experiment over the (mostly) pure-perl stable release version of
-    `Tickit'. Unless you specifically want to test the C library or XS
-    wrapping, you should instead stick to the stable release version at
-    present.
+    At the current version, this is a Perl distribution which contains some
+    XS utility code, and depends on a number of other XS modules to provide
+    the remaining terminal behaviours. Work is in progress at porting the
+    lower level parts into a standalone C library, with the intention being
+    that eventually this distribution will become an XS wrapper for that C
+    library. Development releases may appear on CPAN that include the C
+    library and XS wrappings of it.
 
 CONSTRUCTOR
   $tickit = Tickit->new( %args )
@@ -83,7 +84,7 @@ METHODS
     If `$code' is missing or `undef', any existing callback is removed.
 
     As a convenience for the common application use case, the `Ctrl-C' key
-    is bound to the `_STOP' method.
+    is bound to the `stop' method.
 
     To remove this binding, simply bind another callback, or remove the
     binding entirely by setting `undef'.
@@ -107,8 +108,12 @@ METHODS
 
   $tickit->run
     Calls the `setup_term' method, then processes IO events until stopped,
-    by the `_STOP' method, `SIGINT', `SIGTERM' or the `Ctrl-C' key. Then
-    runs the `teardown_term' method, and returns.
+    by the `stop' method, `SIGINT', `SIGTERM' or the `Ctrl-C' key. Then runs
+    the `teardown_term' method, and returns.
+
+  $tickit->stop
+    Causes a currently-running `run' method to stop processing events and
+    return.
 
 AUTHOR
     Paul Evans <leonerd@leonerd.org.uk>

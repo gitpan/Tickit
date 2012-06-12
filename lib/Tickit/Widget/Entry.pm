@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::Entry;
 
@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.16_001';
+our $VERSION = '0.17';
 
 use Tickit::Utils qw( textwidth chars2cols cols2chars substrwidth );
 
@@ -223,6 +223,7 @@ sub render
    my %args = @_;
 
    my $win = $self->window or return;
+   $win->is_visible or return;
    my $rect = $args{rect};
 
    if( $rect->top == 0 ) {
@@ -380,7 +381,8 @@ sub on_key
    my ( $type, $str, $key ) = @_;
 
    if( $type eq "key" and my $code = $self->{keybindings}{$str} ) {
-      return $self->$code( $str, $key );
+      $self->$code( $str, $key );
+      return 1;
    }
    if( $type eq "text" ) {
       $self->on_text( $str );

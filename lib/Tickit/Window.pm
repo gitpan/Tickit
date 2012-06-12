@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.16_001';
+our $VERSION = '0.17';
 
 use Carp;
 
@@ -16,7 +16,7 @@ use Scalar::Util qw( weaken );
 
 use Tickit::Pen;
 use Tickit::Rect;
-use Tickit::Utils qw( textwidth substrwidth );
+use Tickit::Utils qw( textwidth cols2chars );
 
 =head1 NAME
 
@@ -33,6 +33,32 @@ Windows cannot directly be constructed. Instead they are obtained by
 sub-division of other windows, ultimately coming from the
 root window associated with the terminal.
 
+Normally all windows are visible, but a window may be hidden by calling the
+C<hide> method. After this, the window will not respond to any of the drawing
+methods, until it is made visible again with the C<show> method. A hidden
+window will not receive focus or input events. It may still receive geometry
+change events if it is resized.
+
+=head2 Sub Windows and Floating Windows
+
+A division of a window made by calling C<make_sub> obtains a window that
+represents some portion of the drawing area of the parent window. All sibling
+subdivisions are considered equal; if they happen to overlap then it is
+undefined how input events on overlapping regions are handled among them, or
+how drawing may interact. It is recommended that C<make_sub> be used to obtain
+only windows that cover non-overlapping areas of the parent; such as to
+distribute space within a container.
+
+By comparison, any window created by C<make_float> is considered to sit
+"above" the area of its parent. It will always handle input events before
+other siblings, and any drawing that happens within it overwrites that of its
+non-floating siblings. Any drawing on a non-floating sibling that happens
+within the area of a float is obscured by the contents of the floating window.
+It is recommended that use of floating windows be kept to a minimum, as each
+one imposes a small processing-time overhead in any drawing operations on
+other window. These may be useful for implementing pop-up menus or other
+temporary interactions.
+
 =cut
 
 # Internal constructor
@@ -46,6 +72,7 @@ sub new
    my $self = bless {
       tickit  => $tickit,
       term    => $term,
+      visible => 1,
       top     => 0,
       left    => 0,
       cols    => $cols,
@@ -75,8 +102,9 @@ sub make_sub
    my ( $top, $left, $lines, $cols ) = @_;
 
    my $sub = bless {
-      parent => $self,
-      pen    => Tickit::Pen->new,
+      parent  => $self,
+      visible => 1,
+      pen     => Tickit::Pen->new,
    }, ref $self;
 
    $sub->change_geometry( $top, $left, $lines, $cols );
@@ -84,6 +112,35 @@ sub make_sub
    $self->_reap_dead_children;
    push @{ $self->{child_windows} }, $sub;
    weaken $self->{child_windows}[-1];
+
+   return $sub;
+}
+
+=head2 $float = $win->make_float( $top, $left, $lines, $cols )
+
+Constructs a new floating child window starting at the given coordinates of
+this window. It will be sized to the given limits.
+
+=cut
+
+sub make_float
+{
+   my $self = shift;
+   my ( $top, $left, $lines, $cols ) = @_;
+
+   my $sub = bless {
+      parent  => $self,
+      visible => 1,
+      pen     => Tickit::Pen->new,
+      float   => 1,
+   }, ref $self;
+
+   $sub->change_geometry( $top, $left, $lines, $cols );
+
+   $self->_reap_dead_children;
+   # floats go first
+   unshift @{ $self->{child_windows} }, $sub;
+   weaken $self->{child_windows}[0];
 
    return $sub;
 }
@@ -100,8 +157,8 @@ sub _reap_dead_children
 
 =head2 $parentwin = $win->parent
 
-Returns the parent window; i.e. the window on which C<make_sub> was called to
-create this one
+Returns the parent window; i.e. the window on which C<make_sub> or
+C<make_float> was called to create this one
 
 =cut
 
@@ -149,6 +206,51 @@ sub tickit
 {
    my $self = shift;
    return $self->root->{tickit};
+}
+
+=head2 $win->show
+
+Makes the window visible. Allows drawing methods to output to the terminal.
+Calling this method also exposes the window, invoking the C<on_expose>
+handler. Shows the cursor if this window currently has focus.
+
+=cut
+
+sub show
+{
+   my $self = shift;
+   $self->{visible} = 1;
+
+   $self->expose;
+}
+
+=head2 $win->hide
+
+Makes the window invisible. Prevents drawing methods outputting to the
+terminal. Hides the cursor if this window currently has focus.
+
+=cut
+
+sub hide
+{
+   my $self = shift;
+   $self->{visible} = 0;
+   if( $self->{float} and my $parent = $self->parent ) {
+      $parent->_do_expose( $self->rect );
+   }
+   $self->restore;
+}
+
+=head2 $visible = $win->is_visible
+
+Returns true if the window is currently visible.
+
+=cut
+
+sub is_visible
+{
+   my $self = shift;
+   return $self->{visible};
 }
 
 =head2 $win->resize( $lines, $cols )
@@ -267,6 +369,8 @@ sub _handle_key
 {
    my $self = shift;
 
+   return 0 unless $self->is_visible;
+
    my $focus_child = $self->{focus_child};
    if( $focus_child ) {
       $focus_child->_handle_key( @_ ) and return 1;
@@ -318,6 +422,8 @@ sub _handle_mouse
    my $self = shift;
    my ( $ev, $button, $line, $col ) = @_;
 
+   return 0 unless $self->is_visible;
+
    if( my $children = $self->{child_windows} ) {
       foreach my $child ( @$children ) {
          next unless $child; # weakrefs; may be undef
@@ -344,7 +450,7 @@ sub _handle_mouse
 Set the callback to invoke whenever a region of the window is exposed by the
 C<expose> event.
 
- $on_expose->( $rect )
+ $on_expose->( $win, $rect )
 
 Will be passed a L<Tickit::Rect> representing the exposed region.
 
@@ -623,6 +729,69 @@ sub get_effective_penattrs
    return $self->get_effective_pen->getattrs;
 }
 
+sub _get_span_visibility
+{
+   my $win = shift;
+   my ( $line, $col ) = @_;
+
+   my ( $vis, $len ) = ( 1, $win->cols - $col );
+
+   my $prev;
+   while( $win ) {
+      # Off top, bottom or right: invisible and always going to be
+      if( $line < 0 or $line >= $win->lines or $col >= $win->cols ) {
+         return ( 0, undef );
+      }
+
+      # Off left: invisible for at least as far as it's off by
+      if( $col < 0 ) {
+         $len = -$col if $vis or -$col > $len;
+         $vis = 0;
+      }
+      # Within the window - visible for at most the width of the window
+      elsif( $vis ) {
+         my $remains = $win->cols - $col;
+         $len = $remains if $len > $remains;
+      }
+
+      # Now obscure any floats. Floats always come first so we can stop at the
+      # first non-float for efficiency
+      $win->_reap_dead_children;
+      foreach my $child ( @{ $win->{child_windows} } ) {
+         last if $prev and $child == $prev;
+         last unless $child->{float};
+         next unless $child->{visible};
+         next if $child->top > $line or $child->top + $child->lines <= $line;
+
+         my $child_right = $child->left + $child->cols;
+         next if $col >= $child_right;
+
+         if( $child->left <= $col ) {
+            my $child_cols_hidden = $child_right - $col;
+            if( $vis ) {
+               $len = $child_cols_hidden;
+               $vis = 0;
+            }
+            else {
+               $len = $child_cols_hidden if $child_cols_hidden > $len;
+            }
+         }
+         elsif( $vis ) {
+            my $remaining_visible = $child->left - $col;
+            $len = $remaining_visible if $remaining_visible < $len;
+         }
+      }
+
+      $line += $win->top;
+      $col  += $win->left;
+
+      $prev = $win;
+      $win = $win->parent;
+   }
+
+   return ( $vis, $len );
+}
+
 =head2 $win->goto( $line, $col )
 
 Moves the cursor to the given position within the window. Both C<$line> and
@@ -632,31 +801,30 @@ C<$col> are 0-based.
 
 sub goto
 {
-   my $self = shift;
+   my $win = shift;
    my ( $line, $col ) = @_;
 
-   $line >= 0 and $line < $self->lines or croak '$line out of bounds';
-   $col  >= 0 and $col  < $self->cols  or croak '$col out of bounds';
+   $win->{output_line}   = $line;
+   $win->{output_column} = $col;
 
-   $self->{output_line}   = $line;
-   $self->{output_column} = $col;
+   while( $win ) {
+      $line >= 0 and $line < $win->lines or croak '$line out of bounds';
+      $col  >= 0 and $col  < $win->cols  or croak '$col out of bounds';
 
-   $line += $self->top;
-   $col  += $self->left;
+      return unless $win->{visible};
 
-   if( my $parent = $self->parent ) {
-      if( $line < 0 or $line >= $parent->lines ) {
-         $self->{output_clipped} = 1;
-      }
-      else {
-         undef $self->{output_clipped};
-         $parent->goto( $line, $col ) if $col >= 0;
-         $self->{output_left} = -$col if $col <  0;
-      }
+      $line += $win->top;
+      $col  += $win->left;
+
+      my $parent = $win->parent or last;
+
+      return if $line < 0 or $line >= $parent->lines;
+      return if $col  < 0 or $col  >= $parent->cols;
+
+      $win = $parent;
    }
-   else {
-      $self->term->goto( $line, $col );
-   }
+
+   $win->term->goto( $line, $col );
 }
 
 =head2 $win->print( $text, $pen )
@@ -674,54 +842,49 @@ sub print
    my $self = shift;
    my $text = shift;
 
-   return if $self->{output_clipped};
-
-   return unless my $width = textwidth $text;
-
    my $pen = ( @_ == 1 ) ? shift : Tickit::Pen->new( @_ );
 
-   $self->_rawprint( $text, $width, $pen );
-}
-
-sub _rawprint
-{
-   my $self = shift;
-   my ( $text, $width, $pen ) = @_;
-
-   $pen->default_from( $self->pen );
-
-   my $spare = $self->cols - $self->{output_column};
-   if( $spare <= 0 ) {
-      return;
+   # First collect up the pen attributes and abort early if any window is
+   # invisible
+   for( my $win = $self; $win; $win = $win->parent ) {
+      return unless $win->{visible};
+      $pen->default_from( $win->pen );
    }
 
-   if( $self->{output_left} ) {
-      if( $width <= $self->{output_left} ) {
-         $self->{output_left} -= $width;
-         return;
+   my $line = $self->{output_line};
+   my $term = $self->term;
+
+   my $need_goto = 0;
+   my ( $abs_top, $abs_left );
+
+   while( length $text ) {
+      my ( $vis, $len ) = $self->_get_span_visibility( $line, $self->{output_column} );
+
+      last if !$vis and !defined $len;
+
+      my $len_ch = cols2chars( $text, $len );
+      my $chunk = substr $text, 0, $len_ch, "";
+
+      # truncate $len if it was too high
+      $len = length $chunk;
+
+      if( $vis ) {
+         if( $need_goto ) {
+            $abs_top  //= $self->abs_top;
+            $abs_left //= $self->abs_left;
+            $term->goto( $abs_top + $line, $abs_left + $self->{output_column} );
+         }
+
+         $term->setpen( $pen );
+         $term->print( $chunk );
+      }
+      else {
+         # TODO: $term->move( undef, $len )
+         $need_goto = 1;
       }
 
-      $width -= $self->{output_left};
-      $text = substrwidth $text, $self->{output_left};
-      undef $self->{output_left};
-
-      $self->goto( $self->{output_line}, -$self->left );
+      $self->{output_column} += $len;
    }
-
-   if( $spare < $width ) {
-      $width = $spare;
-      $text = substrwidth $text, 0, $width;
-   }
-
-   if( my $parent = $self->parent ) {
-      $parent->_rawprint( $text, $width, $pen );
-   }
-   else {
-      $self->term->setpen( $pen );
-      $self->term->print( $text );
-   }
-
-   $self->{output_column} += $width;
 }
 
 =head2 $win->erasech( $count, $moveend, $pen )
@@ -746,50 +909,45 @@ sub erasech
 
    my $pen = ( @_ == 1 ) ? shift : Tickit::Pen->new( @_ );
 
-   $self->_rawerasech( $count, $moveend, $pen->getattr( 'bg' ) );
-}
-
-sub _rawerasech
-{
-   my $self = shift;
-   my ( $count, $moveend, $bg ) = @_;
-
-   return if $self->{output_clipped};
-
-   defined $bg or $bg = $self->pen->getattr( 'bg' );
-
-   my $spare = $self->cols - $self->{output_column};
-   if( $spare <= 0 ) {
-      return;
+   # First collect up the pen attributes and abort early if any window is
+   # invisible
+   for( my $win = $self; $win; $win = $win->parent ) {
+      return unless $win->{visible};
+      $pen->default_from( $win->pen );
    }
 
-   if( $self->{output_left} ) {
-      if( $count <= $self->{output_left} ) {
-         $self->{output_left} -= $count;
-         return;
+   my $bg = $pen->getattr( 'bg' );
+
+   my $line = $self->{output_line};
+   my $term = $self->term;
+
+   my $need_goto = 0;
+   my ( $abs_top, $abs_left );
+
+   while( $count ) {
+      my ( $vis, $len ) = $self->_get_span_visibility( $line, $self->{output_column} );
+
+      last if !$vis and !defined $len;
+
+      $len = $count if $len > $count;
+
+      if( $vis ) {
+         if( $need_goto ) {
+            $abs_top  //= $self->abs_top;
+            $abs_left //= $self->abs_left;
+            $term->goto( $abs_top + $line, $abs_left + $self->{output_column} );
+         }
+
+         $term->setpen( bg => $bg );
+         $term->erasech( $len, $moveend );
+      }
+      else {
+         $need_goto = 1;
       }
 
-      $count -= $self->{output_left};
-      undef $self->{output_left};
-
-      $self->goto( $self->{output_line}, -$self->left );
+      $self->{output_column} += $len;
+      $count -= $len;
    }
-
-   if( $spare < $count ) {
-      $count = $spare;
-   }
-
-   if( my $parent = $self->parent ) {
-      $self->parent->_rawerasech( $count, $moveend, $bg );
-   }
-   else {
-      # Also need to disable any remaining attributes that don't apply
-      $self->term->setpen( bg => $bg );
-      $self->term->erasech( $count, $moveend );
-   }
-
-   $self->{output_column} += $count if $moveend;
-   undef $self->{output_column} if !defined $moveend;
 }
 
 =head2 $success = $win->scrollrect( $top, $left, $lines, $cols, $downward, $rightward )
@@ -825,6 +983,8 @@ sub scrollrect
 
    $lines > 0 and $top + $lines <= $self->lines or croak '$lines out of bounds';
    $cols  > 0 and $left + $cols <= $self->cols  or croak '$cols out of bounds';
+
+   return unless $self->{visible};
 
    my $pen = ( @args == 1 ) ? $args[0] : Tickit::Pen->new( @args );
 
@@ -907,7 +1067,7 @@ sub _gain_focus
    if( my $focus_child = $self->{focus_child} ) {
       $focus_child->_gain_focus;
    }
-   else {
+   elsif( $self->is_visible ) {
       $self->goto( $self->{focus_line}, $self->{focus_col} );
    }
 }
@@ -933,8 +1093,13 @@ sub restore
    my $root = $self->root;
 
    if( my $focus_child = $root->{focus_child} ) {
-      $root->term->mode_cursorvis( 1 );
-      $focus_child->_gain_focus;
+      if( $focus_child->is_visible ) {
+         $root->term->mode_cursorvis( 1 );
+         $focus_child->_gain_focus;
+      }
+      else {
+         $root->term->mode_cursorvis( 0 );
+      }
    }
    elsif( defined $root->{focus_line} ) {
       $root->term->mode_cursorvis( 1 );
@@ -953,6 +1118,8 @@ sub clearline
    my $self = shift;
    my ( $line ) = @_;
 
+   return unless $self->{visible};
+
    $self->goto( $line, 0 );
    $self->erasech( $self->cols );
 }
@@ -967,6 +1134,8 @@ colour.
 sub clear
 {
    my $self = shift;
+
+   return unless $self->{visible};
 
    if( $self->parent ) {
       $self->clearline( $_ ) for 0 .. $self->lines - 1;

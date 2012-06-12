@@ -18,6 +18,7 @@ use Tickit;
 pipe my ( $term_rd, $my_wr ) or die "Cannot pipepair - $!";
 
 my $tickit = Tickit->new(
+   UTF8    => 1,
    term_in => $term_rd,
 );
 

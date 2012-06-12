@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 9;
+use Test::More tests => 10;
 use Test::Identity;
 
 use Tickit::Test;
@@ -33,15 +33,19 @@ is_display( [ [TEXT("+".("-"x78)."+")],
               [TEXT("+".("-"x78)."+")] ],
             'Display initially' );
 
-$widget->set_style( "single" );
+SKIP: {
+   skip "No UTF-8 locale", 1 unless ${^UTF8LOCALE};
 
-flush_tickit;
+   $widget->set_style( "single" );
 
-is_display( [ [TEXT("\x{250C}".("\x{2500}"x78)."\x{2510}")],
-              [TEXT("\x{2502}Widget".(" "x72)."\x{2502}")],
-              ( [TEXT("\x{2502}"), BLANK(78), TEXT("\x{2502}")] ) x 22,
-              [TEXT("\x{2514}".("\x{2500}"x78)."\x{2518}")] ],
-            'Display after ->set_style' );
+   flush_tickit;
+
+   is_display( [ [TEXT("\x{250C}".("\x{2500}"x78)."\x{2510}")],
+                 [TEXT("\x{2502}Widget".(" "x72)."\x{2502}")],
+                 ( [TEXT("\x{2502}"), BLANK(78), TEXT("\x{2502}")] ) x 22,
+                 [TEXT("\x{2514}".("\x{2500}"x78)."\x{2518}")] ],
+               'Display after ->set_style' );
+}
 
 # That style is hard to test against so put it back to ASCII
 $widget->set_style( "ascii" );
@@ -75,6 +79,16 @@ is_display( [ [TEXT("+".("-"x71)." Title +",fg=>1)],
               ( [TEXT("|",fg=>1), BLANK(78), TEXT("|",fg=>1)] ) x 22,
               [TEXT("+".("-"x78)."+",fg=>1)] ],
             'Display with correct pen' );
+
+$static->set_text( "New text" );
+
+flush_tickit;
+
+is_display( [ [TEXT("+".("-"x71)." Title +",fg=>1)],
+              [TEXT("|",fg=>1), TEXT("New text".(" "x70)), TEXT("|",fg=>1)],
+              ( [TEXT("|",fg=>1), BLANK(78), TEXT("|",fg=>1)] ) x 22,
+              [TEXT("+".("-"x78)."+",fg=>1)] ],
+            'Display after $static->set_text' );
 
 $widget->set_window( undef );
 

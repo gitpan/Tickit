@@ -41,7 +41,7 @@ SKIP: {
    skip "No Unicode", 1 unless CAN_UNICODE;
 
    is_deeply( [ chars2cols "cafe\x{301}", 3, 4, 5, 6 ],
-              [ 3, 3, 4, 4 ],
+              [ 3, 4, 4, 4 ],
               'chars2cols combining' );
 }
 

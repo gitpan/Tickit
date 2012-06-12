@@ -8,7 +8,7 @@ package Tickit;
 use strict;
 use warnings;
 
-our $VERSION = '0.16_001';
+our $VERSION = '0.17';
 
 use IO::Handle;
 
@@ -16,9 +16,6 @@ use Tickit::Term;
 use Tickit::Window;
 
 use Scalar::Util qw( weaken );
-
-require XSLoader;
-XSLoader::load( __PACKAGE__, $VERSION );
 
 =head1 NAME
 
@@ -61,11 +58,12 @@ via F<libtermkey> (all of these will require a supporting terminal as well).
 It also supports having multiple instances and non-blocking or asynchronous
 control.
 
-This B<DEVELOPMENT> version of C<Tickit> bundles a snapshot copy of the
-F<libtickit> C library, and builds and links against it. It exists largely as
-an experiment over the (mostly) pure-perl stable release version of C<Tickit>.
-Unless you specifically want to test the C library or XS wrapping, you should
-instead stick to the stable release version at present.
+At the current version, this is a Perl distribution which contains some XS
+utility code, and depends on a number of other XS modules to provide the
+remaining terminal behaviours. Work is in progress at porting the lower level
+parts into a standalone C library, with the intention being that eventually
+this distribution will become an XS wrapper for that C library. Development
+releases may appear on CPAN that include the C library and XS wrappings of it.
 
 =cut
 
@@ -123,6 +121,7 @@ sub new
          writer        => $writer,
          input_handle  => $in,
          output_handle => $out,
+         UTF8          => $args{UTF8},
       );
    }
 
@@ -132,7 +131,7 @@ sub new
 
    my $rootwin = $self->{rootwin} = Tickit::Window->new( $self, $term->lines, $term->cols );
 
-   $self->bind_key( 'C-c' => $self->can( "_STOP" ) );
+   $self->bind_key( 'C-c' => $self->can( "stop" ) );
 
    weaken( my $weakself = $self );
 
@@ -274,7 +273,7 @@ previous callback for the same key. The code block is invoked as
 If C<$code> is missing or C<undef>, any existing callback is removed.
 
 As a convenience for the common application use case, the C<Ctrl-C> key is
-bound to the C<_STOP> method.
+bound to the C<stop> method.
 
 To remove this binding, simply bind another callback, or remove the binding
 entirely by setting C<undef>.
@@ -368,12 +367,6 @@ sub teardown_term
    $term->mode_mouse( 0 );
 }
 
-sub _STOP
-{
-   my $self = shift;
-   $self->{keep_running} = 0;
-}
-
 =head2 $tickit->tick
 
 Run a single round of IO events. Does not call C<setup_term> or
@@ -410,7 +403,7 @@ sub tick
 =head2 $tickit->run
 
 Calls the C<setup_term> method, then processes IO events until stopped, by the
-C<_STOP> method, C<SIGINT>, C<SIGTERM> or the C<Ctrl-C> key. Then runs the
+C<stop> method, C<SIGINT>, C<SIGTERM> or the C<Ctrl-C> key. Then runs the
 C<teardown_term> method, and returns.
 
 =cut
@@ -421,7 +414,7 @@ sub run
 
    $self->setup_term;
 
-   $SIG{INT} = $SIG{TERM} = sub { $self->_STOP };
+   $SIG{INT} = $SIG{TERM} = sub { $self->stop };
 
    $SIG{WINCH} = sub { 
       $self->later( sub { $self->_SIGWINCH } )
@@ -443,6 +436,18 @@ sub run
    $self->_tick while( $self->{keep_running} );
 
    $self->teardown_term;
+}
+
+=head2 $tickit->stop
+
+Causes a currently-running C<run> method to stop processing events and return.
+
+=cut
+
+sub stop
+{
+   my $self = shift;
+   $self->{keep_running} = 0;
 }
 
 =head1 AUTHOR

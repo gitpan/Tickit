@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 12;
+use Test::More tests => 13;
 
 use Tickit::Test;
 
@@ -96,3 +96,11 @@ $otherwin->set_on_key( sub { push @handlers, "otherwin"; return 0 } );
 presskey( text => "D" );
 
 is_deeply( \@handlers, [qw( subwin win otherwin )], 'on_key D propagates to otherwin after win' );
+
+$subwin->hide;
+
+undef @handlers;
+
+presskey( text => "E" );
+
+is_deeply( \@handlers, [qw( win otherwin )], 'hidden windows do not receive input events' );
