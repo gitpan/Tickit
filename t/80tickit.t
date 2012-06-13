@@ -65,8 +65,8 @@ $tickit->_flush_later;
 # These strings are fragile but there's not much else we can do for an end-to-end
 # test. If this unit test breaks likely these strings need updating. Sorry.
 stream_is(
-   "\e[?1049h\e[?25l\e[?1002h" .         # Terminal setup
-   "\e[2J\e[m\e[2J\e[13;38H\e[mHello",   # Widget
+   "\e[?1049h\e[?25l\e[?1002h" .     # Terminal setup
+   "\e[2J\e[m\e[2J\e[13;38HHello",   # Widget
    'root widget rendered'
 );
 

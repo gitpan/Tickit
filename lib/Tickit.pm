@@ -8,7 +8,7 @@ package Tickit;
 use strict;
 use warnings;
 
-our $VERSION = '0.17';
+our $VERSION = '0.17_001';
 
 use IO::Handle;
 
@@ -16,6 +16,9 @@ use Tickit::Term;
 use Tickit::Window;
 
 use Scalar::Util qw( weaken );
+
+require XSLoader;
+XSLoader::load( __PACKAGE__, $VERSION );
 
 =head1 NAME
 

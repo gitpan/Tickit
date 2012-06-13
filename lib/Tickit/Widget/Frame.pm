@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::SingleChildWidget );
 use Tickit::WidgetRole::Alignable name => "title_align";
 
-our $VERSION = '0.17';
+our $VERSION = '0.17_001';
 
 use Carp;
 

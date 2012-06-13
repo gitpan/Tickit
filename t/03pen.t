@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 32;
+use Test::More tests => 37;
 use Test::Identity;
 use Test::Refcount;
 
@@ -11,6 +11,7 @@ use Tickit::Pen;
 my $pen = Tickit::Pen->new;
 
 my $changed = 0;
+my $changed_pen;
 my $changed_id;
 
 isa_ok( $pen, "Tickit::Pen", '$pen isa Tickit::Pen' );
@@ -39,7 +40,8 @@ is( $pen->getattr( 'fg' ), 3, '$pen fg after chattr' );
 is_deeply( { $pen->clone->getattrs }, { $pen->getattrs }, '$pen->clone attrs' );
 
 is( $changed, 1, '$changed after chattr' );
-identical( $changed_id, $id, '$changed_id after chattr' );
+identical( $changed_pen, $pen, '$changed_pen after chattr' );
+identical( $changed_id,  $id,  '$changed_id after chattr' );
 
 $pen->chattr( fg => "blue" );
 
@@ -88,19 +90,37 @@ is( $pen->getattr( 'fg' ), 1, '$pen fg initially 1' );
 
 my $bluepen = Tickit::Pen->new( fg => 4 );
 
-is_deeply( { $bluepen->clone->copy_from( $pen )->getattrs },
-           { fg => 1, bg => 2 },
-           'pen ->copy_from overwrites attributes' );
+{
+   my $copy = $bluepen->clone;
+   $copy->add_on_changed( $observer );
+   $changed = 0;
 
-is_deeply( { $bluepen->clone->default_from( $pen )->getattrs },
-           { fg => 4, bg => 2 },
-           'pen ->default_from does not overwrite attributes' );
+   is_deeply( { $copy->copy_from( $pen )->getattrs },
+              { fg => 1, bg => 2 },
+              'pen ->copy_from overwrites attributes' );
+
+   is( $changed, 1, '$changed 1 after copy ->copy_from' );
+   identical( $changed_pen, $copy, '$changed_pen after copy ->copy_from' );
+}
+
+{
+   my $copy = $bluepen->clone;
+   $copy->add_on_changed( $observer );
+   $changed = 0;
+
+   is_deeply( { $copy->default_from( $pen )->getattrs },
+              { fg => 4, bg => 2 },
+              'pen ->default_from does not overwrite attributes' );
+
+   is( $changed, 1, '$changed 1 after copy ->default_from' );
+   identical( $changed_pen, $copy, '$changed_pen after copy ->default_from' );
+}
 
 package PenObserver;
 
 sub on_pen_changed
 {
    my $self = shift;
-   ( undef, $changed_id ) = @_;
+   ( $changed_pen, $changed_id ) = @_;
    $changed++;
 }

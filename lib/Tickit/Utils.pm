@@ -8,7 +8,7 @@ package Tickit::Utils;
 use strict;
 use warnings;
 
-our $VERSION = '0.17';
+our $VERSION = '0.17_001';
 
 use Exporter 'import';
 our @EXPORT_OK = qw(
@@ -22,9 +22,8 @@ our @EXPORT_OK = qw(
    align
 );
 
-require XSLoader;
-XSLoader::load( __PACKAGE__, $VERSION );
-# Provides textwidth
+# XS code comes from Tickit itself
+require Tickit;
 
 =head1 NAME
 

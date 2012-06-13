@@ -1,5 +1,9 @@
 Revision history for Changes
 
+0.17_001 CHANGES:
+         * Complete reimplementation of Tickit::Term layer based on (bundled)
+           libtickit C library.
+
 0.17    CHANGES:
          * $win->hide, $win->show and the concept of hidden windows
          * $win->make_float and the concept of floating windows
