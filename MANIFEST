@@ -15,7 +15,6 @@ examples/HelloWorldWidget-1.pm
 examples/HelloWorldWidget-2.pm
 examples/ShowKeyWidget.pm
 examples/testonewidget.pl
-include/hooklists.h
 include/tickit.h
 lib/Tickit.pm
 lib/Tickit.xs
@@ -38,6 +37,7 @@ lib/Tickit/Widget/Static.pm
 lib/Tickit/Widget/VBox.pm
 lib/Tickit/WidgetRole/Alignable.pm
 lib/Tickit/WidgetRole/Borderable.pm
+lib/Tickit/WidgetRole/Penable.pm
 lib/Tickit/Window.pm
 LICENSE
 Makefile.PL
@@ -46,10 +46,11 @@ META.json
 META.yml
 README
 src/hooklists.c
+src/hooklists.h
 src/pen.c
 src/string.c
 src/term.c
-src/unicode.inc
+src/unicode.h
 t/00use.t
 t/01rect.t
 t/02utils.t

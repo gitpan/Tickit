@@ -43,7 +43,7 @@ else {
       push @{ $build_args{extra_linker_flags} }, qw( -lncurses );
    }
 
-   eval { ExtUtils::PkgConfig->modversion( "termkey" ); 1 } or
+   eval { ExtUtils::PkgConfig->modversion( "termkey" ) } or
       die "OS unsupported - need libtermkey";
 
    add_cflags_libs "termkey";
@@ -59,6 +59,18 @@ my $build = Module::Build->new(
    configure_requires => {
       'ExtUtils::PkgConfig' => 0,
       'Module::Build' => 0,
+   },
+   # Note to downstream package maintainers:
+   # We don't -actually- depend directly on these Alien modules but it's far
+   # easier to get CPAN smoketest machines to install them this way than
+   # anything else.
+   # These dependencies can be omitted if libtermkey/unibilium are installed
+   # by some other mechanism
+   meta_merge => {
+      configure_requires => {
+         'Alien::libtermkey' => 0,
+         'Alien::unibilium' => 0,
+      },
    },
    build_requires => {
       'Test::Builder::Tester' => 0,

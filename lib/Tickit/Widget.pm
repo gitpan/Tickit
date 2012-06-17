@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_001';
+our $VERSION = '0.17_002';
 
 use Carp;
 use Scalar::Util qw( weaken );

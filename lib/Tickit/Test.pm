@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_001';
+our $VERSION = '0.17_002';
 
 use Exporter 'import';
 
@@ -274,6 +274,10 @@ sub is_termlog
       my $want_line = shift @want_log;
       my $got_line  = shift @got_log;
 
+      if( $want_line->[0] eq "chpen_bg" and $got_line->[0] eq "chpen" ) {
+         $got_line = [ chpen_bg => $got_line->[1]->{bg} ];
+      }
+
       foreach ( $want_line, $got_line ) {
          ( $_ = "none" ), next unless defined $_;
 
@@ -283,7 +287,7 @@ sub is_termlog
             $_ = "$op(" . _pen2string( $args[0] ) . ")";
          }
          else {
-            $_ = "$op(" . join( ",", map { $_ =~ m/^-?\d+$/ ? $_ : qq("$_") } @args ) . ")";
+            $_ = "$op(" . join( ",", map { defined $_ ? $_ =~ m/^-?\d+$/ ? $_ : qq("$_") : "undef" } @args ) . ")";
          }
       }
 
@@ -324,7 +328,8 @@ corresponding columns.
                "content here" ] );
 
 The C<TEXT> function accepts pen attributes, to assert that the displayed
-characters have exactly the attributes given.
+characters have exactly the attributes given. In character cells containing
+spaces, only the C<bg> attribute is tested.
 
  is_display( [ [TEXT("This is ",fg=>2), TEXT("bold",fg=>2,b=>1) ] ] );
 
@@ -338,6 +343,8 @@ or list of array references directly.
 
  BLANKLINE      is   [TEXT("")]
  BLANKLINES(3)  is   [TEXT("")], [TEXT("")], [TEXT("")]
+
+
 
 =cut
 
@@ -368,17 +375,31 @@ sub is_display
                return $ok;
             }
 
-            my $endcol = $col + length $want_text;
             my $want_pen = _pen2string( $chunk->[1] );
-            while( $col < $endcol ) {
-               my $got_pen = _pen2string( $term->get_display_pen( $line, $col ) );
-               if( $got_pen ne $want_pen ) {
-                  my $ok = $tb->ok( 0, $name );
-                  $tb->diag( "Display differs on line $line at column $col" );
-                  $tb->diag( "Got pen:      $got_pen" );
-                  $tb->diag( "Expected pen: $want_pen" );
-                  return $ok;
+            my $idx = 0;
+            while( $idx < length $want_text ) {
+               if( substr( $want_text, $idx, 1 ) eq " " ) {
+                  my $want_bg = $chunk->[1]->{bg} // "undef";
+                  my $got_bg = $term->get_display_pen( $line, $col )->{bg} // "undef";
+                  if( $got_bg ne $want_bg ) {
+                     my $ok = $tb->ok( 0, $name );
+                     $tb->diag( "Display differs on line $line at column $col" );
+                     $tb->diag( "Got pen bg:      $got_bg" );
+                     $tb->diag( "Expected pen bg: $want_bg" );
+                     return $ok;
+                  }
                }
+               else {
+                  my $got_pen = _pen2string( $term->get_display_pen( $line, $col ) );
+                  if( $got_pen ne $want_pen ) {
+                     my $ok = $tb->ok( 0, $name );
+                     $tb->diag( "Display differs on line $line at column $col" );
+                     $tb->diag( "Got pen:      $got_pen" );
+                     $tb->diag( "Expected pen: $want_pen" );
+                     return $ok;
+                  }
+               }
+               $idx++;
                $col++;
             }
          }
@@ -484,7 +505,7 @@ sub DELETECH   { [ deletech => $_[0] ] }
 sub SCROLLRECT { [ scrollrect => @_[0..5] ] }
 sub PRINT      { [ print => $_[0] ] }
 sub SETPEN     { [ chpen => { DEFAULTPEN, @_ } ] }
-sub SETBG      { [ chpen => { DEFAULTPEN, bg => $_[0] } ] }
+sub SETBG      { [ chpen_bg => $_[0] ] }
 
 =head1 AUTHOR
 

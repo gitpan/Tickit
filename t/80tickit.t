@@ -42,6 +42,7 @@ sub stream_is
 }
 
 $term->print( "Hello" );
+$term->flush;
 stream_is( "Hello", '$term->print' );
 
 # We'll test with a Unicode character outside of Latin-1, to ensure it
@@ -51,6 +52,7 @@ stream_is( "Hello", '$term->print' );
 #  UTF-8: 0xc4 0x89
 
 $term->print( "\x{109}" );
+$term->flush;
 stream_is( "\xc4\x89", 'print outputs UTF-8' );
 
 is_oneref( $tickit, '$tickit has refcount 1 at EOF' );
@@ -61,6 +63,7 @@ $tickit->setup_term;
 
 # Gut-wrenching
 $tickit->_flush_later;
+$term->flush;
 
 # These strings are fragile but there's not much else we can do for an end-to-end
 # test. If this unit test breaks likely these strings need updating. Sorry.

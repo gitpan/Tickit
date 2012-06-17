@@ -8,7 +8,7 @@ package Tickit;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_001';
+our $VERSION = '0.17_002';
 
 use IO::Handle;
 
@@ -135,6 +135,8 @@ sub new
    my $rootwin = $self->{rootwin} = Tickit::Window->new( $self, $term->lines, $term->cols );
 
    $self->bind_key( 'C-c' => $self->can( "stop" ) );
+
+   $term->set_output_buffer( 2**16 ); # 64KiB
 
    weaken( my $weakself = $self );
 
@@ -348,6 +350,8 @@ sub setup_term
    if( my $widget = $self->{root_widget} ) {
       $widget->set_window( $self->rootwin );
    }
+
+   $term->flush;
 }
 
 =head2 $tickit->teardown_term
@@ -368,6 +372,8 @@ sub teardown_term
    $term->mode_altscreen( 0 );
    $term->mode_cursorvis( 1 );
    $term->mode_mouse( 0 );
+
+   $term->flush;
 }
 
 =head2 $tickit->tick

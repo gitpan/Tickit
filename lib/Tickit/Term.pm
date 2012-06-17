@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_001';
+our $VERSION = '0.17_002';
 
 # Load the XS code
 require Tickit;
@@ -161,6 +161,18 @@ Returns the input handle set by the C<input_handle> constructor arg.
 =head2 $fh = $term->get_output_handle
 
 Returns the output handle set by the C<output_handle> constructor arg.
+
+=cut
+
+=head2 $term->set_output_buffer( $len )
+
+Sets the size of the output buffer
+
+=cut
+
+=head2 $term->flush
+
+Flushes the output buffer to the terminal
 
 =cut
 

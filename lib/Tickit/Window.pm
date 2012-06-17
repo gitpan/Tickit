@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_001';
+our $VERSION = '0.17_002';
 
 use Carp;
 
@@ -842,7 +842,7 @@ sub print
    my $self = shift;
    my $text = shift;
 
-   my $pen = ( @_ == 1 ) ? shift : Tickit::Pen->new( @_ );
+   my $pen = ( @_ == 1 ) ? shift->clone : Tickit::Pen->new( @_ );
 
    # First collect up the pen attributes and abort early if any window is
    # invisible
@@ -907,7 +907,7 @@ sub erasech
    my $count = shift;
    my $moveend = shift;
 
-   my $pen = ( @_ == 1 ) ? shift : Tickit::Pen->new( @_ );
+   my $pen = ( @_ == 1 ) ? shift->clone : Tickit::Pen->new( @_ );
 
    # First collect up the pen attributes and abort early if any window is
    # invisible
@@ -915,8 +915,6 @@ sub erasech
       return unless $win->{visible};
       $pen->default_from( $win->pen );
    }
-
-   my $bg = $pen->getattr( 'bg' );
 
    my $line = $self->{output_line};
    my $term = $self->term;
@@ -938,7 +936,7 @@ sub erasech
             $term->goto( $abs_top + $line, $abs_left + $self->{output_column} );
          }
 
-         $term->setpen( bg => $bg );
+         $term->setpen( $pen );
          $term->erasech( $len, $moveend );
       }
       else {
@@ -975,35 +973,42 @@ scroll the terminal (and returns false).
 
 sub scrollrect
 {
-   my $self = shift;
+   my $win = shift;
    my ( $top, $left, $lines, $cols, $downward, $rightward, @args ) = @_;
 
-   $top  >= 0 and $top  < $self->lines or croak '$top out of bounds';
-   $left >= 0 and $left < $self->cols  or croak '$left out of bounds';
+   my $pen = ( @args == 1 ) ? $args[0]->clone : Tickit::Pen->new( @args );
 
-   $lines > 0 and $top + $lines <= $self->lines or croak '$lines out of bounds';
-   $cols  > 0 and $left + $cols <= $self->cols  or croak '$cols out of bounds';
+   while( $win ) {
+      $top  >= 0 and $top  < $win->lines or croak '$top out of bounds';
+      $left >= 0 and $left < $win->cols  or croak '$left out of bounds';
 
-   return unless $self->{visible};
+      $lines > 0 and $top + $lines <= $win->lines or croak '$lines out of bounds';
+      $cols  > 0 and $left + $cols <= $win->cols  or croak '$cols out of bounds';
 
-   my $pen = ( @args == 1 ) ? $args[0] : Tickit::Pen->new( @args );
+      return unless $win->{visible};
 
-   $pen->default_from( $self->pen );
+      $pen->default_from( $win->pen );
 
-   if( my $parent = $self->parent ) {
-      return $parent->scrollrect(
-         $self->top  + $top, $self->left + $left, $lines, $cols,
-         $downward, $rightward,
-         $pen,
-      );
+      $top  += $win->top;
+      $left += $win->left;
+
+      my $parent = $win->parent or last;
+      $win = $parent;
    }
-   else {
-      $self->term->setpen( bg => $pen->getattr( 'bg' ) );
-      return $self->term->scrollrect(
-         $top, $left, $lines, $cols,
-         $downward, $rightward
-      );
+
+   # Check there are no floating windows in the way
+   foreach my $line ( $top .. $top + $lines - 1 ) {
+      my ( $vis, $len ) = $win->_get_span_visibility( $line, $left );
+      return 0 unless $vis;
+      return 0 unless $len >= $cols;
    }
+
+   my $term = $win->term;
+
+   $term->setpen( bg => $pen->getattr( 'bg' ) );
+
+   return $term->scrollrect( $top, $left, $lines, $cols,
+      $downward, $rightward );
 }
 
 =head2 $success = $win->scroll( $downward, $rightward )
@@ -1092,19 +1097,23 @@ sub restore
    my $self = shift;
    my $root = $self->root;
 
+   my $term = $root->term;
+
    if( my $focus_child = $root->{focus_child} ) {
       if( $focus_child->is_visible ) {
-         $root->term->mode_cursorvis( 1 );
+         $term->mode_cursorvis( 1 );
          $focus_child->_gain_focus;
       }
       else {
-         $root->term->mode_cursorvis( 0 );
+         $term->mode_cursorvis( 0 );
       }
    }
    elsif( defined $root->{focus_line} ) {
-      $root->term->mode_cursorvis( 1 );
+      $term->mode_cursorvis( 1 );
       $root->_gain_focus;
    }
+
+   $term->flush;
 }
 
 =head2 $win->clearline( $line )

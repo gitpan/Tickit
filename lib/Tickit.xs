@@ -557,6 +557,19 @@ set_output_func(self,func)
     tickit_term_set_output_func(self->tt, term_output_fn, self);
 
 void
+flush(self)
+  Tickit::Term  self
+  CODE:
+    tickit_term_flush(self->tt);
+
+void
+set_output_buffer(self,len)
+  Tickit::Term  self
+  size_t        len
+  CODE:
+    tickit_term_set_output_buffer(self->tt, len);
+
+void
 set_utf8(self,utf8)
   Tickit::Term  self
   int           utf8;
@@ -788,7 +801,8 @@ int textwidth(str)
     s = SvPV_const(str, len);
 
     tickit_stringpos_limit_bytes(&limit, len);
-    tickit_string_count(s, &pos, &limit);
+    if(tickit_string_count(s, &pos, &limit) == -1)
+      XSRETURN_UNDEF;
 
     RETVAL = pos.columns;
 
@@ -822,7 +836,8 @@ void chars2cols(str,...)
         croak("chars2cols requires a monotonically-increasing list of character numbers; %d is not greater than %d\n",
           limit.codepoints, pos.codepoints);
 
-      tickit_string_countmore(s, &pos, &limit);
+      if(tickit_string_countmore(s, &pos, &limit) == -1)
+        XSRETURN_UNDEF;
 
       mPUSHu(pos.columns);
 
@@ -859,7 +874,8 @@ void cols2chars(str,...)
         croak("cols2chars requires a monotonically-increasing list of column numbers; %d is not greater than %d\n",
           limit.columns, pos.columns);
 
-      tickit_string_countmore(s, &pos, &limit);
+      if(tickit_string_countmore(s, &pos, &limit) == -1)
+        XSRETURN_UNDEF;
 
       mPUSHu(pos.codepoints);
 

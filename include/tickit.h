@@ -9,10 +9,10 @@
 
 /* bitmasks */
 typedef enum {
-  TICKIT_EV_RESIZE = 0x01, // lines, cols
-  TICKIT_EV_KEY    = 0x02, // type(TickitKeyEventType), str
-  TICKIT_EV_MOUSE  = 0x04, // type(TickitMouseEventType), button, line, col
-  TICKIT_EV_CHANGE = 0x08, // {none}
+  TICKIT_EV_RESIZE = 0x01, // Term = lines, cols
+  TICKIT_EV_KEY    = 0x02, // Term = type(TickitKeyEventType), str
+  TICKIT_EV_MOUSE  = 0x04, // Term = type(TickitMouseEventType), button, line, col
+  TICKIT_EV_CHANGE = 0x08, // Pen = {none}
 
   TICKIT_EV_UNBIND = 0x80000000, // event handler is being unbound
 } TickitEventType;
@@ -107,18 +107,21 @@ typedef void TickitTermOutputFunc(TickitTerm *tt, const char *bytes, size_t len,
 
 TickitTerm *tickit_term_new(void);
 TickitTerm *tickit_term_new_for_termtype(const char *termtype);
-void tickit_term_free(TickitTerm *tt);
 void tickit_term_destroy(TickitTerm *tt);
 
 void tickit_term_set_output_fd(TickitTerm *tt, int fd);
 int  tickit_term_get_output_fd(TickitTerm *tt);
 void tickit_term_set_output_func(TickitTerm *tt, TickitTermOutputFunc *fn, void *user);
+void tickit_term_set_output_buffer(TickitTerm *tt, size_t len);
+
+void tickit_term_flush(TickitTerm *tt);
 
 /* fd is allowed to be unset (-1); works abstractly */
 void tickit_term_set_input_fd(TickitTerm *tt, int fd);
 int  tickit_term_get_input_fd(TickitTerm *tt);
 
-void tickit_term_utf8(TickitTerm *tt, int utf8);
+int  tickit_term_get_utf8(TickitTerm *tt);
+void tickit_term_set_utf8(TickitTerm *tt, int utf8);
 
 void tickit_term_input_push_bytes(TickitTerm *tt, const char *bytes, size_t len);
 void tickit_term_input_readable(TickitTerm *tt);

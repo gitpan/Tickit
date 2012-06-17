@@ -8,9 +8,11 @@ package Tickit::Widget::Frame;
 use strict;
 use warnings;
 use base qw( Tickit::SingleChildWidget );
-use Tickit::WidgetRole::Alignable name => "title_align";
 
-our $VERSION = '0.17_001';
+use Tickit::WidgetRole::Alignable name => "title_align";
+use Tickit::WidgetRole::Penable name => "frame";
+
+our $VERSION = '0.17_002';
 
 use Carp;
 
@@ -88,7 +90,7 @@ sub new
    my $self = $class->SUPER::new( %args );
 
    $self->set_style( $args{style} || "ascii" );
-   $self->set_frame_pen( Tickit::Pen->new );
+   $self->_init_frame_pen;
    $self->set_title( $args{title} ) if defined $args{title};
    $self->set_title_align( $args{title_align} || 0 );
 
@@ -176,12 +178,6 @@ results in the widget being redrawn if the widget has a window associated.
 
 =cut
 
-sub frame_pen
-{
-   my $self = shift;
-   return $self->{frame_pen};
-}
-
 =head2 $widget->set_frame_pen( $pen )
 
 Set a new C<Tickit::Pen> object. This is stored by reference; changes to the
@@ -190,23 +186,12 @@ shared by more than one widget; updates will affect them all.
 
 =cut
 
-sub set_frame_pen
-{
-   my $self = shift;
-   my ( $newpen ) = @_;
-   return if $self->{frame_pen} and $self->{frame_pen} == $newpen;
-
-   $self->{frame_pen}->remove_on_changed( $self ) if $self->{frame_pen};
-   $self->{frame_pen} = $newpen;
-   $newpen->add_on_changed( $self );
-}
-
 sub on_pen_changed
 {
    my $self = shift;
    my ( $pen ) = @_;
 
-   if( $self->window and $pen == $self->{frame_pen} ) {
+   if( $self->window and $pen == $self->frame_pen ) {
       $self->redraw;
    }
    else {

@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 17;
+use Test::More tests => 18;
 use Test::Refcount;
 
 use Tickit::Test;
@@ -69,6 +69,8 @@ is_termlog( [ GOTO(10,10),
 is_display( [ BLANKLINES(10),
               [TEXT("X"x10), TEXT("|-- Yipee --|"), BLANK(17), TEXT("Y"x30), TEXT("X"x10)] ],
             'Display for print to floating window' );
+
+ok( !$rootwin->scrollrect( 0, 0, 20, 80, 0, +3 ), '$rootwin disallows scrollrect under a float' );
 
 my $subwin = $floatwin->make_sub( 0, 4, 1, 6 );
 $subwin->goto( 0, 0 );

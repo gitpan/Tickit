@@ -1,5 +1,10 @@
 Revision history for Changes
 
+0.17_002 CHANGES:
+         * Add Alien::libtermkey and Alien::unibilium to configure_requires of
+           generated META.{yml,json} so that CPAN smokers will find it easier
+           test them
+
 0.17_001 CHANGES:
          * Complete reimplementation of Tickit::Term layer based on (bundled)
            libtickit C library.

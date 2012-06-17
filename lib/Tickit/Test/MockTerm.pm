@@ -3,7 +3,7 @@ package Tickit::Test::MockTerm;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_001';
+our $VERSION = '0.17_002';
 
 sub new
 {
@@ -25,6 +25,10 @@ sub new
 
    return $self;
 }
+
+# Ignore output buffering
+sub set_output_buffer { }
+sub flush { }
 
 sub set_on_resize
 {
