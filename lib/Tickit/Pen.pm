@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_002';
+our $VERSION = '0.17_003';
 
 use Carp;
 

@@ -1,5 +1,8 @@
 Revision history for Changes
 
+0.17_003 CHANGES:
+         * Actually -use- pulled-in Alien:: dependencies
+
 0.17_002 CHANGES:
          * Add Alien::libtermkey and Alien::unibilium to configure_requires of
            generated META.{yml,json} so that CPAN smokers will find it easier

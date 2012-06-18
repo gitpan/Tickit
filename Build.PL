@@ -6,6 +6,17 @@ use ExtUtils::PkgConfig;
 
 my %build_args;
 
+sub eu_pc_modversion
+{
+   my ( $module ) = @_;
+
+   # Silence its scary errors
+   local *STDERR = *STDERR;
+   open STDERR, ">>", "/dev/null" or die "Cannot reopen STDERR - $!";
+
+   eval { ExtUtils::PkgConfig->modversion( $module ) };
+}
+
 sub add_cflags_libs
 {
    my ( $modname ) = @_;
@@ -18,12 +29,16 @@ sub add_cflags_libs
    push @{ $build_args{extra_linker_flags} }, split( m/ +/, $libs );
 }
 
-if( eval { ExtUtils::PkgConfig->modversion( "tickit" ) } ) {
+if( eu_pc_modversion( "tickit" ) ) {
    # libtickit installed; just use it
+   print "Using installed libtickit\n";
+
    add_cflags_libs "tickit";
 }
 else {
    # libtickit not installed; use bundled source code instead
+   print "Using bundled libtickit source\n";
+
    $build_args{c_source}     = "src";
    $build_args{include_dirs} = "include";
 
@@ -31,22 +46,50 @@ else {
 
    # bundled source still needs libtermkey and optionally can use
    # unibilium
-   if( eval { ExtUtils::PkgConfig->modversion( "unibilium" ) } ) {
+   if( eu_pc_modversion( "termkey" ) ) {
+      print "Using installed libtermkey\n";
+
+      add_cflags_libs "termkey";
+   }
+   elsif( eval { require Alien::libtermkey } ) {
+      print "Using Alien::libtermkey\n";
+
+      push @{ $build_args{extra_compiler_flags} },
+         split m/ +/, Alien::libtermkey->cflags;
+
+      push @{ $build_args{extra_linker_flags} },
+         split m/ +/, Alien::libtermkey->libs;
+   }
+   else {
+      die "OS unsupported - need libtermkey";
+   }
+
+   if( eu_pc_modversion( "unibilium" ) ) {
+      print "Using installed unibilium\n";
+
       push @{ $build_args{extra_compiler_flags} }, qw( -DHAVE_UNIBILIUM );
 
       add_cflags_libs "unibilium";
    }
-   elsif( eval { ExtUtils::PkgConfig->modversion( "ncursesw" ) } ) {
+   elsif( eval { require Alien::unibilium } ) {
+      print "Using Alien::unibilium\n";
+
+      push @{ $build_args{extra_compiler_flags} }, qw( -DHAVE_UNIBILIUM ),
+         split m/ +/, Alien::unibilium->cflags;
+
+      push @{ $build_args{extra_linker_flags} },
+         split m/ +/, Alien::unibilium->libs;
+   }
+   elsif( eu_pc_modversion( "ncursesw" ) ) {
+      print "Using installed ncursesw\n";
+
       add_cflags_libs "ncursesw";
    }
    else {
+      print "Using installed ncurses\n";
+
       push @{ $build_args{extra_linker_flags} }, qw( -lncurses );
    }
-
-   eval { ExtUtils::PkgConfig->modversion( "termkey" ) } or
-      die "OS unsupported - need libtermkey";
-
-   add_cflags_libs "termkey";
 }
 
 my $build = Module::Build->new(
