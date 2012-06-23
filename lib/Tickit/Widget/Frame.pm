@@ -12,7 +12,7 @@ use base qw( Tickit::SingleChildWidget );
 use Tickit::WidgetRole::Alignable name => "title_align";
 use Tickit::WidgetRole::Penable name => "frame";
 
-our $VERSION = '0.17_003';
+our $VERSION = '0.18';
 
 use Carp;
 
@@ -281,7 +281,7 @@ sub render
 
    my $framepen = $self->frame_pen;
 
-   foreach my $line ( $rect->top .. $rect->bottom - 1 ) {
+   foreach my $line ( $rect->linerange ) {
       $win->goto( $line, 0 );
 
       if( $line == 0 ) {

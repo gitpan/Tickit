@@ -8,7 +8,7 @@ package Tickit;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_003';
+our $VERSION = '0.18';
 
 use IO::Handle;
 
@@ -61,12 +61,12 @@ via F<libtermkey> (all of these will require a supporting terminal as well).
 It also supports having multiple instances and non-blocking or asynchronous
 control.
 
-At the current version, this is a Perl distribution which contains some XS
-utility code, and depends on a number of other XS modules to provide the
-remaining terminal behaviours. Work is in progress at porting the lower level
-parts into a standalone C library, with the intention being that eventually
-this distribution will become an XS wrapper for that C library. Development
-releases may appear on CPAN that include the C library and XS wrappings of it.
+At the current version, this is a Perl distribution which contains and XS and
+C implementation of the lower levels (L<Tickit::Term> and L<Tickit::Pen>), and
+implements the higher levels (L<Tickit::Window> and L<Tickit::Widget>) in pure
+perl. The XS parts are supported by F<libtickit>, either from the installed
+library, or using a bundled copy compiled at build time. It is intended that
+eventually the Window layer will be rewritten in XS and C instead.
 
 =cut
 

@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_003';
+our $VERSION = '0.18';
 
 use Carp;
 
@@ -143,6 +143,35 @@ sub make_float
    weaken $self->{child_windows}[0];
 
    return $sub;
+}
+
+=head2 $popup = $win->make_popup( $top, $left, $lines, $cols )
+
+Constructs a new floating popup window starting at the given coordinates
+relative to this window. It will be sized to the given limits.
+
+This window will have the root window as its parent, rather than the window
+the method was called on. Additionally, a popup window will steal all keyboard
+and mouse events that happen, regardless of focus or mouse position. It is
+possible that, if the window has an C<on_mouse> handler, that it may receive
+mouse events from outwide the bounds of the window.
+
+=cut
+
+sub make_popup
+{
+   my $win = shift;
+   my ( $top, $left, $lines, $cols ) = @_;
+
+   while( $win->parent ) {
+      $top  += $win->top;
+      $left += $win->left;
+      $win = $win->parent;
+   }
+
+   my $popup = $win->make_float( $top, $left, $lines, $cols );
+   $popup->{steal_input} = 1;
+   return $popup;
 }
 
 sub _reap_dead_children
@@ -371,6 +400,12 @@ sub _handle_key
 
    return 0 unless $self->is_visible;
 
+   $self->_reap_dead_children;
+   my $children = $self->{child_windows};
+   if( $children and @$children and $children->[0]->{steal_input} ) {
+      $children->[0]->_handle_key( @_ ) and return;
+   }
+
    my $focus_child = $self->{focus_child};
    if( $focus_child ) {
       $focus_child->_handle_key( @_ ) and return 1;
@@ -380,7 +415,7 @@ sub _handle_key
       $on_key->( $self, @_ ) and return 1;
    }
 
-   if( my $children = $self->{child_windows} ) {
+   if( $children ) {
       foreach my $child ( @$children ) {
          next unless $child; # weakrefs; may be undef
          next if $focus_child and $child == $focus_child;
@@ -431,8 +466,10 @@ sub _handle_mouse
          my $child_line = $line - $child->top;
          my $child_col  = $col  - $child->left;
 
-         next if $child_line < 0 or $child_line >= $child->lines;
-         next if $child_col  < 0 or $child_col  >= $child->cols;
+         if( !$child->{steal_input} ) {
+            next if $child_line < 0 or $child_line >= $child->lines;
+            next if $child_col  < 0 or $child_col  >= $child->cols;
+         }
 
          return 1 if $child->_handle_mouse( $ev, $button, $child_line, $child_col );
       }
@@ -945,6 +982,37 @@ sub erasech
 
       $self->{output_column} += $len;
       $count -= $len;
+   }
+}
+
+=head2 $win->clearrect( $rect )
+
+=head2 $win->clearrect( $rect, $pen )
+
+=head2 $win->clearrect( $rect, %attrs )
+
+Erase the content of the window within the given L<Tickit::Rect>. If a
+C<Tickit::Pen> or pen attributes are provided, they are used to override the
+background colour for the erased region.
+
+=cut
+
+sub clearrect
+{
+   my $self = shift;
+   my $rect = shift;
+
+   my $pen = ( @_ == 1 ) ? shift->clone : Tickit::Pen->new( @_ );
+
+   if( $rect->top == 0 and $rect->left == 0 and
+       $rect->bottom == $self->lines and $rect->right == $self->cols ) {
+      $self->clear;
+      return;
+   }
+
+   foreach my $line ( $rect->linerange ) {
+      $self->goto( $line, $rect->left );
+      $self->erasech( $rect->cols, undef, $pen );
    }
 }
 

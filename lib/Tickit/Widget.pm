@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_003';
+our $VERSION = '0.18';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -127,7 +127,7 @@ sub window_gained
 
    $window->set_on_expose( sub {
       my ( $win, $rect ) = @_;
-      $self->_do_clear if $self->CLEAR_BEFORE_RENDER;
+      $self->_do_clear( $rect ) if $self->CLEAR_BEFORE_RENDER;
       $self->render(
          rect => $rect,
          top   => $rect->top,
@@ -251,6 +251,7 @@ sub redraw
 sub _do_clear
 {
    my $self = shift;
+   my ( $rect ) = @_;
    my $window = $self->window or return;
 
    if( my $parentwin = $window->parent ) {
@@ -261,7 +262,7 @@ sub _do_clear
       return 0 if  defined $bg and  defined $parentbg and $bg == $parentbg;
    }
 
-   $window->clear;
+   $window->clearrect( $rect );
    return 1;
 }
 

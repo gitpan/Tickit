@@ -1,16 +1,18 @@
 Revision history for Changes
 
-0.17_003 CHANGES:
-         * Actually -use- pulled-in Alien:: dependencies
+0.18    CHANGES:
+         * Re-implement Term and Pen in XS/C using libtickit (bundled source
+           pkg-config driven build)
+         * Defined a new Tickit::WidgetRole::Penable
+         * Added $rect->linerange
+         * Added $win->clearrect
+         * Added $win->make_popup to create on-top floating input-stealing
+           Windows
 
-0.17_002 CHANGES:
-         * Add Alien::libtermkey and Alien::unibilium to configure_requires of
-           generated META.{yml,json} so that CPAN smokers will find it easier
-           test them
-
-0.17_001 CHANGES:
-         * Complete reimplementation of Tickit::Term layer based on (bundled)
-           libtickit C library.
+        BUGFIXES:
+         * Disallow $win->scrollrect if there are any floating windows in the
+           way
+         * Perform $win->erasech with the entire pen in case 'rv' is set
 
 0.17    CHANGES:
          * $win->hide, $win->show and the concept of hidden windows

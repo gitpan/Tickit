@@ -10,7 +10,7 @@ use warnings;
 
 use List::Util qw( min max );
 
-our $VERSION = '0.17_003';
+our $VERSION = '0.18';
 
 =head1 NAME
 
@@ -129,6 +129,20 @@ sub cols  { $_[0]->[3] }
 
 sub bottom { $_[0]->[0] + $_[0]->[2] }
 sub right  { $_[0]->[1] + $_[0]->[3] }
+
+=head2 @lines = $rect->linerange
+
+A convenient shortcut to generate the list of lines covered; being
+
+ $rect->top .. $rect->bottom - 1
+
+=cut
+
+sub linerange
+{
+   my $self = shift;
+   return $self->top .. $self->bottom - 1;
+}
 
 use overload '""' => sub {
    my $self = shift;

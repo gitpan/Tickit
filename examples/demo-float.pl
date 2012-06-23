@@ -19,7 +19,7 @@ my $win = $rootwin->make_sub( 5, 5, $rootwin->lines - 10, $rootwin->cols - 10 );
 $win->set_on_expose( sub {
    my ( $self, $rect ) = @_;
 
-   foreach my $line ( $rect->top .. $rect->bottom - 1 ) {
+   foreach my $line ( $rect->linerange ) {
       $self->goto( $line, 0 );
       $self->print( "Here is some content for line $line " .
          "X" x ( $self->cols - 30 ),

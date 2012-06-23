@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 37;
+use Test::More tests => 38;
 use Test::Identity;
 use Test::Refcount;
 
@@ -115,6 +115,12 @@ my $bluepen = Tickit::Pen->new( fg => 4 );
    is( $changed, 1, '$changed 1 after copy ->default_from' );
    identical( $changed_pen, $copy, '$changed_pen after copy ->default_from' );
 }
+
+my $norv_pen = Tickit::Pen->new( rv => 0 );
+$norv_pen->default_from( Tickit::Pen->new( rv => 1 ) );
+is_deeply( { $norv_pen->getattrs },
+           { rv => '' },
+           'pen ->default_from does not overwrite defined-but-false attributes' );
 
 package PenObserver;
 

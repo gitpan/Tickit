@@ -262,14 +262,19 @@ SV *
 _new(package)
   char *package
   INIT:
-    Tickit__Pen self;
+    Tickit__Pen  self;
+    TickitPen   *pen;
   CODE:
+    pen = tickit_pen_new();
+    if(!pen)
+      XSRETURN_UNDEF;
+
     Newx(self, 1, struct Tickit__Pen);
     RETVAL = newSV(0);
     sv_setref_pv(RETVAL, "Tickit::Pen", self);
     self->self = newSVsv(RETVAL);
 
-    self->pen = tickit_pen_new();
+    self->pen = pen;
     self->observers = NULL;
   OUTPUT:
     RETVAL
@@ -453,14 +458,19 @@ SV *
 _new(package,termtype)
   char *termtype;
   INIT:
-    Tickit__Term self;
+    Tickit__Term  self;
+    TickitTerm   *tt;
   CODE:
+    tt = tickit_term_new_for_termtype(termtype);
+    if(!tt)
+      XSRETURN_UNDEF;
+
     Newx(self, 1, struct Tickit__Term);
     RETVAL = newSV(0);
     sv_setref_pv(RETVAL, "Tickit::Term", self);
     self->self = newSVsv(RETVAL);
 
-    self->tt = tickit_term_new_for_termtype(termtype);
+    self->tt = tt;
     self->input_handle  = NULL;
     self->output_handle = NULL;
     self->output_func = NULL;
@@ -705,6 +715,8 @@ scrollrect(self,top,left,lines,cols,downward,rightward)
   int           rightward
   CODE:
     RETVAL = tickit_term_scrollrect(self->tt, top, left, lines, cols, downward, rightward);
+  OUTPUT:
+    RETVAL
 
 void
 chpen(self,...)

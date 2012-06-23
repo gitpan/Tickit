@@ -8,7 +8,7 @@ package Tickit::Utils;
 use strict;
 use warnings;
 
-our $VERSION = '0.17_003';
+our $VERSION = '0.18';
 
 use Exporter 'import';
 our @EXPORT_OK = qw(

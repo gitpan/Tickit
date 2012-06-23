@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 26;
+use Test::More tests => 27;
 
 use Tickit::Rect;
 
@@ -21,6 +21,8 @@ is( $rect->lines,   7, '$rect->lines' );
 is( $rect->cols,   20, '$rect->cols' );
 is( $rect->bottom, 12, '$rect->bottom' );
 is( $rect->right,  30, '$rect->right' );
+
+is_deeply( [ $rect->linerange ], [ 5 .. 11 ], '$rect->linerange' );
 
 my $subrect;
 

@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 50;
+use Test::More tests => 52;
 
 use Tickit::Test;
 
@@ -127,6 +127,18 @@ is_display( [ BLANKLINES(3),
               BLANKLINE,
               [BLANK(13), TEXT("Hello",b=>1), TEXT("large",fg=>1,b=>1), TEXT("world",b=>1,u=>1), BLANK(4,bg=>6)] ],
             'Display after $win->clearline' );
+
+$win->clearrect( Tickit::Rect->new( top => 1, left => 4, lines => 2, cols => 10 ) );
+
+is_termlog( [ GOTO(4,14), SETBG(4), ERASECH(10),
+              GOTO(5,14), SETBG(4), ERASECH(10) ],
+            'Termlog after $win->clearrect' );
+
+is_display( [ BLANKLINES(3),
+              [BLANK(10), BLANK(30,bg=>4)],
+              [BLANK(14), BLANK(10,bg=>4)],
+              [BLANK(13), TEXT("H",b=>1), BLANK(10,bg=>4), TEXT("orld",b=>1,u=>1), BLANK(4,bg=>6)] ],
+            'Display after $win->clearrect' );
 
 $win->clear;
 
