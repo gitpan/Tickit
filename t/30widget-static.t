@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 18;
+use Test::More tests => 19;
 
 use Tickit::Test;
 
@@ -97,3 +97,12 @@ flush_tickit;
 
 is_display( [ [BLANK(85,bg=>4), TEXT("Changed message",bg=>4)] ],
             'Display redrawn after chpen bg' );
+
+$static->set_text( "A message\nwith\nmultiple lines" );
+
+flush_tickit;
+
+is_display( [ [BLANK(91,bg=>4), TEXT("A message",bg=>4)],
+              [BLANK(96,bg=>4), TEXT("with",bg=>4)],
+              [BLANK(86,bg=>4), TEXT("multiple lines",bg=>4)] ],
+            'Display redrawn for multiple-line text' );

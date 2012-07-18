@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 
 use Carp;
 
@@ -862,6 +862,7 @@ sub goto
    }
 
    $win->term->goto( $line, $col );
+   $win->_needs_flush;
 }
 
 =head2 $win->print( $text, $pen )
@@ -893,6 +894,7 @@ sub print
 
    my $need_goto = 0;
    my ( $abs_top, $abs_left );
+   my $need_flush = 0;
 
    while( length $text ) {
       my ( $vis, $len ) = $self->_get_span_visibility( $line, $self->{output_column} );
@@ -914,6 +916,8 @@ sub print
 
          $term->setpen( $pen );
          $term->print( $chunk );
+
+         $need_flush = 1;
       }
       else {
          # TODO: $term->move( undef, $len )
@@ -922,6 +926,8 @@ sub print
 
       $self->{output_column} += $len;
    }
+
+   $self->root->_needs_flush if $need_flush;
 }
 
 =head2 $win->erasech( $count, $moveend, $pen )
@@ -958,6 +964,7 @@ sub erasech
 
    my $need_goto = 0;
    my ( $abs_top, $abs_left );
+   my $need_flush = 0;
 
    while( $count ) {
       my ( $vis, $len ) = $self->_get_span_visibility( $line, $self->{output_column} );
@@ -975,6 +982,8 @@ sub erasech
 
          $term->setpen( $pen );
          $term->erasech( $len, $moveend );
+
+         $need_flush = 1;
       }
       else {
          $need_goto = 1;
@@ -983,6 +992,8 @@ sub erasech
       $self->{output_column} += $len;
       $count -= $len;
    }
+
+   $self->root->_needs_flush if $need_flush;
 }
 
 =head2 $win->clearrect( $rect )
@@ -1075,8 +1086,11 @@ sub scrollrect
 
    $term->setpen( bg => $pen->getattr( 'bg' ) );
 
-   return $term->scrollrect( $top, $left, $lines, $cols,
+   return 0 unless $term->scrollrect( $top, $left, $lines, $cols,
       $downward, $rightward );
+
+   $win->_needs_flush;
+   return 1;
 }
 
 =head2 $success = $win->scroll( $downward, $rightward )
@@ -1181,7 +1195,7 @@ sub restore
       $root->_gain_focus;
    }
 
-   $term->flush;
+   $root->_needs_flush;
 }
 
 =head2 $win->clearline( $line )
@@ -1221,7 +1235,22 @@ sub clear
       my $term = $self->term;
       $term->setpen( $self->get_effective_pen );
       $term->clear;
+
+      $self->_needs_flush;
    }
+}
+
+sub _needs_flush
+{
+   my $self = shift;
+   return if $self->{flush_queued};
+
+   $self->tickit->later( sub {
+      $self->term->flush;
+      undef $self->{flush_queued};
+   } );
+
+   $self->{flush_queued}++;
 }
 
 use overload

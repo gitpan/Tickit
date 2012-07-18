@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 38;
+use Test::More tests => 41;
 use Test::Identity;
 use Test::Refcount;
 
@@ -15,6 +15,8 @@ my $changed_pen;
 my $changed_id;
 
 isa_ok( $pen, "Tickit::Pen", '$pen isa Tickit::Pen' );
+
+is( "$pen", "Tickit::Pen={}", '"$pen" empty' );
 
 my $id = [];
 is_oneref( $id, 'Pen $id has refcount 1 before ->add_on_changed' );
@@ -36,6 +38,8 @@ $pen->chattr( fg => 3 );
 is_deeply( { $pen->getattrs }, { fg => 3 }, '$pen attrs after chattr' );
 ok( $pen->hasattr( 'fg' ), '$pen now has fg' );
 is( $pen->getattr( 'fg' ), 3, '$pen fg after chattr' );
+
+is( "$pen", "Tickit::Pen={fg=3}", '"$pen" after chattr' );
 
 is_deeply( { $pen->clone->getattrs }, { $pen->getattrs }, '$pen->clone attrs' );
 
@@ -87,6 +91,8 @@ $pen = Tickit::Pen->new( fg => 1, bg => 2 );
 is_deeply( { $pen->getattrs }, { fg => 1, bg => 2 }, '$pen initial attrs' );
 
 is( $pen->getattr( 'fg' ), 1, '$pen fg initially 1' );
+
+is( "$pen", "Tickit::Pen={fg=1,bg=2}", '"$pen" fg+bg' );
 
 my $bluepen = Tickit::Pen->new( fg => 4 );
 

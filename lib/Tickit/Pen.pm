@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 
 use Carp;
 
@@ -206,6 +206,20 @@ not weakened.
 Remove an observer previously added by C<add_on_changed>.
 
 =cut
+
+use overload '""' => "STRING";
+
+sub STRING
+{
+   my $self = shift;
+
+   return ref($self) . "={" . join( ",", map {
+      $self->hasattr($_) ? "$_=" . $self->getattr($_) : () 
+   } @ALL_ATTRS ) . "}";
+}
+
+use Scalar::Util qw( refaddr );
+use overload '==' => sub { refaddr($_[0]) == refaddr($_[1]) };
 
 =head1 AUTHOR
 

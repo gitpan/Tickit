@@ -2,6 +2,12 @@
 
 use strict;
 
+BEGIN {
+   # We need to force TERM=xterm so that we can guarantee the right byte
+   # sequences for testing
+   $ENV{TERM} = "xterm";
+}
+
 use Test::More tests => 37;
 use Test::HexString;
 

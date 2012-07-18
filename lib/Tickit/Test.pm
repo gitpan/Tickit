@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 
 use Exporter 'import';
 
@@ -245,7 +245,7 @@ test scripts.
 sub _pen2string
 {
    my $pen = shift;
-   return "{" . join( ",", map { defined $pen->{$_} ? "$_=$pen->{$_}" : "!$_" } sort keys %$pen ) . "}";
+   return "{" . join( ",", map { defined $pen->{$_} ? "$_=" . ($pen->{$_} || 0) : "!$_" } sort keys %$pen ) . "}";
 }
 
 =head2 is_termlog( $log, $name )

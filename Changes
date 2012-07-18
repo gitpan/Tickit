@@ -1,5 +1,13 @@
 Revision history for Changes
 
+0.19    CHANGES:
+         * Allow multi-line Static text
+         * Added a stringification overload to Pen to make unit testing easier
+
+        BUGFIXES:
+         * Better terminal flushing
+         * Force TERM=xterm during t/0term-output.t
+
 0.18    CHANGES:
          * Re-implement Term and Pen in XS/C using libtickit (bundled source
            pkg-config driven build)

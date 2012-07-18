@@ -151,6 +151,8 @@ is_termlog( [ SETBG(undef),
 
 $win->clear;
 
+flush_tickit;
+
 is_termlog( [ SETPEN(fg => 3),
               CLEAR ],
             'Termlog cleared' );

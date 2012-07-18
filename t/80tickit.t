@@ -63,7 +63,6 @@ $tickit->setup_term;
 
 # Gut-wrenching
 $tickit->_flush_later;
-$term->flush;
 
 # These strings are fragile but there's not much else we can do for an end-to-end
 # test. If this unit test breaks likely these strings need updating. Sorry.

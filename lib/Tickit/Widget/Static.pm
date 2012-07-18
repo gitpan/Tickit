@@ -7,11 +7,14 @@ package Tickit::Widget::Static;
 
 use strict;
 use warnings;
-use base qw( Tickit::OneLineWidget );
-use Tickit::WidgetRole::Alignable;
+use base qw( Tickit::Widget );
 
-our $VERSION = '0.18';
+use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
+use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
+our $VERSION = '0.19';
+
+use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );
 
 =head1 NAME
@@ -37,7 +40,9 @@ C<Tickit::Widget::Static> - a widget displaying static text
 
 =head1 DESCRIPTION
 
-This class provides a widget which displays a single piece of static text.
+This class provides a widget which displays a single piece of static text. The
+text may contain more than one line, separated by linefeed (C<\n>) characters.
+No other control sequences are allowed in the string.
 
 =cut
 
@@ -81,6 +86,7 @@ sub new
 
    $self->set_text( $args{text} );
    $self->set_align( $args{align} || 0 );
+   $self->set_valign( $args{valign} || 0 );
 
    return $self;
 }
@@ -89,10 +95,16 @@ sub new
 
 =cut
 
+sub lines
+{
+   my $self = shift;
+   return scalar @{ $self->{lines} };
+}
+
 sub cols
 {
    my $self = shift;
-   return textwidth( $self->{text} );
+   return max map { textwidth $_ } @{ $self->{lines} }
 }
 
 =head2 $text = $static->text
@@ -102,7 +114,7 @@ sub cols
 sub text
 {
    my $self = shift;
-   return $self->{text};
+   return join "\n", @{ $self->{lines} };
 }
 
 =head2 $static->set_text( $text )
@@ -114,7 +126,8 @@ Accessor for C<text> property; the actual text on display in the widget
 sub set_text
 {
    my $self = shift;
-   ( $self->{text} ) = @_;
+   my ( $text ) = @_;
+   $self->{lines} = [ split m/\n/, $text ];
    $self->resized;
    $self->redraw;
 }
@@ -136,17 +149,33 @@ See also L<Tickit::WidgetRole::Alignable>.
 
 use constant CLEAR_BEFORE_RENDER => 0;
 
-sub render_line
+sub render
 {
    my $self = shift;
-   my $window = $self->window;
+   my %args = @_;
 
-   my $text = $self->{text};
-   my ( $left, $textwidth, $right ) = $self->_align_allocation( textwidth( $text ), $window->cols );
+   my $win = $self->window;
+   $win->is_visible or return;
+   my $rect = $args{rect};
 
-   $window->erasech( $left, 1 ) if $left;
-   $window->print( substrwidth $text, 0, $textwidth );
-   $window->erasech( $right ) if $right;
+   my $cols = $win->cols;
+
+   my ( $above, $lines ) = $self->_valign_allocation( $self->lines, $win->lines );
+
+   $win->goto( $_, 0 ), $win->erasech( $cols ) for $rect->top .. $above - 1;
+
+   foreach my $line ( 0 .. $lines - 1 ) {
+      my $text = $self->{lines}[$line];
+
+      my ( $left, $textwidth, $right ) = $self->_align_allocation( textwidth( $text ), $cols );
+
+      $win->goto( $above + $line, 0 );
+      $win->erasech( $left, 1 ) if $left;
+      $win->print( substrwidth $text, 0, $textwidth );
+      $win->erasech( $right ) if $right;
+   }
+
+   $win->goto( $_, 0 ), $win->erasech( $cols ) for $above + $lines .. $rect->bottom - 1;
 }
 
 =head1 AUTHOR
