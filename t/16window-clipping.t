@@ -2,11 +2,90 @@
 
 use strict;
 
-use Test::More tests => 28;
+use Test::More tests => 40;
 
 use Tickit::Test;
 
 my $rootwin = mk_window;
+
+# Off the top
+$rootwin->goto( -1, 0 );
+$rootwin->print( "Clipping off top" );
+
+is_termlog( [],
+            'Termlog empty for window goto off top' );
+
+is_display( [],
+            'Display empty for window goto off top' );
+
+# Off the bottom
+$rootwin->goto( 28, 0 );
+$rootwin->print( "Clipping off bottom" );
+
+is_termlog( [],
+            'Termlog empty for window goto off bottom' );
+
+is_display( [],
+            'Display empty for window goto off bottom' );
+
+# Clip to the left
+$rootwin->goto( 0, -7 );
+$rootwin->print( "Clipping off left" );
+
+is_termlog( [ GOTO(0,0),
+              SETPEN,
+              PRINT("g off left") ],
+            'Termlog for window goto off left' );
+
+is_display( [ [TEXT("g off left")], ],
+            'Display for window goto off left' );
+
+$rootwin->clear;
+drain_termlog;
+
+# Boundary conditions
+$rootwin->goto( 0, -1 );
+$rootwin->print( "A" );
+$rootwin->print( "B" );
+
+is_termlog( [ GOTO(0,0),
+              SETPEN,
+              PRINT("B") ],
+            'Termlog for window left boundary condition' );
+
+is_display( [ [TEXT("B")], ],
+            'Display for window left boundary condition' );
+
+$rootwin->clear;
+drain_termlog;
+
+# Clip to the right
+$rootwin->goto( 0, 73 );
+$rootwin->print( "Clipping off right" );
+
+is_termlog( [ GOTO(0,73),
+              SETPEN,
+              PRINT("Clippin") ],
+            'Termlog for window goto clip right' );
+
+is_display( [ [BLANK(73), TEXT("Clippin")], ],
+            'Display for window goto clip right' );
+
+$rootwin->clear;
+drain_termlog;
+
+# Off the right
+$rootwin->goto( 0, 85 );
+$rootwin->print( "Entirely missing" );
+
+is_termlog( [],
+            'Termlog empty for window goto off right' );
+
+is_display( [],
+            'Display empty for window goto off right' );
+
+$rootwin->clear;
+drain_termlog;
 
 my $win;
 

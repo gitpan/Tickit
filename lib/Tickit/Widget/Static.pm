@@ -12,7 +12,7 @@ use base qw( Tickit::Widget );
 use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );
@@ -127,7 +127,10 @@ sub set_text
 {
    my $self = shift;
    my ( $text ) = @_;
-   $self->{lines} = [ split m/\n/, $text ];
+   my @lines = split m/\n/, $text;
+   # split on empty string returns empty list
+   @lines = ( "" ) if !@lines;
+   $self->{lines} = \@lines;
    $self->resized;
    $self->redraw;
 }

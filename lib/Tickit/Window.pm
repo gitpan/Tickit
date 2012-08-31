@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 use Carp;
 
@@ -832,7 +832,11 @@ sub _get_span_visibility
 =head2 $win->goto( $line, $col )
 
 Moves the cursor to the given position within the window. Both C<$line> and
-C<$col> are 0-based.
+C<$col> are 0-based. The given position does not have to lie within the bounds
+of the window. Lines above or below the window are never displayed, columns to
+the left or right are clipped as appropriate. The virtual position of the
+cursor is still tracked even if it is not visibly displayed on the actual
+terminal.
 
 =cut
 
@@ -843,10 +847,11 @@ sub goto
 
    $win->{output_line}   = $line;
    $win->{output_column} = $col;
+   $win->{output_needs_goto} = 0;
 
    while( $win ) {
-      $line >= 0 and $line < $win->lines or croak '$line out of bounds';
-      $col  >= 0 and $col  < $win->cols  or croak '$col out of bounds';
+      return if $line < 0 or $line >= $win->lines;
+      return if $col  < 0 or $col  >= $win->cols;
 
       return unless $win->{visible};
 
@@ -854,10 +859,6 @@ sub goto
       $col  += $win->left;
 
       my $parent = $win->parent or last;
-
-      return if $line < 0 or $line >= $parent->lines;
-      return if $col  < 0 or $col  >= $parent->cols;
-
       $win = $parent;
    }
 
@@ -892,7 +893,7 @@ sub print
    my $line = $self->{output_line};
    my $term = $self->term;
 
-   my $need_goto = 0;
+   my $need_goto = $self->{output_needs_goto};
    my ( $abs_top, $abs_left );
    my $need_flush = 0;
 
@@ -912,6 +913,7 @@ sub print
             $abs_top  //= $self->abs_top;
             $abs_left //= $self->abs_left;
             $term->goto( $abs_top + $line, $abs_left + $self->{output_column} );
+            $need_goto = 0;
          }
 
          $term->setpen( $pen );
@@ -928,6 +930,7 @@ sub print
    }
 
    $self->root->_needs_flush if $need_flush;
+   $self->{output_needs_goto} = $need_goto;
 }
 
 =head2 $win->erasech( $count, $moveend, $pen )
@@ -962,7 +965,7 @@ sub erasech
    my $line = $self->{output_line};
    my $term = $self->term;
 
-   my $need_goto = 0;
+   my $need_goto = $self->{output_needs_goto};
    my ( $abs_top, $abs_left );
    my $need_flush = 0;
 
@@ -978,6 +981,7 @@ sub erasech
             $abs_top  //= $self->abs_top;
             $abs_left //= $self->abs_left;
             $term->goto( $abs_top + $line, $abs_left + $self->{output_column} );
+            $need_goto = 0;
          }
 
          $term->setpen( $pen );
@@ -994,6 +998,7 @@ sub erasech
    }
 
    $self->root->_needs_flush if $need_flush;
+   $self->{output_needs_goto} = $need_goto;
 }
 
 =head2 $win->clearrect( $rect )

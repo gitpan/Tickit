@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 19;
+use Test::More tests => 21;
 
 use Tickit::Test;
 
@@ -106,3 +106,8 @@ is_display( [ [BLANK(91,bg=>4), TEXT("A message",bg=>4)],
               [BLANK(96,bg=>4), TEXT("with",bg=>4)],
               [BLANK(86,bg=>4), TEXT("multiple lines",bg=>4)] ],
             'Display redrawn for multiple-line text' );
+
+$static->set_text( "" );
+
+is( $static->lines, 1, 'Static with empty text still consumes 1 line' );
+is( $static->cols,  0, 'Static with empty text consumes 0 columns defined' );

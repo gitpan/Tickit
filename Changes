@@ -1,5 +1,15 @@
 Revision history for Changes
 
+0.20    CHANGES:
+         * Allow $win->goto outside of its edges, apply clipping
+         * Removed Tickit::Widget::Entry; now found in the Tickit-Widgets
+           distribution
+         * Updated for latest libtickit
+
+        BUGFIXES:
+         * Ensure that Static widgets with empty text still behave correctly
+         * Fix test skip counts in t/02utils.t
+
 0.19    CHANGES:
          * Allow multi-line Static text
          * Added a stringification overload to Pen to make unit testing easier

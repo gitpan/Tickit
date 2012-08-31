@@ -109,11 +109,11 @@ stream_is( "\e[?1049l", '$term->mode_altscreen( 0 )' );
 
 $stream = "";
 $term->mode_mouse( 1 );
-stream_is( "\e[?1002h", '$term->mode_mouse( 1 )' );
+stream_is( "\e[?1002h\e[?1006h", '$term->mode_mouse( 1 )' );
 
 $stream = "";
 $term->mode_mouse( 0 );
-stream_is( "\e[?1002l", '$term->mode_mouse( 0 )' );
+stream_is( "\e[?1002l\e[?1006l", '$term->mode_mouse( 0 )' );
 
 # Reset the pen
 $term->setpen;

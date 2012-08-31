@@ -12,7 +12,7 @@ use base qw( Tickit::SingleChildWidget );
 use Tickit::WidgetRole::Alignable name => "title_align";
 use Tickit::WidgetRole::Penable name => "frame";
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 use Carp;
 
@@ -148,7 +148,7 @@ sub style
    return $self->{style};
 }
 
-=head2 $frame->style( $style )
+=head2 $frame->set_style( $style )
 
 Accessor for the C<style> property, which controls the way the actual frame is
 drawn around the inner widget. Must be one of the following names:

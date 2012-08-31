@@ -16,10 +16,12 @@ BEGIN {
    import constant CAN_UNICODE => $CAN_UNICODE;
 }
 
-use Test::More tests => 34;
+use Test::More tests => 35;
 
 # An invalid UTF-8 string
 my $BAD_UTF8 = do { no utf8; "foo\xA9bar" };
+
+my $CJK_UTF8 = do { use utf8; "(ノಠ益ಠ)ノ彡┻━┻" };
 
 use Tickit::Utils qw(
    textwidth
@@ -32,13 +34,15 @@ use Tickit::Utils qw(
 is( textwidth( "" ),            0, 'textwidth empty' );
 is( textwidth( "ABC" ),         3, 'textwidth ASCII' );
 SKIP: {
-   skip "No Unicode", 3 unless CAN_UNICODE;
+   skip "No Unicode", 6 unless CAN_UNICODE;
 
    is( textwidth( "cafe\x{301}" ), 4, 'textwidth combining' );
 
    is( textwidth( "caf\x{fffd}" ), 4, 'U+FFFD counts as width 1' );
 
    is( textwidth( $BAD_UTF8 ), 7, 'Invalid UTF-8 counts as width 1' );
+
+   is( textwidth( $CJK_UTF8 ), 15, 'CKJ UTF-8 counts as width 15');
 
    is( textwidth( "\x1b" ), undef, 'C0 control is invalid for textwidth' );
    is( textwidth( "\x9b" ), undef, 'C1 control is invalid for textwidth' );
@@ -48,7 +52,7 @@ is_deeply( [ chars2cols "ABC", 0, 1, 3, 4 ],
            [ 0, 1, 3, 3 ],
            'chars2cols ASCII' );
 SKIP: {
-   skip "No Unicode", 3 unless CAN_UNICODE;
+   skip "No Unicode", 5 unless CAN_UNICODE;
 
    is_deeply( [ chars2cols "cafe\x{301}", 3, 4, 5, 6 ],
               [ 3, 3, 4, 4 ],
@@ -74,7 +78,7 @@ is_deeply( [ cols2chars "ABC", 0, 1, 3, 4 ],
            [ 0, 1, 3, 3 ],
            'cols2chars ASCII' );
 SKIP: {
-   skip "No Unicode", 3 unless CAN_UNICODE;
+   skip "No Unicode", 5 unless CAN_UNICODE;
 
    is_deeply( [ cols2chars "cafe\x{301}", 3, 4, 5 ],
               [ 3, 5, 5 ],

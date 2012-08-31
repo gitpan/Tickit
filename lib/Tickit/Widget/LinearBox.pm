@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 use List::Util qw( sum );
 
@@ -124,10 +124,14 @@ sub redistribute_child_windows
    $self->foreach_child( sub {
       my ( $child, %opts ) = @_;
 
-      $base{$child} = defined $opts{force_size} ? $opts{force_size} 
-                                                : $self->get_child_base( $child );
+      my $base = defined $opts{force_size} ? $opts{force_size} 
+                                           : $self->get_child_base( $child );
+      warn "Child $child did not define a base size for $self\n", $base = 0
+         unless defined $base;
 
-      $spare -= $base{$child};
+      $base{$child} = $base;
+
+      $spare -= $base;
       $expand_total += $opts{expand};
    } );
 

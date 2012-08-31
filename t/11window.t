@@ -2,8 +2,7 @@
 
 use strict;
 
-use Test::More tests => 43;
-use Test::Fatal;
+use Test::More tests => 41;
 use Test::Identity;
 use Test::Refcount;
 
@@ -56,12 +55,6 @@ is( $win->lines, 4, '$win->lines is 4 after resize' );
 is( $win->cols, 15, '$win->cols is 15 after resize' );
 
 is( $geom_changed, 1, '$reshaped is 1 after resize' );
-
-ok( exception { $win->goto( 6, 1 ) },
-   '$win->goto out of line bounds' );
-
-ok( exception { $win->goto( 0, 50 ) },
-   '$win->goto out of col bounds' );
 
 my $subwin = $win->make_sub( 2, 2, 1, 10 );
 
