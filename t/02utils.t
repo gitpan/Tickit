@@ -16,7 +16,7 @@ BEGIN {
    import constant CAN_UNICODE => $CAN_UNICODE;
 }
 
-use Test::More tests => 35;
+use Test::More tests => 61;
 
 # An invalid UTF-8 string
 my $BAD_UTF8 = do { no utf8; "foo\xA9bar" };
@@ -24,12 +24,57 @@ my $BAD_UTF8 = do { no utf8; "foo\xA9bar" };
 my $CJK_UTF8 = do { use utf8; "(ノಠ益ಠ)ノ彡┻━┻" };
 
 use Tickit::Utils qw(
+   string_count
+   string_countmore
+
    textwidth
    chars2cols
    cols2chars
    substrwidth
    align
 );
+use Tickit::StringPos;
+
+{
+   my $pos = Tickit::StringPos->zero;
+
+   ok( ref $pos, '$pos isa ref' );
+
+   is( $pos->bytes,      0, '$pos->bytes is 0' );
+   is( $pos->codepoints, 0, '$pos->codepoints is 0' );
+   is( $pos->graphemes,  0, '$pos->graphemes is 0' );
+   is( $pos->columns,    0, '$pos->columns is 0' );
+
+   is( string_count( "", $pos ), 0, 'string_count("") is 0' );
+
+   is( string_count( "ABC", $pos ), 3, 'string_count("ABC") is 3' );
+
+   is( $pos->bytes,      3, '$pos->bytes is 3 after count "ABC"' );
+   is( $pos->codepoints, 3, '$pos->codepoints is 3 after count "ABC"' );
+   is( $pos->graphemes,  3, '$pos->graphemes is 3 after count "ABC"' );
+   is( $pos->columns,    3, '$pos->columns is 3 after count "ABC"' );
+
+   is( string_countmore( "DEF", $pos ), 3, 'string_count("DEF") is 3' );
+
+   is( $pos->bytes,      6, '$pos->bytes is 6 after countmore "DEF"' );
+   is( $pos->codepoints, 6, '$pos->codepoints is 6 after countmore "DEF"' );
+   is( $pos->graphemes,  6, '$pos->graphemes is 6 after countmore "DEF"' );
+   is( $pos->columns,    6, '$pos->columns is 6 after countmore "DEF"' );
+
+   my $limit = Tickit::StringPos->limit_bytes( 5 );
+
+   is( $limit->bytes,       5, '$limit->bytes is 5' );
+   is( $limit->codepoints, -1, '$limit->codepoints is -1' );
+   is( $limit->graphemes,  -1, '$limit->graphemes is -1' );
+   is( $limit->columns,    -1, '$limit->columns is -1' );
+
+   is( string_countmore( "ABCDEFGHI", $pos, undef, 6 ), 3, 'string_countmore("ABCDEFGHI") start=6 yields 3' );
+
+   is( $pos->bytes,      9, '$pos->bytes is 9 after countmore with start' );
+   is( $pos->codepoints, 9, '$pos->codepoints is 9 after countmore with start' );
+   is( $pos->graphemes,  9, '$pos->graphemes is 9 after countmore with start' );
+   is( $pos->columns,    9, '$pos->columns is 9 after countmore with start' );
+}
 
 is( textwidth( "" ),            0, 'textwidth empty' );
 is( textwidth( "ABC" ),         3, 'textwidth ASCII' );
@@ -46,6 +91,7 @@ SKIP: {
 
    is( textwidth( "\x1b" ), undef, 'C0 control is invalid for textwidth' );
    is( textwidth( "\x9b" ), undef, 'C1 control is invalid for textwidth' );
+   is( textwidth( "\x7f" ), undef, 'DEL is invalid for textwidth' );
 }
 
 is_deeply( [ chars2cols "ABC", 0, 1, 3, 4 ],

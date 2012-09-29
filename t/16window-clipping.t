@@ -2,15 +2,17 @@
 
 use strict;
 
-use Test::More tests => 40;
+use Test::More tests => 44;
 
 use Tickit::Test;
 
 my $rootwin = mk_window;
 
+my $pos;
+
 # Off the top
 $rootwin->goto( -1, 0 );
-$rootwin->print( "Clipping off top" );
+$pos = $rootwin->print( "Clipping off top" );
 
 is_termlog( [],
             'Termlog empty for window goto off top' );
@@ -18,9 +20,11 @@ is_termlog( [],
 is_display( [],
             'Display empty for window goto off top' );
 
+is( $pos->columns, 16, '$pos->columns is 16 for print off top' );
+
 # Off the bottom
 $rootwin->goto( 28, 0 );
-$rootwin->print( "Clipping off bottom" );
+$pos = $rootwin->print( "Clipping off bottom" );
 
 is_termlog( [],
             'Termlog empty for window goto off bottom' );
@@ -28,9 +32,11 @@ is_termlog( [],
 is_display( [],
             'Display empty for window goto off bottom' );
 
+is( $pos->columns, 19, '$pos->columns is 19 for print off bottom' );
+
 # Clip to the left
 $rootwin->goto( 0, -7 );
-$rootwin->print( "Clipping off left" );
+$pos =$rootwin->print( "Clipping off left" );
 
 is_termlog( [ GOTO(0,0),
               SETPEN,
@@ -39,6 +45,8 @@ is_termlog( [ GOTO(0,0),
 
 is_display( [ [TEXT("g off left")], ],
             'Display for window goto off left' );
+
+is( $pos->columns, 17, '$pos->columns is 17 for print off left' );
 
 $rootwin->clear;
 drain_termlog;
@@ -61,7 +69,7 @@ drain_termlog;
 
 # Clip to the right
 $rootwin->goto( 0, 73 );
-$rootwin->print( "Clipping off right" );
+$pos = $rootwin->print( "Clipping off right" );
 
 is_termlog( [ GOTO(0,73),
               SETPEN,
@@ -70,6 +78,8 @@ is_termlog( [ GOTO(0,73),
 
 is_display( [ [BLANK(73), TEXT("Clippin")], ],
             'Display for window goto clip right' );
+
+is( $pos->columns, 18, '$pos->columns is 16 for print off right' );
 
 $rootwin->clear;
 drain_termlog;

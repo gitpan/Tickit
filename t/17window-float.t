@@ -2,13 +2,15 @@
 
 use strict;
 
-use Test::More tests => 23;
+use Test::More tests => 26;
 use Test::Identity;
 use Test::Refcount;
 
 use Tickit::Test;
 
 my $rootwin = mk_window;
+
+my $pos;
 
 my $floatwin = $rootwin->make_float( 10, 10, 5, 30 );
 
@@ -30,7 +32,7 @@ is_deeply( [ $floatwin->_get_span_visibility( 0, 20 ) ],
            [ 1, 10 ], '$floatwin 0,20 is visible for 10 columns' );
 
 $rootwin->goto( 10, 0 );
-$rootwin->print( "X" x 80 );
+$pos = $rootwin->print( "X" x 80 );
 
 is_termlog( [ GOTO(10,0),
               SETPEN,
@@ -44,10 +46,12 @@ is_display( [ BLANKLINES(10),
               [TEXT("X"x10), BLANK(30), TEXT("X"x40)] ],
             'Display for print under floating window' );
 
+is( $pos->columns, 80, '$pos->columns is 80 for print under floating window' );
+
 my $win = $rootwin->make_sub( 10, 20, 1, 50 );
 
 $win->goto( 0, 0 );
-$win->print( "Y" x 50 );
+$pos = $win->print( "Y" x 50 );
 
 is_termlog( [ GOTO(10,20),
               GOTO(10,40),
@@ -58,6 +62,8 @@ is_termlog( [ GOTO(10,20),
 is_display( [ BLANKLINES(10),
               [TEXT("X"x10), BLANK(30), TEXT("Y"x30), TEXT("X"x10)] ],
             'Display for print sibling under floating window' );
+
+is( $pos->columns, 50, '$pos->columns is 50 for print sibling under floating window' );
 
 $floatwin->goto( 0, 0 );
 $floatwin->print( "|-- Yipee --|" );
@@ -75,7 +81,7 @@ ok( !$rootwin->scrollrect( 0, 0, 20, 80, 0, +3 ), '$rootwin disallows scrollrect
 
 my $subwin = $floatwin->make_sub( 0, 4, 1, 6 );
 $subwin->goto( 0, 0 );
-$subwin->print( "Byenow" );
+$pos = $subwin->print( "Byenow" );
 
 is_termlog( [ GOTO(10,14),
               SETPEN,
@@ -85,6 +91,8 @@ is_termlog( [ GOTO(10,14),
 is_display( [ BLANKLINES(10),
               [TEXT("X"x10), TEXT("|-- Byenow--|"), BLANK(17), TEXT("Y"x30), TEXT("X"x10)] ],
             'Display for print to child of floating window' );
+
+is( $pos->columns, 6, '$pos->columns is 6 for print to child of floating window' );
 
 $floatwin->hide;
 

@@ -1,2 +1,17 @@
-Tickit::Term T_PTROBJ
-Tickit::Pen  T_PTROBJ
+Tickit::Pen       T_PTROBJ
+Tickit::StringPos T_PTROBJ_OR_NULL
+Tickit::Term      T_PTROBJ
+
+INPUT
+T_PTROBJ_OR_NULL
+        if (!SvOK($arg)) {
+            $var = NULL;
+        }
+        else if (SvROK($arg) && sv_derived_from($arg, \"${ntype}\")) {
+            IV tmp = SvIV((SV*)SvRV($arg));
+            $var = INT2PTR($type,tmp);
+        }
+        else
+            Perl_croak(aTHX_ \"%s: %s is not of type %s\",
+                        ${$ALIAS?\q[GvNAME(CvGV(cv))]:\qq[\"$pname\"]},
+                        \"$var\", \"$ntype\")

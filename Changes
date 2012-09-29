@@ -1,5 +1,13 @@
 Revision history for Changes
 
+0.21    CHANGES:
+         * Wrap tickit_string_count and tickit_string_countmore; provide a
+           Tickit::StringPos counter object
+         * Have $win->print return a Tickit::StringPos
+
+        BUGFIXES:
+         * Don't use_ok Tickit::Widget::Entry
+
 0.20    CHANGES:
          * Allow $win->goto outside of its edges, apply clipping
          * Removed Tickit::Widget::Entry; now found in the Tickit-Widgets

@@ -1,17 +1,20 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2012 -- leonerd@leonerd.org.uk
 
 package Tickit::Utils;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 use Exporter 'import';
 our @EXPORT_OK = qw(
+   string_count
+   string_countmore
+
    textwidth
 
    chars2cols
@@ -36,6 +39,21 @@ This module provides a number of utility functions used across C<Tickit>.
 =cut
 
 =head1 FUNCTIONS
+
+=head2 $bytes = string_count( $str, $pos, $limit )
+
+Given a string in C<$str> and a L<Tickit::StringPos> instance in C<$pos>,
+updates the counters in C<$pos> by counting the string, and returns the number
+of bytes consumed. If C<$limit> is given, then it will count no further than
+any of the limits given.
+
+=head2 $bytes = string_countmore( $str, $pos, $limit, $start )
+
+Similar to C<string_count> but will not zero the counters before it begins.
+Counters in C<$pos> will still be incremented. If C<$start> is provided it
+gives the byte offset within C<$str> to begin counting from. This is more
+efficient than applying C<substr> on the input string to create the starting
+point.
 
 =head2 $cols = textwidth( $str )
 

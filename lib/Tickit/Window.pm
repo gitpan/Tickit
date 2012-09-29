@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 use Carp;
 
@@ -16,7 +16,7 @@ use Scalar::Util qw( weaken );
 
 use Tickit::Pen;
 use Tickit::Rect;
-use Tickit::Utils qw( textwidth cols2chars );
+use Tickit::Utils qw( string_countmore );
 
 =head1 NAME
 
@@ -866,13 +866,17 @@ sub goto
    $win->_needs_flush;
 }
 
-=head2 $win->print( $text, $pen )
+=head2 $pos = $win->print( $text, $pen )
 
-=head2 $win->print( $text, %attrs )
+=head2 $pos = $win->print( $text, %attrs )
 
 Print the given text to the terminal at the current cursor position using the
 pen of the window, possibly overridden by any extra attributes in the given
 C<Tickit::Pen> instance, or directly in the given hash, if one is provided.
+
+Returns a L<Tickit::StringPos> object giving the total count of string
+printed, including in obscured sections covered by other windows, or clipped
+by window boundaries.
 
 =cut
 
@@ -897,22 +901,31 @@ sub print
    my ( $abs_top, $abs_left );
    my $need_flush = 0;
 
-   while( length $text ) {
-      my ( $vis, $len ) = $self->_get_span_visibility( $line, $self->{output_column} );
+   my $pos = Tickit::StringPos->zero;
 
-      last if !$vis and !defined $len;
+   my $total_len = length $text;
 
-      my $len_ch = cols2chars( $text, $len );
-      my $chunk = substr $text, 0, $len_ch, "";
+   while( $pos->codepoints < $total_len ) {
+      my ( $vis, $cols ) = $self->_get_span_visibility( $line, $self->{output_column} + $pos->columns );
 
-      # truncate $len if it was too high
-      $len = length $chunk;
+      if( !$vis and !defined $cols ) {
+         string_countmore( $text, $pos, undef, $pos->bytes );
+         last;
+      }
+
+      my $prev_cp  = $pos->codepoints;
+      my $prev_col = $pos->columns;
+      string_countmore( $text, $pos, Tickit::StringPos->limit_columns( $cols + $pos->columns ), $pos->bytes );
+
+      # TODO: This would be more efficient in bytes, but 'use bytes' breaks
+      # the UTF-8ness of the return value
+      my $chunk = substr $text, $prev_cp, $pos->codepoints - $prev_cp;
 
       if( $vis ) {
          if( $need_goto ) {
             $abs_top  //= $self->abs_top;
             $abs_left //= $self->abs_left;
-            $term->goto( $abs_top + $line, $abs_left + $self->{output_column} );
+            $term->goto( $abs_top + $line, $abs_left + $self->{output_column} + $prev_col );
             $need_goto = 0;
          }
 
@@ -922,15 +935,17 @@ sub print
          $need_flush = 1;
       }
       else {
-         # TODO: $term->move( undef, $len )
+         # TODO: $term->move( undef, $pos->columns - $prev_col )
          $need_goto = 1;
       }
-
-      $self->{output_column} += $len;
    }
+
+   $self->{output_column} += $pos->columns;
 
    $self->root->_needs_flush if $need_flush;
    $self->{output_needs_goto} = $need_goto;
+
+   return $pos;
 }
 
 =head2 $win->erasech( $count, $moveend, $pen )

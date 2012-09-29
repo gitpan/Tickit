@@ -12,7 +12,7 @@ use base qw( Tickit::SingleChildWidget );
 use Tickit::WidgetRole::Alignable name => "title_align";
 use Tickit::WidgetRole::Penable name => "frame";
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 use Carp;
 

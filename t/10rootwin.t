@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 41;
+use Test::More tests => 45;
 use Test::Identity;
 use Test::Refcount;
 
@@ -59,7 +59,7 @@ is( $exposed_rect->lines, 25, '$exposed_rect->lines after exposure' );
 is( $exposed_rect->cols,  80, '$exposed_rect->cols after exposure' );
 
 $win->goto( 2, 3 );
-$win->print( "Hello" );
+my $len = $win->print( "Hello" );
 
 is_termlog( [ GOTO(2,3),
               SETPEN,
@@ -70,6 +70,11 @@ is_display( [ BLANKLINE,
               BLANKLINE,
               [BLANK(3), TEXT("Hello")], ],
             'Display initially' );
+
+is( $len->bytes,      5, '->print()->bytes is 5' );
+is( $len->codepoints, 5, '->print()->codepoints is 5' );
+is( $len->graphemes,  5, '->print()->graphemes is 5' );
+is( $len->columns,    5, '->print()->columns is 5' );
 
 $win->pen->chattr( fg => 3 );
 

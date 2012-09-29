@@ -256,6 +256,19 @@ static void term_output_fn(TickitTerm *tt, const char *bytes, size_t len, void *
   LEAVE;
 }
 
+typedef TickitStringPos *Tickit__StringPos;
+
+static Tickit__StringPos new_stringpos(SV **svp)
+{
+  TickitStringPos *pos;
+
+  Newx(pos, 1, TickitStringPos);
+  *svp = newSV(0);
+  sv_setref_pv(*svp, "Tickit::StringPos", pos);
+
+  return pos;
+}
+
 MODULE = Tickit             PACKAGE = Tickit::Pen
 
 SV *
@@ -451,6 +464,105 @@ remove_on_changed(self,observer)
       tickit_pen_unbind_event_id(self->pen, self->event_id);
       self->event_id = 0;
     }
+
+MODULE = Tickit             PACKAGE = Tickit::StringPos
+
+SV *
+zero(package)
+  char *package;
+  INIT:
+    TickitStringPos *pos;
+  CODE:
+    pos = new_stringpos(&RETVAL);
+    tickit_stringpos_zero(pos);
+  OUTPUT:
+    RETVAL
+
+SV *
+limit_bytes(package,bytes)
+  char *package;
+  size_t bytes;
+  INIT:
+    TickitStringPos *pos;
+  CODE:
+    pos = new_stringpos(&RETVAL);
+    tickit_stringpos_limit_bytes(pos, bytes);
+  OUTPUT:
+    RETVAL
+
+SV *
+limit_codepoints(package,codepoints)
+  char *package;
+  int codepoints;
+  INIT:
+    TickitStringPos *pos;
+  CODE:
+    pos = new_stringpos(&RETVAL);
+    tickit_stringpos_limit_codepoints(pos, codepoints);
+  OUTPUT:
+    RETVAL
+
+SV *
+limit_graphemes(package,graphemes)
+  char *package;
+  int graphemes;
+  INIT:
+    TickitStringPos *pos;
+  CODE:
+    pos = new_stringpos(&RETVAL);
+    tickit_stringpos_limit_graphemes(pos, graphemes);
+  OUTPUT:
+    RETVAL
+
+SV *
+limit_columns(package,columns)
+  char *package;
+  int columns;
+  INIT:
+    TickitStringPos *pos;
+  CODE:
+    pos = new_stringpos(&RETVAL);
+    tickit_stringpos_limit_columns(pos, columns);
+  OUTPUT:
+    RETVAL
+
+void
+DESTROY(self)
+  Tickit::StringPos self
+  CODE:
+    Safefree(self);
+
+size_t
+bytes(self)
+  Tickit::StringPos self;
+  CODE:
+    RETVAL = self->bytes;
+  OUTPUT:
+    RETVAL
+
+int
+codepoints(self)
+  Tickit::StringPos self;
+  CODE:
+    RETVAL = self->codepoints;
+  OUTPUT:
+    RETVAL
+
+int
+graphemes(self)
+  Tickit::StringPos self;
+  CODE:
+    RETVAL = self->graphemes;
+  OUTPUT:
+    RETVAL
+
+int
+columns(self)
+  Tickit::StringPos self;
+  CODE:
+    RETVAL = self->columns;
+  OUTPUT:
+    RETVAL
 
 MODULE = Tickit             PACKAGE = Tickit::Term
 
@@ -795,6 +907,41 @@ set_mode_mouse(self,on)
 
 MODULE = Tickit             PACKAGE = Tickit::Utils
 
+size_t
+string_count(str,pos,limit=NULL)
+    SV *str
+    Tickit::StringPos pos
+    Tickit::StringPos limit
+  CODE:
+    if(!SvUTF8(str)) {
+      str = sv_mortalcopy(str);
+      sv_utf8_upgrade(str);
+    }
+
+    RETVAL = tickit_string_count(SvPVX(str), pos, limit);
+    if(RETVAL == -1)
+      XSRETURN_UNDEF;
+  OUTPUT:
+    RETVAL
+
+size_t
+string_countmore(str,pos,limit=NULL,start=0)
+    SV *str
+    Tickit::StringPos pos
+    Tickit::StringPos limit
+    size_t start
+  CODE:
+    if(!SvUTF8(str)) {
+      str = sv_mortalcopy(str);
+      sv_utf8_upgrade(str);
+    }
+
+    RETVAL = tickit_string_countmore(SvPVX(str) + start, pos, limit);
+    if(RETVAL == -1)
+      XSRETURN_UNDEF;
+  OUTPUT:
+    RETVAL
+
 int textwidth(str)
     SV *str
   INIT:
@@ -828,6 +975,7 @@ void chars2cols(str,...)
     const char *s;
     int i;
     TickitStringPos pos, limit;
+    size_t bytes;
 
   PPCODE:
     if(!SvUTF8(str)) {
@@ -848,13 +996,16 @@ void chars2cols(str,...)
         croak("chars2cols requires a monotonically-increasing list of character numbers; %d is not greater than %d\n",
           limit.codepoints, pos.codepoints);
 
-      if(tickit_string_countmore(s, &pos, &limit) == -1)
+      bytes = tickit_string_countmore(s, &pos, &limit);
+      if(bytes == -1)
         XSRETURN_UNDEF;
 
       mPUSHu(pos.columns);
 
       if(GIMME_V != G_ARRAY)
         XSRETURN(1);
+
+      s += bytes;
     }
 
     XSRETURN(items - 1);
@@ -866,6 +1017,7 @@ void cols2chars(str,...)
     const char *s;
     int i;
     TickitStringPos pos, limit;
+    size_t bytes;
 
   PPCODE:
     if(!SvUTF8(str)) {
@@ -886,13 +1038,16 @@ void cols2chars(str,...)
         croak("cols2chars requires a monotonically-increasing list of column numbers; %d is not greater than %d\n",
           limit.columns, pos.columns);
 
-      if(tickit_string_countmore(s, &pos, &limit) == -1)
+      bytes = tickit_string_countmore(s, &pos, &limit);
+      if(bytes == -1)
         XSRETURN_UNDEF;
 
       mPUSHu(pos.codepoints);
 
       if(GIMME_V != G_ARRAY)
         XSRETURN(1);
+
+      s += bytes;
     }
 
     XSRETURN(items - 1);
