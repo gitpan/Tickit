@@ -10,7 +10,7 @@ use warnings;
 
 use List::Util qw( min max );
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 =head1 NAME
 
@@ -142,6 +142,41 @@ sub linerange
 {
    my $self = shift;
    return $self->top .. $self->bottom - 1;
+}
+
+=head1 METHODS
+
+=cut
+
+=head2 $bool = $rect->contains( $other )
+
+Returns true if C<$other> is entirely contained within the bounds of C<$rect>.
+
+=cut
+
+sub contains
+{
+   my $self = shift;
+   my ( $other ) = @_;
+   return $other->top    >= $self->top    &&
+          $other->bottom <= $self->bottom &&
+          $other->left   >= $self->left   &&
+          $other->right  <= $self->right;
+}
+
+=head2 $bool = $rect->intersects( $other )
+
+Returns true if C<$other> and C<$rect> intersect at all, even if they overlap.
+
+=cut
+
+sub intersects
+{
+   my $self = shift;
+   my ( $other ) = @_;
+   return 0 if $self->top >= $other->bottom || $other->top >= $self->bottom;
+   return 0 if $self->left >= $other->right || $other->left >= $self->right;
+   return 1;
 }
 
 use overload '""' => sub {

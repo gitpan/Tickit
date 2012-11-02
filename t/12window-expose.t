@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 19;
+use Test::More tests => 15;
 
 use Tickit::Test;
 
@@ -14,32 +14,38 @@ my $root_exposed;
 $rootwin->set_on_expose( sub { $root_exposed++ } );
 
 my $win_exposed;
-my $exposed_rect;
-$win->set_on_expose( sub { shift; ( $exposed_rect ) = @_; $win_exposed++ } );
+my @exposed_rects;
+$win->set_on_expose( sub { shift; push @exposed_rects, $_[0]; $win_exposed++ } );
 
 $rootwin->expose;
 
-ok( !$exposed_rect, 'on_expose not yet invoked' );
+ok( !$win_exposed, 'on_expose not yet invoked' );
 
 flush_tickit;
 
-is( $exposed_rect->top,    0, '$exposed_rect->top after $rootwin->expose' );
-is( $exposed_rect->left,   0, '$exposed_rect->left after $rootwin->expose' );
-is( $exposed_rect->lines,  4, '$exposed_rect->lines after $rootwin->expose' );
-is( $exposed_rect->cols,  20, '$exposed_rect->cols after $rootwin->expose' );
 is( $root_exposed, 1, '$root expose count 1 after $rootwin->expose' );
 is( $win_exposed,  1, '$win expose count 1 after $rootwin->expose' );
+
+is_deeply( \@exposed_rects,
+   [ Tickit::Rect->new( top => 0, left => 0, lines => 4, cols => 20 ) ],
+   'Exposed regions after $rootwin->expose'
+);
+
+undef @exposed_rects;
 
 $win->expose;
 
 flush_tickit;
 
-is( $exposed_rect->top,    0, '$exposed_rect->top after $win->expose' );
-is( $exposed_rect->left,   0, '$exposed_rect->left after $win->expose' );
-is( $exposed_rect->lines,  4, '$exposed_rect->lines after $win->expose' );
-is( $exposed_rect->cols,  20, '$exposed_rect->cols after $win->expose' );
 is( $root_exposed, 1, '$root expose count 1 after $win->expose' );
 is( $win_exposed, 2, '$win expose count 2 after $win->expose' );
+
+is_deeply( \@exposed_rects,
+   [ Tickit::Rect->new( top => 0, left => 0, lines => 4, cols => 20 ) ],
+   'Exposed regions after $win->expose'
+);
+
+undef @exposed_rects;
 
 $rootwin->expose;
 $win->expose;
@@ -64,3 +70,18 @@ flush_tickit;
 
 is( $root_exposed, 3, '$root expose count 3 after hide+show' );
 is( $win_exposed, 5, '$win expose count 5 after hide+show' );
+
+undef @exposed_rects;
+
+$win->expose( Tickit::Rect->new( top => 0, left => 0, lines => 1, cols => 20 ) );
+$win->expose( Tickit::Rect->new( top => 2, left => 0, lines => 1, cols => 20 ) );
+
+flush_tickit;
+
+is( $win_exposed, 7, '$win expose count 7 after expose two regions' );
+
+is_deeply( \@exposed_rects,
+   [ Tickit::Rect->new( top => 0, left => 0, lines => 1, cols => 20 ),
+     Tickit::Rect->new( top => 2, left => 0, lines => 1, cols => 20 ) ],
+   'Exposed regions after expose two regions'
+);

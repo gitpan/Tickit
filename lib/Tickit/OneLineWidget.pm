@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::Widget );
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 use Carp;
 

@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::SingleChildWidget );
 use Tickit::WidgetRole::Borderable;
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 =head1 NAME
 

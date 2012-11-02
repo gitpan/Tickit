@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 use Carp;
 
@@ -16,6 +16,7 @@ use Scalar::Util qw( weaken );
 
 use Tickit::Pen;
 use Tickit::Rect;
+use Tickit::RectSet;
 use Tickit::Utils qw( string_countmore );
 
 =head1 NAME
@@ -72,17 +73,25 @@ sub new
    my $self = bless {
       tickit  => $tickit,
       term    => $term,
-      visible => 1,
       top     => 0,
       left    => 0,
       cols    => $cols,
       lines   => $lines,
-      pen     => Tickit::Pen->new,
    }, $class;
+   $self->_init;
 
    weaken( $self->{tickit} );
 
    return $self;
+}
+
+# Shared initialisation by both ->new and ->make_sub
+sub _init
+{
+   my $self = shift;
+   $self->{visible} = 1;
+   $self->{pen}     = Tickit::Pen->new;
+   $self->{damage}  = Tickit::RectSet->new;
 }
 
 =head1 METHODS
@@ -103,9 +112,8 @@ sub make_sub
 
    my $sub = bless {
       parent  => $self,
-      visible => 1,
-      pen     => Tickit::Pen->new,
    }, ref $self;
+   $sub->_init;
 
    $sub->change_geometry( $top, $left, $lines, $cols );
 
@@ -130,10 +138,9 @@ sub make_float
 
    my $sub = bless {
       parent  => $self,
-      visible => 1,
-      pen     => Tickit::Pen->new,
       float   => 1,
    }, ref $self;
+   $sub->_init;
 
    $sub->change_geometry( $top, $left, $lines, $cols );
 
@@ -504,54 +511,73 @@ sub _do_expose
    my $self = shift;
    my ( $rect ) = @_;
 
+   # This might be a call from the parent, so flush all pending areas as well
+   $self->{damage}->add( $rect );
+
    undef $self->{expose_pending};
+   my @rects = $self->{damage}->rects;
+   $self->{damage}->clear;
 
    if( my $on_expose = $self->{on_expose} ) {
-      $on_expose->( $self, $rect );
+      $on_expose->( $self, $_ ) for @rects;
    }
 
    my $children = $self->{child_windows} or return;
 
    foreach my $win ( sort { $a->top <=> $b->top || $a->left <=> $b->left } grep { defined } @$children ) {
-      next unless my $winrect = $rect->intersect( $win->rect );
-      $win->_do_expose( $winrect->translate( -$win->top, -$win->left ) );
+      foreach my $rect ( @rects ) {
+         next unless my $winrect = $rect->intersect( $win->rect );
+         $win->_do_expose( $winrect->translate( -$win->top, -$win->left ) );
+      }
    }
 }
 
-=head2 $win->expose
+=head2 $win->expose( $rect )
 
-Marks the window as having been exposed, to invoke the C<on_expose> event
-handler on itself, and all its child windows. The window's own handler will be
-invoked first, followed by all the child windows, in screen order (top to
-bottom, then left to right).
+Marks the given region of the window as having been exposed, to invoke the
+C<on_expose> event handler on itself, and all its child windows. The window's
+own handler will be invoked first, followed by all the child windows, in
+screen order (top to bottom, then left to right).
+
+If C<$rect> is not supplied it defaults to exposing the entire window area.
 
 The C<on_expose> event handler isn't invoked immediately; instead, the
 C<Tickit> C<later> method is used to invoke it at the next round of IO event
 handling. Until then, any other window could be exposed. Duplicates are
 suppressed; so if a window and any of its ancestors are both queued for
-expose, the actual handler will only be invoked once.
+expose, the actual handler will only be invoked once per unique region of the
+window.
 
 =cut
 
 sub expose
 {
    my $self = shift;
+   my ( $rect ) = @_;
+   $rect ||= Tickit::Rect->new(
+      top   => 0,
+      left  => 0,
+      lines => $self->lines,
+      cols  => $self->cols,
+   );
+
+   return if $self->{damage}->contains( $rect );
+
+   $self->{damage}->add( $rect );
 
    return if $self->_expose_pending;
 
    $self->{expose_pending} = 1;
 
    $self->tickit->enqueue_redraw( sub {
+      my @rects = $self->{damage}->rects;
+      $self->{damage}->clear;
+
       return if $self->parent && $self->parent->_expose_pending;
 
       undef $self->{expose_pending};
 
-      $self->_do_expose( Tickit::Rect->new(
-         top    => 0,
-         left   => 0,
-         bottom => $self->lines,
-         right  => $self->cols,
-      ) );
+      $self->_do_expose( $_ ) for @rects;
    } );
 }
 
@@ -560,6 +586,42 @@ sub _expose_pending
    my $self = shift;
    return $self->{expose_pending} ||
           ( $self->parent && $self->parent->_expose_pending );
+}
+
+=head2 $win->set_on_focus( $on_refocus )
+
+Set the callback to invoke whenever the window gains or loses focus.
+
+ $on_refocus->( $win, $has_focus )
+
+Will be passed a boolean value, true if the focus was just gained, false if
+the focus was just lost.
+
+=cut
+
+sub set_on_focus
+{
+   my $self = shift;
+   ( $self->{on_focus} ) = @_;
+}
+
+=head2 $win->set_expose_after_scroll( $expose_after_scroll )
+
+If set to a true value, the C<scrollrect> method will expose the region of
+the window that requires redrawing. If C<scrollrect> was successful, this will
+be just the newly-exposed portion that was scrolled in. If it was unsuccessful
+it will be the entire window region. If set false, no expose will happen, and
+the code calling C<scrollrect> must re-expose as required.
+
+This is a temporary method to handle the transition of behaviours; it may be
+removed in the future and its behaviour implied true always.
+
+=cut
+
+sub set_expose_after_scroll
+{
+   my $self = shift;
+   ( $self->{expose_after_scroll} ) = @_;
 }
 
 =head2 $top  = $win->top
@@ -1072,11 +1134,12 @@ scroll the terminal (and returns false).
 
 sub scrollrect
 {
-   my $win = shift;
+   my $self = shift;
    my ( $top, $left, $lines, $cols, $downward, $rightward, @args ) = @_;
 
    my $pen = ( @args == 1 ) ? $args[0]->clone : Tickit::Pen->new( @args );
 
+   my $win = $self;
    while( $win ) {
       $top  >= 0 and $top  < $win->lines or croak '$top out of bounds';
       $left >= 0 and $left < $win->cols  or croak '$left out of bounds';
@@ -1106,10 +1169,34 @@ sub scrollrect
 
    $term->setpen( bg => $pen->getattr( 'bg' ) );
 
-   return 0 unless $term->scrollrect( $top, $left, $lines, $cols,
-      $downward, $rightward );
+   unless( $term->scrollrect( $top, $left, $lines, $cols, $downward, $rightward ) ) {
+      $self->expose if $self->{expose_after_scroll};
+      return 0;
+   }
 
-   $win->_needs_flush;
+   if( $self->{expose_after_scroll} ) {
+      if( $downward > 0 ) {
+         # "scroll down" means lines moved upward, so the bottom needs redrawing
+         $self->expose( Tickit::Rect->new( top => $self->lines - $downward, lines => $downward, left => 0, cols => $self->cols ) );
+      }
+      elsif( $downward < 0 ) {
+         # "scroll up" means lines moved downward, so top needs redrawing
+         $self->expose( Tickit::Rect->new( top => 0, lines => -$downward, left => 0, cols => $self->cols ) );
+      }
+
+      if( $rightward > 0 ) {
+         # "scroll right" means columns moved leftward, so the right edge needs redrawing
+         $self->expose( Tickit::Rect->new( top => 0, lines => $self->lines, left => $self->cols - $rightward, cols => $rightward ) );
+      }
+      elsif( $rightward < 0 ) {
+         # "scroll left" means lines moved rightward, so left edge needs redrawing
+         $self->expose( Tickit::Rect->new( top => 0, lines => $self->lines, left => 0, cols => -$rightward ) );
+      }
+   }
+   else {
+      $win->_needs_flush;
+   }
+
    return 1;
 }
 
@@ -1144,6 +1231,8 @@ sub focus
 
    $self->{focus_line} = $line;
    $self->{focus_col}  = $col;
+
+   $self->{on_focus}->( $self, 1 ) if $self->{on_focus};
 
    $self->_requeue_focus
 }
@@ -1185,6 +1274,20 @@ sub _lose_focus
 
    undef $self->{focus_line};
    undef $self->{focus_col};
+
+   $self->{on_focus}->( $self, 0 ) if $self->{on_focus};
+}
+
+=head2 $focused = $win->is_focused
+
+Returns true if this window currently has the input focus
+
+=cut
+
+sub is_focused
+{
+   my $self = shift;
+   return defined $self->{focus_line};
 }
 
 =head2 $win->restore

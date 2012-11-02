@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 52;
+use Test::More tests => 56;
 
 use Tickit::Test;
 
@@ -189,19 +189,57 @@ is_display( [ BLANKLINES(3),
               ( [BLANK(10), BLANK(30,bg=>4)] ) x 1 ],
             'Display with correct pen' );
 
-$rootwin->scroll( 1, 0 );
+# Scrolling and region exposure
+{
+   my @exposed_rects;
+   $rootwin->set_on_expose( sub { push @exposed_rects, $_[1] } );
+   $rootwin->set_expose_after_scroll( 1 );
 
-is_termlog( [ SETBG(undef),
-              SCROLLRECT(0,0,25,80, 1,0) ],
-            'Termlog after ->scroll' );
+   $rootwin->scroll( 1, 0 );
 
-is_display( [ BLANKLINES(2),
-              ( [BLANK(10), BLANK(30,bg=>4)] ) x 2,
-              ( [BLANK(10), BLANK(2,bg=>4), TEXT("Foo",fg=>3,bg=>4,b=>1), BLANK(25,bg=>4)] ) x 1,
-              ( [BLANK(10), BLANK(30,bg=>4)] ) x 1 ],
-            'Display after ->scroll' );
+   flush_tickit;
 
-ok( !$win->scroll( 1, 0 ), '$win does not support scrolling' );
+   is_termlog( [ SETBG(undef),
+                 SCROLLRECT(0,0,25,80, 1,0) ],
+               'Termlog after ->scroll' );
+
+   is_display( [ BLANKLINES(2),
+                 ( [BLANK(10), BLANK(30,bg=>4)] ) x 2,
+                 ( [BLANK(10), BLANK(2,bg=>4), TEXT("Foo",fg=>3,bg=>4,b=>1), BLANK(25,bg=>4)] ) x 1,
+                 ( [BLANK(10), BLANK(30,bg=>4)] ) x 1 ],
+               'Display after ->scroll' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 24, bottom => 25, left => 0, right => 80 ) ],
+              'Root window exposed area after ->scroll downward' );
+   undef @exposed_rects;
+
+   $rootwin->scroll( -1, 0 );
+   flush_tickit;
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 0, bottom => 1, left => 0, right => 80 ) ],
+              'Root window exposed area after ->scroll upward' );
+   undef @exposed_rects;
+
+   $rootwin->scroll( 0, 1 );
+   flush_tickit;
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 0, bottom => 25, left => 79, right => 80 ) ],
+              'Root window exposed area after ->scroll rightward' );
+   undef @exposed_rects;
+
+   $rootwin->scroll( 0, -1 );
+   flush_tickit;
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 0, bottom => 25, left => 0, right => 1 ) ],
+              'Root window exposed area after ->scroll leftward' );
+   undef @exposed_rects;
+
+   ok( !$win->scroll( 1, 0 ), '$win does not support scrolling' );
+}
 
 # Hidden windows
 {

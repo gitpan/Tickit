@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 27;
+use Test::More tests => 32;
 
 use Tickit::Rect;
 
@@ -44,6 +44,13 @@ is( $subrect->right,  30, '$subrect->right after intersect partial' );
 
 $subrect = $rect->intersect( Tickit::Rect->new( top => 20, left => 20, lines => 5, cols => 60 ) );
 ok( !defined $subrect, '$subrect undefined after intersect outside' );
+
+ok(  $rect->contains( Tickit::Rect->new( top => 7, left => 12, lines => 3, cols => 10 ) ), '$rect contains smaller rect' );
+ok( !$rect->contains( Tickit::Rect->new( top => 3, left => 10, lines => 5, cols => 12 ) ), '$rect does not contain overlap' );
+
+ok(  $rect->intersects( Tickit::Rect->new( top => 3, left => 10, lines => 5, cols => 12 ) ), '$rect intersects with overlap' );
+ok( !$rect->intersects( Tickit::Rect->new( top => 14, left => 10, lines => 3, cols => 20 ) ), '$rect does not intersect with other' );
+ok( !$rect->intersects( Tickit::Rect->new( top => 12, left => 10, lines => 3, cols => 20 ) ), '$rect does not intersect with abutting' );
 
 $rect = Tickit::Rect->new(
    top    => 3,

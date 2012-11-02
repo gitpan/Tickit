@@ -1,12 +1,13 @@
 #!/usr/bin/perl
 
-use Test::More tests => 14;
+use Test::More tests => 15;
 
 use_ok( 'Tickit' );
 
 use_ok( 'Tickit::Term' );
 use_ok( 'Tickit::Pen' );
 use_ok( 'Tickit::Rect' );
+use_ok( 'Tickit::RectSet' );
 use_ok( 'Tickit::Utils' );
 use_ok( 'Tickit::StringPos' );
 

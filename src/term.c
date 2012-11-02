@@ -1,10 +1,13 @@
+/* We need C99 vsnprintf() semantics */
+#define _ISOC99_SOURCE
+
+/* We need strdup */
+#define _XOPEN_SOURCE 500
+
 #include "tickit.h"
 
 #include "hooklists.h"
 #include "termdriver.h"
-
-/* We need C99 vsnprintf() semantics */
-#define _ISOC99_SOURCE
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -30,6 +33,8 @@ struct TickitTerm {
   int                   termkey_flags;
   TermKey              *termkey;
   struct timeval        input_timeout_at; /* absolute time */
+
+  const char *termtype;
 
   char *outbuffer;
   size_t outbuffer_len; /* size of outbuffer */
@@ -106,6 +111,8 @@ TickitTerm *tickit_term_new_for_termtype(const char *termtype)
 
   tt->hooks = NULL;
 
+  tt->termtype = strdup(termtype);
+
   /* TODO: driver integration */
   tt->driver = (*xterm_probe.new)(tt, termtype);
   /* /TODO */
@@ -136,6 +143,11 @@ void tickit_term_free(TickitTerm *tt)
 void tickit_term_destroy(TickitTerm *tt)
 {
   tickit_term_free(tt);
+}
+
+const char *tickit_term_get_termtype(TickitTerm *tt)
+{
+  return tt->termtype;
 }
 
 static void *get_tmpbuffer(TickitTerm *tt, size_t len)
@@ -527,17 +539,22 @@ void tickit_term_erasech(TickitTerm *tt, int count, int moveend)
   (*tt->driver->vtable->erasech)(tt->driver, count, moveend);
 }
 
+int tickit_term_setctl_int(TickitTerm *tt, TickitTermDriverCtl ctl, int value)
+{
+  return (*tt->driver->vtable->setctl_int)(tt->driver, ctl, value);
+}
+
 void tickit_term_set_mode_altscreen(TickitTerm *tt, int on)
 {
-  (*tt->driver->vtable->set_mode)(tt->driver, TICKIT_TERMMODE_ALTSCREEN, on);
+  tickit_term_setctl_int(tt, TICKIT_TERMCTL_ALTSCREEN, on);
 }
 
 void tickit_term_set_mode_cursorvis(TickitTerm *tt, int on)
 {
-  (*tt->driver->vtable->set_mode)(tt->driver, TICKIT_TERMMODE_CURSORVIS, on);
+  tickit_term_setctl_int(tt, TICKIT_TERMCTL_CURSORVIS, on);
 }
 
 void tickit_term_set_mode_mouse(TickitTerm *tt, int on)
 {
-  (*tt->driver->vtable->set_mode)(tt->driver, TICKIT_TERMMODE_MOUSE, on);
+  tickit_term_setctl_int(tt, TICKIT_TERMCTL_MOUSE, on);
 }

@@ -1,5 +1,12 @@
 Revision history for Changes
 
+0.22    CHANGES:
+         * Window focus in/out events, $win->is_focused accessor
+         * Added Tickit::RectSet object class
+         * Allow Window to store a set of expose regions rather than just a
+           boolean flag
+         * Added Window expose-after-scroll behaviour
+
 0.21    CHANGES:
          * Wrap tickit_string_count and tickit_string_countmore; provide a
            Tickit::StringPos counter object

@@ -21,7 +21,6 @@ static inline int terminfo_columns(void) { return columns; }
 # undef back_color_erase
 # undef lines
 # undef columns
-# undef clear
 #endif
 
 
@@ -170,7 +169,8 @@ static void erasech(TickitTermDriver *ttd, int count, int moveend)
   }
 }
 
-static void clear(TickitTermDriver *ttd)
+/* clear() may collide with something from curses.h or term.h */
+static void ttd_clear(TickitTermDriver *ttd)
 {
   tickit_termdrv_write_strf(ttd, "\e[2J", 4);
 }
@@ -270,32 +270,35 @@ static void chpen(TickitTermDriver *ttd, const TickitPen *delta, const TickitPen
   tickit_termdrv_write_str(ttd, buffer, len);
 }
 
-void set_mode(TickitTermDriver *ttd, TickitTermDriverMode mode, int value)
+static int setctl_int(TickitTermDriver *ttd, TickitTermDriverCtl ctl, int value)
 {
   struct XTermDriver *xd = (struct XTermDriver *)ttd;
 
-  switch(mode) {
-    case TICKIT_TERMMODE_ALTSCREEN:
+  switch(ctl) {
+    case TICKIT_TERMCTL_ALTSCREEN:
       if(!xd->mode.altscreen == !value)
-        return;
+        return 1;
 
       tickit_termdrv_write_str(ttd, value ? "\e[?1049h" : "\e[?1049l", 0);
       xd->mode.altscreen = !!value;
-      break;
-    case TICKIT_TERMMODE_CURSORVIS:
+      return 1;
+    case TICKIT_TERMCTL_CURSORVIS:
       if(!xd->mode.cursorvis == !value)
-        return;
+        return 1;
 
       tickit_termdrv_write_str(ttd, value ? "\e[?25h" : "\e[?25l", 0);
       xd->mode.cursorvis = !!value;
-      break;
-    case TICKIT_TERMMODE_MOUSE:
+      return 1;
+    case TICKIT_TERMCTL_MOUSE:
       if(!xd->mode.mouse == !value)
-        return;
+        return 1;
 
       tickit_termdrv_write_str(ttd, value ? "\e[?1002h\e[?1006h" : "\e[?1002l\e[?1006l", 0);
       xd->mode.mouse = !!value;
+      return 1;
   }
+
+  return 0;
 }
 
 static void destroy(TickitTermDriver *ttd)
@@ -303,11 +306,11 @@ static void destroy(TickitTermDriver *ttd)
   struct XTermDriver *xd = (struct XTermDriver *)ttd;
 
   if(xd->mode.mouse)
-    set_mode(ttd, TICKIT_TERMMODE_MOUSE, 0);
+    setctl_int(ttd, TICKIT_TERMCTL_MOUSE, 0);
   if(!xd->mode.cursorvis)
-    set_mode(ttd, TICKIT_TERMMODE_CURSORVIS, 1);
+    setctl_int(ttd, TICKIT_TERMCTL_CURSORVIS, 1);
   if(xd->mode.altscreen)
-    set_mode(ttd, TICKIT_TERMMODE_ALTSCREEN, 0);
+    setctl_int(ttd, TICKIT_TERMCTL_ALTSCREEN, 0);
 
   free(xd);
 }
@@ -319,9 +322,9 @@ TickitTermDriverVTable xterm_vtable = {
   .move_rel   = move_rel,
   .scrollrect = scrollrect,
   .erasech    = erasech,
-  .clear      = clear,
+  .clear      = ttd_clear,
   .chpen      = chpen,
-  .set_mode   = set_mode,
+  .setctl_int = setctl_int,
 };
 
 static TickitTermDriver *new(TickitTerm *tt, const char *termtype)
