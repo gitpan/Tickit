@@ -68,6 +68,7 @@ package TestWidget;
 
 use base qw( Tickit::Widget );
 
+use constant CLEAR_BEFORE_RENDER => 0;
 sub render {}
 
 sub lines { 1 }
@@ -77,6 +78,7 @@ package TestContainer;
 
 use base qw( Tickit::ContainerWidget );
 
+use constant CLEAR_BEFORE_RENDER => 0;
 sub render {}
 
 sub lines { 2 }

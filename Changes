@@ -1,5 +1,10 @@
 Revision history for Changes
 
+0.23    CHANGES:
+         * Many improvements to Window float logic; beginning of merging float
+           and non-float implementations
+         * Added $win->bottom and $win->right
+
 0.22    CHANGES:
          * Window focus in/out events, $win->is_focused accessor
          * Added Tickit::RectSet object class

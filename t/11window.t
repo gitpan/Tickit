@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 41;
+use Test::More tests => 50;
 use Test::Identity;
 use Test::Refcount;
 
@@ -36,6 +36,9 @@ is( $win->abs_left, 10, '$win->abs_left' );
 is( $win->lines,  4, '$win->lines' );
 is( $win->cols,  20, '$win->cols' );
 
+is( $win->bottom,  7, '$win->bottom' );
+is( $win->right,  30, '$win->right' );
+
 isa_ok( my $rect = $win->rect, "Tickit::Rect", '$win->rect' );
 is( $rect->top,     3, '$win->rect->top' );
 is( $rect->left,   10, '$win->rect->left' );
@@ -46,6 +49,21 @@ identical( $win->parent, $rootwin, '$win->parent' );
 identical( $win->root,   $rootwin, '$win->root' );
 
 identical( $win->term, $term, '$win->term' );
+
+is_deeply( [ $win->_get_span_visibility( 0, 0 ) ],
+           [ 1, 20 ], '$win 0,0 visible for 20 columns' );
+is_deeply( [ $win->_get_span_visibility( 0, 5 ) ],
+           [ 1, 15 ], '$win 0,5 visible for 15 columns' );
+is_deeply( [ $win->_get_span_visibility( 0, -3 ) ],
+           [ 0, 3 ], '$win 0,-3 invisible for 3 columns' );
+is_deeply( [ $win->_get_span_visibility( 0, 20 ) ],
+           [ 0, undef ], '$win 0,20 invisible indefinitely' );
+is_deeply( [ $win->_get_span_visibility( 0, 50 ) ],
+           [ 0, undef ], '$win 0,50 invisible indefinitely' );
+is_deeply( [ $win->_get_span_visibility( -2, 0 ) ],
+           [ 0, undef ], '$win -2,0 invisible indefinitely' );
+is_deeply( [ $win->_get_span_visibility( 5, 0 ) ],
+           [ 0, undef ], '$win 5,0 invisible indefinitely' );
 
 is( $geom_changed, 0, '$reshaped is 0 before resize' );
 

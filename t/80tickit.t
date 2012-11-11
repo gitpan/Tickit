@@ -68,7 +68,7 @@ $tickit->_flush_later;
 # test. If this unit test breaks likely these strings need updating. Sorry.
 stream_is(
    "\e[?1049h\e[?25l\e[?1002h\e[?1006h" . # Terminal setup
-   "\e[2J\e[m\e[2J\e[13;38HHello"     ,   # Widget
+   "\e[2J\e[13;38H\e[mHello"            , # Widget
    'root widget rendered'
 );
 
@@ -79,6 +79,7 @@ use base qw( Tickit::Widget );
 sub lines { 1 }
 sub cols  { 5 }
 
+use constant CLEAR_BEFORE_RENDER => 0;
 sub render
 {
    my $self = shift;

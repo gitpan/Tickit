@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 use Carp;
 
@@ -18,6 +18,8 @@ use Tickit::Pen;
 use Tickit::Rect;
 use Tickit::RectSet;
 use Tickit::Utils qw( string_countmore );
+
+use constant FLOAT_ALL_THE_WINDOWS => $ENV{TICKIT_FLOAT_ALL_THE_WINDOWS};
 
 =head1 NAME
 
@@ -55,10 +57,18 @@ By comparison, any window created by C<make_float> is considered to sit
 other siblings, and any drawing that happens within it overwrites that of its
 non-floating siblings. Any drawing on a non-floating sibling that happens
 within the area of a float is obscured by the contents of the floating window.
-It is recommended that use of floating windows be kept to a minimum, as each
-one imposes a small processing-time overhead in any drawing operations on
-other window. These may be useful for implementing pop-up menus or other
-temporary interactions.
+
+At the current version, floating and non-floating child windows have a
+different implementation. However, these two differing implementations will be
+merged in a later version, at which point all child windows will implement
+obscuring and z-ordering behaviour; the only difference then will be the order
+in which the child windows are traversed.
+
+To enable this shared implementation for unit-testing purposes, or to test if
+it will work correctly in future, set the environment variable
+C<TICKIT_FLOAT_ALL_THE_WINDOWS> to some true value
+
+ $ TICKIT_FLOAT_ALL_THE_WINDOWS=1 ./Build test
 
 =cut
 
@@ -112,6 +122,7 @@ sub make_sub
 
    my $sub = bless {
       parent  => $self,
+      float   => FLOAT_ALL_THE_WINDOWS,
    }, ref $self;
    $sub->_init;
 
@@ -120,6 +131,23 @@ sub make_sub
    $self->_reap_dead_children;
    push @{ $self->{child_windows} }, $sub;
    weaken $self->{child_windows}[-1];
+
+   return $sub;
+}
+
+=head2 $sub = $win->make_hidden_sub( $top, $left, $lines, $cols )
+
+Constructs a new sub-window like C<make_sub>, but the window starts initially
+hidden. This avoids having to call C<hide> separately afterwards.
+
+=cut
+
+sub make_hidden_sub
+{
+   my $self = shift;
+
+   my $sub = $self->make_sub( @_ );
+   $sub->{visible} = 0;
 
    return $sub;
 }
@@ -271,7 +299,8 @@ sub hide
 {
    my $self = shift;
    $self->{visible} = 0;
-   if( $self->{float} and my $parent = $self->parent ) {
+
+   if( my $parent = $self->parent ) {
       $parent->_do_expose( $self->rect );
    }
    $self->restore;
@@ -527,6 +556,7 @@ sub _do_expose
    foreach my $win ( sort { $a->top <=> $b->top || $a->left <=> $b->left } grep { defined } @$children ) {
       foreach my $rect ( @rects ) {
          next unless my $winrect = $rect->intersect( $win->rect );
+         next unless $win->{visible};
          $win->_do_expose( $winrect->translate( -$win->top, -$win->left ) );
       }
    }
@@ -572,10 +602,9 @@ sub expose
    $self->tickit->enqueue_redraw( sub {
       my @rects = $self->{damage}->rects;
       $self->{damage}->clear;
+      undef $self->{expose_pending};
 
       return if $self->parent && $self->parent->_expose_pending;
-
-      undef $self->{expose_pending};
 
       $self->_do_expose( $_ ) for @rects;
    } );
@@ -624,9 +653,13 @@ sub set_expose_after_scroll
    ( $self->{expose_after_scroll} ) = @_;
 }
 
-=head2 $top  = $win->top
+=head2 $top = $win->top
+
+=head2 $bottom = $win->bottom
 
 =head2 $left = $win->left
+
+=head2 $right = $win->right
 
 Returns the coordinates of the start of the window, relative to the parent
 window.
@@ -639,10 +672,22 @@ sub top
    return $self->{top};
 }
 
+sub bottom
+{
+   my $self = shift;
+   return $self->top + $self->lines;
+}
+
 sub left
 {
    my $self = shift;
    return $self->{left};
+}
+
+sub right
+{
+   my $self = shift;
+   return $self->left + $self->cols;
 }
 
 =head2 $top  = $win->abs_top
@@ -860,13 +905,12 @@ sub _get_span_visibility
          last if $prev and $child == $prev;
          last unless $child->{float};
          next unless $child->{visible};
-         next if $child->top > $line or $child->top + $child->lines <= $line;
+         next if $child->top > $line or $child->bottom <= $line;
 
-         my $child_right = $child->left + $child->cols;
-         next if $col >= $child_right;
+         next if $col >= $child->right;
 
          if( $child->left <= $col ) {
-            my $child_cols_hidden = $child_right - $col;
+            my $child_cols_hidden = $child->right - $col;
             if( $vis ) {
                $len = $child_cols_hidden;
                $vis = 0;
@@ -1139,6 +1183,13 @@ sub scrollrect
 
    my $pen = ( @args == 1 ) ? $args[0]->clone : Tickit::Pen->new( @args );
 
+   # Check there are no floating windows in the way
+   foreach my $line ( $top .. $top + $lines - 1 ) {
+      my ( $vis, $len ) = $self->_get_span_visibility( $line, $left );
+      return 0 unless $vis;
+      return 0 unless $len >= $cols;
+   }
+
    my $win = $self;
    while( $win ) {
       $top  >= 0 and $top  < $win->lines or croak '$top out of bounds';
@@ -1156,13 +1207,6 @@ sub scrollrect
 
       my $parent = $win->parent or last;
       $win = $parent;
-   }
-
-   # Check there are no floating windows in the way
-   foreach my $line ( $top .. $top + $lines - 1 ) {
-      my ( $vis, $len ) = $win->_get_span_visibility( $line, $left );
-      return 0 unless $vis;
-      return 0 unless $len >= $cols;
    }
 
    my $term = $win->term;

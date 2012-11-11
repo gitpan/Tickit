@@ -37,6 +37,7 @@ package TestWidget;
 
 use base qw( Tickit::Widget );
 
+use constant CLEAR_BEFORE_RENDER => 0;
 sub render
 {
    my $self = shift;

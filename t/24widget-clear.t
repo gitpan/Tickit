@@ -66,6 +66,7 @@ sub cols  { 5 }
 
 package WidgetWithClear;
 use base qw( WidgetBase );
+use constant CLEAR_BEFORE_RENDER => 1;
 
 package WidgetNoClear;
 use base qw( WidgetBase );

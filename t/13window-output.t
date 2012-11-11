@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 56;
+use Test::More tests => 43;
 
 use Tickit::Test;
 
@@ -11,21 +11,6 @@ use Tickit::Pen;
 my $rootwin = mk_window;
 
 my $win = $rootwin->make_sub( 3, 10, 4, 30 );
-
-is_deeply( [ $win->_get_span_visibility( 0, 0 ) ],
-           [ 1, 30 ], '$win 0,0 visible for 30 columns' );
-is_deeply( [ $win->_get_span_visibility( 0, 5 ) ],
-           [ 1, 25 ], '$win 0,5 visible for 25 columns' );
-is_deeply( [ $win->_get_span_visibility( 0, -3 ) ],
-           [ 0, 3 ], '$win 0,-3 invisible for 3 columns' );
-is_deeply( [ $win->_get_span_visibility( 0, 30 ) ],
-           [ 0, undef ], '$win 0,30 invisible indefinitely' );
-is_deeply( [ $win->_get_span_visibility( 0, 50 ) ],
-           [ 0, undef ], '$win 0,50 invisible indefinitely' );
-is_deeply( [ $win->_get_span_visibility( -2, 0 ) ],
-           [ 0, undef ], '$win -2,0 invisible indefinitely' );
-is_deeply( [ $win->_get_span_visibility( 5, 0 ) ],
-           [ 0, undef ], '$win 5,0 invisible indefinitely' );
 
 $win->goto( 2, 3 );
 $win->print( "Hello" );
@@ -152,93 +137,46 @@ is_display( [ BLANKLINES(3),
               ( [BLANK(10), BLANK(30,bg=>4)] ) x 4 ],
             'Display after $win->clear' );
 
-my $subwin = $win->make_sub( 2, 2, 1, 10 );
+ok( !$win->scroll( 1, 0 ), '$win does not support scrolling' );
+drain_termlog;
 
-is_deeply( [ $subwin->_get_span_visibility( 0, 0 ) ],
-           [ 1, 10 ], '$subwin 0,0 visible for 10 columns' );
-is_deeply( [ $subwin->_get_span_visibility( 0, 7 ) ],
-           [ 1, 3 ], '$subwin 0,7 visible for 3 columns' );
-
-$subwin->pen->chattr( fg => 3 );
-
-is_deeply( { $subwin->pen->getattrs },
-           { fg => 3 },
-           '$subwin has fg => 3' );
-
-is( $subwin->getpenattr( 'b' ),  undef, '$win has pen b undef' );
-is( $subwin->getpenattr( 'fg' ), 3,     '$win has pen fg 1' );
-
-is_deeply( { $subwin->get_effective_pen->getattrs },
-           { b => 1, bg => 4, fg => 3 },
-           '$subwin->get_effective_pen has all attrs' );
-
-is( $subwin->get_effective_penattr( 'b' ),  1, '$win has effective pen b 1' );
-is( $subwin->get_effective_penattr( 'fg' ), 3, '$win has effective pen fg 1' );
-
-$subwin->goto( 0, 0 );
-$subwin->print( "Foo" );
-
-is_termlog( [ GOTO(5,12),
-              SETPEN(fg => 3, bg => 4, b => 1),
-              PRINT("Foo"), ],
-            'Termlog with correct pen' );
-
-is_display( [ BLANKLINES(3),
-              ( [BLANK(10), BLANK(30,bg=>4)] ) x 2,
-              ( [BLANK(10), BLANK(2,bg=>4), TEXT("Foo",fg=>3,bg=>4,b=>1), BLANK(25,bg=>4)] ) x 1,
-              ( [BLANK(10), BLANK(30,bg=>4)] ) x 1 ],
-            'Display with correct pen' );
-
-# Scrolling and region exposure
 {
-   my @exposed_rects;
-   $rootwin->set_on_expose( sub { push @exposed_rects, $_[1] } );
-   $rootwin->set_expose_after_scroll( 1 );
+   my $subwin = $win->make_sub( 2, 2, 1, 10 );
 
-   $rootwin->scroll( 1, 0 );
+   is_deeply( [ $subwin->_get_span_visibility( 0, 0 ) ],
+              [ 1, 10 ], '$subwin 0,0 visible for 10 columns' );
+   is_deeply( [ $subwin->_get_span_visibility( 0, 7 ) ],
+              [ 1, 3 ], '$subwin 0,7 visible for 3 columns' );
 
-   flush_tickit;
+   $subwin->pen->chattr( fg => 3 );
 
-   is_termlog( [ SETBG(undef),
-                 SCROLLRECT(0,0,25,80, 1,0) ],
-               'Termlog after ->scroll' );
+   is_deeply( { $subwin->pen->getattrs },
+              { fg => 3 },
+              '$subwin has fg => 3' );
 
-   is_display( [ BLANKLINES(2),
+   is( $subwin->getpenattr( 'b' ),  undef, '$win has pen b undef' );
+   is( $subwin->getpenattr( 'fg' ), 3,     '$win has pen fg 1' );
+
+   is_deeply( { $subwin->get_effective_pen->getattrs },
+              { b => 1, bg => 4, fg => 3 },
+              '$subwin->get_effective_pen has all attrs' );
+
+   is( $subwin->get_effective_penattr( 'b' ),  1, '$win has effective pen b 1' );
+   is( $subwin->get_effective_penattr( 'fg' ), 3, '$win has effective pen fg 1' );
+
+   $subwin->goto( 0, 0 );
+   $subwin->print( "Foo" );
+
+   is_termlog( [ GOTO(5,12),
+                 SETPEN(fg => 3, bg => 4, b => 1),
+                 PRINT("Foo"), ],
+               'Termlog with correct pen' );
+
+   is_display( [ BLANKLINES(3),
                  ( [BLANK(10), BLANK(30,bg=>4)] ) x 2,
                  ( [BLANK(10), BLANK(2,bg=>4), TEXT("Foo",fg=>3,bg=>4,b=>1), BLANK(25,bg=>4)] ) x 1,
                  ( [BLANK(10), BLANK(30,bg=>4)] ) x 1 ],
-               'Display after ->scroll' );
-
-   is_deeply( \@exposed_rects,
-              [ Tickit::Rect->new( top => 24, bottom => 25, left => 0, right => 80 ) ],
-              'Root window exposed area after ->scroll downward' );
-   undef @exposed_rects;
-
-   $rootwin->scroll( -1, 0 );
-   flush_tickit;
-
-   is_deeply( \@exposed_rects,
-              [ Tickit::Rect->new( top => 0, bottom => 1, left => 0, right => 80 ) ],
-              'Root window exposed area after ->scroll upward' );
-   undef @exposed_rects;
-
-   $rootwin->scroll( 0, 1 );
-   flush_tickit;
-
-   is_deeply( \@exposed_rects,
-              [ Tickit::Rect->new( top => 0, bottom => 25, left => 79, right => 80 ) ],
-              'Root window exposed area after ->scroll rightward' );
-   undef @exposed_rects;
-
-   $rootwin->scroll( 0, -1 );
-   flush_tickit;
-
-   is_deeply( \@exposed_rects,
-              [ Tickit::Rect->new( top => 0, bottom => 25, left => 0, right => 1 ) ],
-              'Root window exposed area after ->scroll leftward' );
-   undef @exposed_rects;
-
-   ok( !$win->scroll( 1, 0 ), '$win does not support scrolling' );
+               'Display with correct pen' );
 }
 
 # Hidden windows
