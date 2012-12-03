@@ -16,10 +16,12 @@ use Test::More tests => 4;
 use Tickit;
 
 pipe my ( $term_rd, $my_wr ) or die "Cannot pipepair - $!";
+open my $term_wr, ">", \my $output;
 
 my $tickit = Tickit->new(
    UTF8    => 1,
    term_in => $term_rd,
+   term_out => $term_wr,
 );
 
 my $got_Ctrl_A;

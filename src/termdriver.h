@@ -1,9 +1,13 @@
 #include "tickit.h"
 
+#include "termkey.h"
+
 typedef struct TickitTermDriver TickitTermDriver;
 
 typedef struct {
   void (*destroy)(TickitTermDriver *ttd);
+  void (*start)(TickitTermDriver *ttd);
+  void (*stop)(TickitTermDriver *ttd);
   void (*print)(TickitTermDriver *ttd, const char *str);
   void (*goto_abs)(TickitTermDriver *ttd, int line, int col);
   void (*move_rel)(TickitTermDriver *ttd, int downward, int rightward);
@@ -11,7 +15,8 @@ typedef struct {
   void (*erasech)(TickitTermDriver *ttd, int count, int moveend);
   void (*clear)(TickitTermDriver *ttd);
   void (*chpen)(TickitTermDriver *ttd, const TickitPen *delta, const TickitPen *final);
-  int  (*setctl_int)(TickitTermDriver *ttd, TickitTermDriverCtl ctl, int value);
+  int  (*setctl_int)(TickitTermDriver *ttd, TickitTermCtl ctl, int value);
+  void (*gotkey)(TickitTermDriver *ttd, TermKey *tk, const TermKeyKey *key);
 } TickitTermDriverVTable;
 
 struct TickitTermDriver {

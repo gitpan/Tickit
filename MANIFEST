@@ -72,6 +72,7 @@ t/14window-focus.t
 t/15window-input.t
 t/16window-clipping.t
 t/17window-float.t
+t/18window-popup.t
 t/20widget.t
 t/21widget-window.t
 t/22widget-parent.t

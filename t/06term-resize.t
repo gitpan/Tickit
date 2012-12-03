@@ -7,7 +7,7 @@ use Test::Identity;
 
 use Tickit::Term;
 
-my $term = Tickit::Term->new( writer => sub {} );
+my $term = Tickit::Term->new();
 $term->set_size( 25, 80 );
 
 my ( $lines, $cols );

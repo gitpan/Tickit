@@ -48,6 +48,8 @@ struct TickitTerm {
   int lines;
   int cols;
 
+  int started;
+
   TickitPen *pen;
 
   struct TickitEventHook *hooks;
@@ -117,6 +119,9 @@ TickitTerm *tickit_term_new_for_termtype(const char *termtype)
   tt->driver = (*xterm_probe.new)(tt, termtype);
   /* /TODO */
 
+  // Can't 'start' yet until we have an output method
+  tt->started = 0;
+
   return tt;
 }
 
@@ -125,8 +130,12 @@ void tickit_term_free(TickitTerm *tt)
   tickit_hooklist_unbind_and_destroy(tt->hooks, tt);
   tickit_pen_destroy(tt->pen);
 
-  if(tt->driver)
+  if(tt->driver) {
+    if(tt->driver->vtable->stop)
+      (*tt->driver->vtable->stop)(tt->driver);
+
     (*tt->driver->vtable->destroy)(tt->driver);
+  }
 
   if(tt->termkey)
     termkey_destroy(tt->termkey);
@@ -204,6 +213,12 @@ void tickit_term_set_output_fd(TickitTerm *tt, int fd)
   tt->outfd = fd;
 
   tickit_term_refresh_size(tt);
+
+  if(!tt->started) {
+    if(tt->driver->vtable->start)
+      (*tt->driver->vtable->start)(tt->driver);
+    tt->started = 1;
+  }
 }
 
 int tickit_term_get_output_fd(const TickitTerm *tt)
@@ -215,6 +230,12 @@ void tickit_term_set_output_func(TickitTerm *tt, TickitTermOutputFunc *fn, void 
 {
   tt->outfunc      = fn;
   tt->outfunc_user = user;
+
+  if(!tt->started) {
+    if(tt->driver->vtable->start)
+      (*tt->driver->vtable->start)(tt->driver);
+    tt->started = 1;
+  }
 }
 
 void tickit_term_set_output_buffer(TickitTerm *tt, size_t len)
@@ -295,7 +316,9 @@ static void got_key(TickitTerm *tt, TermKey *tk, TermKeyKey *key)
 
     run_events(tt, TICKIT_EV_KEY, &args);
   }
-  else {
+  else if(key->type == TERMKEY_TYPE_UNICODE ||
+          key->type == TERMKEY_TYPE_FUNCTION ||
+          key->type == TERMKEY_TYPE_KEYSYM) {
     char buffer[64]; // TODO: should be long enough
     termkey_strfkey(tk, buffer, sizeof buffer, key, TERMKEY_FORMAT_ALTISMETA);
 
@@ -303,6 +326,10 @@ static void got_key(TickitTerm *tt, TermKey *tk, TermKeyKey *key)
     args.str  = buffer;
 
     run_events(tt, TICKIT_EV_KEY, &args);
+  }
+  else {
+    if(tt->driver->vtable->gotkey)
+      (*tt->driver->vtable->gotkey)(tt->driver, tk, key);
   }
 }
 
@@ -539,7 +566,7 @@ void tickit_term_erasech(TickitTerm *tt, int count, int moveend)
   (*tt->driver->vtable->erasech)(tt->driver, count, moveend);
 }
 
-int tickit_term_setctl_int(TickitTerm *tt, TickitTermDriverCtl ctl, int value)
+int tickit_term_setctl_int(TickitTerm *tt, TickitTermCtl ctl, int value)
 {
   return (*tt->driver->vtable->setctl_int)(tt->driver, ctl, value);
 }

@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 43;
+use Test::More tests => 53;
 
 use Tickit::Test;
 
@@ -230,4 +230,65 @@ drain_termlog;
    is_display( [ BLANKLINES(4),
                  [BLANK(10), TEXT("Content from Window 2")] ],
               'Display after print with $win1 hidden' );
+}
+
+# Scrollable window probably needs to be fullwidth
+{
+   my $win = $rootwin->make_sub( 5, 0, 10, 80 );
+
+   my @exposed_rects;
+   $win->set_on_expose( sub { push @exposed_rects, $_[1] } );
+   $win->set_expose_after_scroll( 1 );
+
+   ok( $win->scroll( 1, 0 ), 'Fullwidth $win supports scrolling' );
+   flush_tickit;
+
+   is_termlog( [ SETPEN,
+                 SCROLLRECT(5,0,10,80,1,0) ],
+               'Termlog after fullwidth $win->scroll downward' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 9, lines => 1, left => 0, cols => 80 ) ],
+              'Exposed area after ->scroll downward' );
+
+   undef @exposed_rects;
+
+   $win->scroll( -1, 0 );
+   flush_tickit;
+
+   is_termlog( [ SETPEN,
+                 SCROLLRECT(5,0,10,80,-1,0) ],
+               'Termlog after fullwidth $win->scroll upward' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 0, lines => 1, left => 0, cols => 80 ) ],
+              'Exposed area after ->scroll upward' );
+
+   undef @exposed_rects;
+
+   ok( $win->scrollrect( 2, 0, 3, 80, -1, 0 ), 'Fullwidth $win supports scrolling a region' );
+   flush_tickit;
+
+   is_termlog( [ SETPEN,
+                 SCROLLRECT(7,0,3,80,-1,0) ],
+               'Termlog after fullwidth $win->scrollrect downward' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 2, lines => 1, left => 0, cols => 80 ) ],
+              'Exposed area after ->scroll downward' );
+
+   undef @exposed_rects;
+
+   $win->scrollrect( 2, 0, 3, 80, 1, 0 );
+   flush_tickit;
+
+   is_termlog( [ SETPEN,
+                 SCROLLRECT(7,0,3,80,1,0) ],
+               'Termlog after fullwidth $win->scrollrect upward' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 4, lines => 1, left => 0, cols => 80 ) ],
+              'Exposed area after ->scroll upward' );
+
+   undef @exposed_rects;
 }

@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 21;
+use Test::More tests => 23;
 use Test::Refcount;
 
 use Tickit::Test;
@@ -99,3 +99,30 @@ $rootfloat->hide;
 
 is_deeply( [ $root->_get_span_visibility( 10, 0 ) ],
            [ 1, 80 ], '$root 10,0 visible for 80 columns after $rootfloat->hide' );
+
+$rootfloat->show;
+
+# Scrolling with float obscurations
+{
+   my @exposed_rects;
+   $root->set_on_expose( sub { push @exposed_rects, $_[1] } );
+   $root->set_expose_after_scroll( 1 );
+
+   $root->scroll( 3, 0 );
+   flush_tickit;
+
+   is_termlog( [ SETPEN,
+                 SCROLLRECT(0,0,10,80, 3,0),
+                 SETPEN,
+                 SETPEN,
+                 SETPEN,
+                 SCROLLRECT(15,0,10,80, 3,0) ],
+               'Termlog after scroll with floats' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top =>  7, left =>  0, lines => 3, cols => 80 ),
+                Tickit::Rect->new( top => 10, left =>  0, lines => 5, cols => 10 ),
+                Tickit::Rect->new( top => 10, left => 40, lines => 5, cols => 40 ),
+                Tickit::Rect->new( top => 22, left =>  0, lines => 3, cols => 80 ), ],
+              'Exposed regions after scroll with floats' );
+}

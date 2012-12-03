@@ -162,7 +162,7 @@ stream_is( "\e[24;3m", '$term->setpen( Tickit::Pen )' );
 {
    pipe( my $rd, my $wr ) or die "pipe() - $!";
 
-   my $term = Tickit::Term->new( writer => sub {}, output_handle => $wr );
+   my $term = Tickit::Term->new( output_handle => $wr );
 
    isa_ok( $term, "Tickit::Term", '$term isa Tickit::Term' );
    is( $term->get_output_handle, $wr, '$term->get_output_handle is $wr' );

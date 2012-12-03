@@ -151,13 +151,23 @@ void tickit_term_clear(TickitTerm *tt);
 void tickit_term_erasech(TickitTerm *tt, int count, int moveend);
 
 typedef enum {
+  /* This is part of the API so additions must go at the end only */
   TICKIT_TERMCTL_ALTSCREEN = 1,
   TICKIT_TERMCTL_CURSORVIS,
   TICKIT_TERMCTL_MOUSE,
-} TickitTermDriverCtl;
+  TICKIT_TERMCTL_CURSORBLINK,
+  TICKIT_TERMCTL_CURSORSHAPE,
+} TickitTermCtl;
 
-int tickit_term_setctl_int(TickitTerm *tt, TickitTermDriverCtl ctl, int value);
+typedef enum {
+  TICKIT_TERM_CURSORSHAPE_BLOCK = 1,
+  TICKIT_TERM_CURSORSHAPE_UNDER,
+  TICKIT_TERM_CURSORSHAPE_LEFT_BAR,
+} TickitTermCursorShape;
 
+int tickit_term_setctl_int(TickitTerm *tt, TickitTermCtl ctl, int value);
+
+/* These are deprecated, don't use them */
 void tickit_term_set_mode_altscreen(TickitTerm *tt, int on);
 void tickit_term_set_mode_cursorvis(TickitTerm *tt, int on);
 void tickit_term_set_mode_mouse(TickitTerm *tt, int on);

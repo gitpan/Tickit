@@ -8,9 +8,11 @@ package Tickit::Rect;
 use strict;
 use warnings;
 
+use Carp;
+
 use List::Util qw( min max );
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 =head1 NAME
 
@@ -42,12 +44,25 @@ simply as a convenient data store containing some useful utility methods.
 Construct a new rectangle of the given geometry, given by C<top>, C<left> and
 either C<lines> and C<cols>, or C<bottom> and C<right>.
 
+=head2 $rect = Tickit::Rect->new( $str )
+
+If given a single string, this will be parsed in the form
+
+ (left,top)..(right,bottom)
+
 =cut
 
 sub new
 {
    my $class = shift;
-   my %args = @_;
+   my %args;
+   if( @_ == 1 ) {
+      @args{qw(left top right bottom)} = 
+         $_[0] =~ m/^\((\d+),(\d+)\)..\((\d+),(\d+)\)$/ or croak "Unrecognised Tickit::Rect string '$_[0]'";
+   }
+   else {
+      %args = @_;
+   }
 
    defined $args{lines} or $args{lines} = $args{bottom} - $args{top};
    defined $args{cols}  or $args{cols}  = $args{right}  - $args{left};
@@ -183,6 +198,126 @@ use overload '""' => sub {
    my $self = shift;
    sprintf "Tickit::Rect[(%d,%d)..(%d,%d)]", $self->left, $self->top, $self->right, $self->bottom;
 };
+
+=head2 @r = $rect->add( $other )
+
+Returns a list of the non-overlapping regions covered by either C<$rect> or
+C<$other>.
+
+In the trivial case that the two given rectangles do not touch, the result
+will simply be a list of the two initial rectangles. Otherwise a list of
+newly-constructed rectangles will be returned that covers the same area as
+the original two. This list will contain anywhere between 1 and 3 rectangles.
+
+=cut
+
+sub add
+{
+   my $x = shift;
+   my ( $y ) = @_;
+
+   return ( $x, $y ) if $x->left > $y->right or $y->left > $x->right
+                     or $x->top > $y->bottom or $y->top > $x->bottom;
+
+   my @rects;
+
+   my @rows = sort { $a <=> $b } $x->top, $x->bottom, $y->top, $y->bottom;
+
+   # We know there must be between 2 and 4 distinct values here
+   foreach my $i ( 0 .. $#rows-1 ) {
+      my $this_top    = $rows[$i];
+      my $this_bottom = $rows[$i+1];
+
+      # Skip non-unique
+      next if $this_bottom == $this_top;
+
+      my $has_x = $this_top >= $x->top && $this_bottom <= $x->bottom;
+      my $has_y = $this_top >= $y->top && $this_bottom <= $y->bottom;
+
+      my $this_left =  ( $has_x and $has_y ) ? min( $x->left, $y->left ) :
+                         $has_x              ? $x->left :
+                                               $y->left;
+      my $this_right = ( $has_x and $has_y ) ? max( $x->right, $y->right ) :
+                         $has_x              ? $x->right :
+                                               $y->right;
+
+      if( @rects and $this_left == $rects[-1]->left and 
+                     $this_right == $rects[-1]->right ) {
+         $this_top = ( pop @rects )->top;
+      }
+
+      push @rects, Tickit::Rect->new(
+         top    => $this_top,
+         bottom => $this_bottom,
+         left   => $this_left,
+         right  => $this_right,
+      );
+   }
+
+   return @rects;
+}
+
+=head2 @r = $rect->subtract( $other )
+
+Returns a list of the non-overlapping regions covered by C<$rect> but not by
+C<$other>.
+
+In the trivial case that C<$other> completely covers C<$rect> then the empty
+list is returned. In the trivial case that C<$other> and C<$rect> do not
+intersect then a list containing C<$rect> is returned. Otherwise, a list of
+newly-constructed rectangles will be returned that covers the required area.
+This list will contain anywhere between 1 and 4 rectangles.
+
+=cut
+
+sub subtract
+{
+   my $self = shift;
+   my ( $hole ) = @_;
+
+   return () if $hole->contains( $self );
+   return $self unless $self->intersects( $hole );
+
+   my @rects;
+
+   if( $self->top < $hole->top ) {
+      push @rects, Tickit::Rect->new(
+         top    => $self->top,
+         bottom => $hole->top,
+         left   => $self->left,
+         right  => $self->right,
+      );
+   }
+
+   if( $self->left < $hole->left ) {
+      push @rects, Tickit::Rect->new(
+         top    => max( $self->top, $hole->top ),
+         bottom => min( $self->bottom, $hole->bottom ),
+         left   => $self->left,
+         right  => $hole->left,
+      );
+   }
+
+   if( $self->right > $hole->right ) {
+      push @rects, Tickit::Rect->new(
+         top    => max( $self->top, $hole->top ),
+         bottom => min( $self->bottom, $hole->bottom ),
+         left   => $hole->right,
+         right  => $self->right,
+      );
+   }
+
+   if( $self->bottom > $hole->bottom ) {
+      push @rects, Tickit::Rect->new(
+         top    => $hole->bottom,
+         bottom => $self->bottom,
+         left   => $self->left,
+         right  => $self->right,
+      );
+   }
+
+   return @rects;
+}
 
 =head1 AUTHOR
 

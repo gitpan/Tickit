@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 # Load the XS code
 require Tickit;
@@ -133,11 +133,11 @@ sub new
 
    my $self = $class->_new( $ENV{TERM} );
 
-   my $writer = $params{writer};
-   $self->set_output_func( sub { $writer->write( @_ ) } ) if $writer;
-
    $self->set_input_handle ( $params{input_handle}  ) if $params{input_handle};
    $self->set_output_handle( $params{output_handle} ) if $params{output_handle};
+
+   my $writer = $params{writer};
+   $self->set_output_func( sub { $writer->write( @_ ) } ) if $writer;
 
    $self->set_utf8( $params{UTF8} ) if defined $params{UTF8};
 

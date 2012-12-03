@@ -8,7 +8,7 @@ package Tickit::Window;
 use strict;
 use warnings;
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 use Carp;
 
@@ -543,7 +543,6 @@ sub _do_expose
    # This might be a call from the parent, so flush all pending areas as well
    $self->{damage}->add( $rect );
 
-   undef $self->{expose_pending};
    my @rects = $self->{damage}->rects;
    $self->{damage}->clear;
 
@@ -591,30 +590,25 @@ sub expose
       cols  => $self->cols,
    );
 
-   return if $self->{damage}->contains( $rect );
+   return if $self->_expose_pending( $rect );
 
    $self->{damage}->add( $rect );
-
-   return if $self->_expose_pending;
-
-   $self->{expose_pending} = 1;
 
    $self->tickit->enqueue_redraw( sub {
       my @rects = $self->{damage}->rects;
       $self->{damage}->clear;
-      undef $self->{expose_pending};
 
-      return if $self->parent && $self->parent->_expose_pending;
-
-      $self->_do_expose( $_ ) for @rects;
+      $self->_expose_pending( $_ ) or $self->_do_expose( $_ ) for @rects;
    } );
 }
 
 sub _expose_pending
 {
    my $self = shift;
-   return $self->{expose_pending} ||
-          ( $self->parent && $self->parent->_expose_pending );
+   my ( $rect ) = @_;
+   return 1 if $self->{damage}->contains( $rect );
+   return 0 unless $self->parent;
+   return $self->parent->_expose_pending( $rect->translate( $self->top, $self->left ) );
 }
 
 =head2 $win->set_on_focus( $on_refocus )
@@ -1174,21 +1168,29 @@ undefined if this method returns successful. The terminal pen, in particular
 the background colour, may be modified by this method even if it fails to
 scroll the terminal (and returns false).
 
+If the C<expose_after_scroll> behavior is enabled, then this method will
+enqueue all of the required expose requests before returning, so in this case
+the return value is not interesting.
+
 =cut
 
-sub scrollrect
+sub _scrollrect_inner
 {
    my $self = shift;
-   my ( $top, $left, $lines, $cols, $downward, $rightward, @args ) = @_;
+   my ( $rect, $downward, $rightward, @args ) = @_;
+
+   if( abs($downward) >= $rect->lines or abs($rightward) >= $rect->cols ) {
+      $self->expose( $rect ) if $self->{expose_after_scroll};
+      return 1;
+   }
 
    my $pen = ( @args == 1 ) ? $args[0]->clone : Tickit::Pen->new( @args );
 
-   # Check there are no floating windows in the way
-   foreach my $line ( $top .. $top + $lines - 1 ) {
-      my ( $vis, $len ) = $self->_get_span_visibility( $line, $left );
-      return 0 unless $vis;
-      return 0 unless $len >= $cols;
-   }
+   my $top  = $rect->top;
+   my $left = $rect->left;
+
+   my $lines = $rect->lines;
+   my $cols  = $rect->cols;
 
    my $win = $self;
    while( $win ) {
@@ -1214,34 +1216,104 @@ sub scrollrect
    $term->setpen( bg => $pen->getattr( 'bg' ) );
 
    unless( $term->scrollrect( $top, $left, $lines, $cols, $downward, $rightward ) ) {
-      $self->expose if $self->{expose_after_scroll};
+      $self->expose( $rect ) if $self->{expose_after_scroll};
       return 0;
    }
 
    if( $self->{expose_after_scroll} ) {
       if( $downward > 0 ) {
          # "scroll down" means lines moved upward, so the bottom needs redrawing
-         $self->expose( Tickit::Rect->new( top => $self->lines - $downward, lines => $downward, left => 0, cols => $self->cols ) );
+         $self->expose( Tickit::Rect->new(
+               top  => $rect->bottom - $downward, lines => $downward,
+               left => $rect->left,               cols  => $rect->cols,
+         ) );
       }
       elsif( $downward < 0 ) {
          # "scroll up" means lines moved downward, so top needs redrawing
-         $self->expose( Tickit::Rect->new( top => 0, lines => -$downward, left => 0, cols => $self->cols ) );
+         $self->expose( Tickit::Rect->new(
+               top  => $rect->top,  lines => -$downward,
+               left => $rect->left, cols  => $rect->cols,
+         ) );
       }
 
       if( $rightward > 0 ) {
          # "scroll right" means columns moved leftward, so the right edge needs redrawing
-         $self->expose( Tickit::Rect->new( top => 0, lines => $self->lines, left => $self->cols - $rightward, cols => $rightward ) );
+         $self->expose( Tickit::Rect->new(
+               top  => $rect->top,                lines => $rect->lines,
+               left => $rect->right - $rightward, cols  => $rightward,
+         ) );
       }
       elsif( $rightward < 0 ) {
          # "scroll left" means lines moved rightward, so left edge needs redrawing
-         $self->expose( Tickit::Rect->new( top => 0, lines => $self->lines, left => 0, cols => -$rightward ) );
+         $self->expose( Tickit::Rect->new(
+               top  => $rect->top,  lines => $rect->lines,
+               left => $rect->left, cols  => -$rightward,
+         ) );
       }
    }
    else {
-      $win->_needs_flush;
+      $self->_needs_flush;
    }
 
    return 1;
+}
+
+# TODO: This ought probably to take a Tickit::Rect instead of 4 ints
+sub scrollrect
+{
+   my $self = shift;
+   my ( $top, $left, $lines, $cols, $downward, $rightward, @args ) = @_;
+
+   my $rect = Tickit::Rect->new(
+      top   => $top,
+      left  => $left,
+      lines => $lines,
+      cols  => $cols,
+   );
+
+   my $visible = Tickit::RectSet->new;
+   $visible->add( $rect );
+
+   my $right = $left + $cols;
+
+   foreach my $line ( $top .. $top + $lines - 1 ) {
+      my $col = $left;
+      while( $col < $right ) {
+         my ( $vis, $len ) = $self->_get_span_visibility( $line, $col );
+         $col += $len and next if $vis;
+         my $until = defined $len ? $col + $len : $right;
+
+         return 0 unless $self->{expose_after_scroll};
+
+         $visible->subtract( Tickit::Rect->new( 
+            top    => $line,
+            bottom => $line+1,
+            left   => $col,
+            right  => $until,
+         ) );
+
+         $col = $until;
+      }
+   }
+
+   my @rects = $self->{damage}->rects;
+   $self->{damage}->clear;
+   foreach my $r ( @rects ) {
+      $self->{damage}->add( $r ), next if $r->bottom < $top or $r->top > $top + $lines or
+                                          $r->right < $left or $r->left > $left + $cols;
+      my $inside = $r->intersect( $rect );
+      my @outside = $r->subtract( $rect );
+
+      $self->{damage}->add( $_ ) for @outside;
+      $self->{damage}->add( $inside->translate( -$downward, -$rightward ) ) if $inside;
+   }
+
+   my $ret = 1;
+   foreach my $r ( $visible->rects ) {
+      $self->_scrollrect_inner( $r, $downward, $rightward, @args ) or $ret = 0;
+   }
+
+   return $ret;
 }
 
 =head2 $success = $win->scroll( $downward, $rightward )

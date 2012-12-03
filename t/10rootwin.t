@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 50;
+use Test::More tests => 51;
 use Test::Identity;
 use Test::Refcount;
 
@@ -185,6 +185,17 @@ is_termlog( [ SETBG(undef),
               [ Tickit::Rect->new( top => 0, bottom => 25, left => 0, right => 1 ) ],
               'Exposed area after ->scroll leftward' );
    undef @exposed_rects;
+
+   # Test that ->scroll updates pending damage
+
+   $win->expose( Tickit::Rect->new( top => 10, bottom => 12, left => 0, right => 80 ) );
+   $win->scroll( 2, 0 );
+   flush_tickit;
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 8, bottom => 10, left => 0, right => 80 ),
+                Tickit::Rect->new( top => 23, bottom => 25, left => 0, right => 80 ) ],
+              'Damage area updated after ->scroll' );
 
    drain_termlog;
 }

@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 17;
+use Test::More tests => 19;
 
 use Tickit::Test;
 
@@ -90,4 +90,18 @@ is_deeply( \@exposed_rects,
    [ Tickit::Rect->new( top => 0, left => 0, lines => 1, cols => 20 ),
      Tickit::Rect->new( top => 2, left => 0, lines => 1, cols => 20 ) ],
    'Exposed regions after expose two regions'
+);
+
+undef @exposed_rects;
+
+$rootwin->expose( Tickit::Rect->new( top => 0, left => 0, lines => 1, cols => 20 ) );
+$win->expose( Tickit::Rect->new( top => 0, left => 5, lines => 1, cols => 10 ) );
+
+flush_tickit;
+
+is( $win_exposed, 8, '$win expose count 8 after expose separate root+win' );
+
+is_deeply( \@exposed_rects,
+   [ Tickit::Rect->new( top => 0, left => 5, lines => 1, cols => 10 ) ],
+   'Exposed regions after expose separate root+win'
 );

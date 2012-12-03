@@ -8,7 +8,7 @@ package Tickit::StringPos;
 use strict;
 use warnings;
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 # XS code comes from Tickit itself
 require Tickit;

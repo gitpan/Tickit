@@ -1,5 +1,14 @@
 Revision history for Changes
 
+0.24    CHANGES:
+         * Many improvements to Window scroll logic; allow scroll with
+           terminal scrollrect even with obscuring floats
+         * Added Rect->add and ->subtract methods
+         * Added RectSet->subtract method
+
+        BUGFIXES:
+         * Correctly adjust pending window damage after ->scrollrect
+
 0.23    CHANGES:
          * Many improvements to Window float logic; beginning of merging float
            and non-float implementations

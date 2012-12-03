@@ -8,7 +8,7 @@ package Tickit::RectSet;
 use strict;
 use warnings;
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 use List::Util qw( min max );
 
@@ -130,14 +130,11 @@ sub add
       # non-overlapping rectangles with neighbouring row limits which cover
       # the same region
 
-      last if $top > $r->bottom;
-      next if $bottom < $r->top;
+      next if $top > $r->bottom;
+      last if $bottom < $r->top;
       next if $left > $r->right or $right < $r->left;
 
       # There may be an interaction then
-
-      my @add;
-      my $delete;
 
       my $top_eq    = $top    == $r->top;
       my $bottom_eq = $bottom == $r->bottom;
@@ -148,10 +145,7 @@ sub add
       my $cols_eq = $left_eq && $right_eq;
 
       # Handle a few simple cases first
-      if( $rows_eq and $cols_eq or
-          $rows_eq and $left >= $r->left and $right  <= $r->right or
-          $cols_eq and $top  >= $r->top  and $bottom <= $r->bottom or
-          $top >= $r->top and $bottom <= $r->bottom and $left >= $r->left and $right <= $r->right ) {
+      if( $top >= $r->top and $bottom <= $r->bottom and $left >= $r->left and $right <= $r->right ) {
          # Already entirely covered; just return
          return;
       }
@@ -177,39 +171,7 @@ sub add
 
       # Non-simple case. Split the covered region into the 2 or 3 separate
       # line runs that it must necessarily be composed of by now.
-      my @rects;
-
-      my @rows = do {
-         my %rows = map +( $_ => 1 ), $top, $bottom, $r->top, $r->bottom;
-         sort { $a <=> $b } keys %rows;
-      };
-
-      # We know there must be either 3 or 4 distinct values here
-      foreach my $i ( 0 .. $#rows-1 ) {
-         my $this_top    = $rows[$i];
-         my $this_bottom = $rows[$i+1];
-
-         my $has_r   = $this_top >= $r->top && $this_bottom <= $r->bottom;
-         my $has_new = $this_top >= $top    && $this_bottom <= $bottom;
-
-         my $this_left =  ( $has_r and $has_new ) ? min( $left, $r->left ) :
-                            $has_r                ? $r->left
-                                                  : $left;
-         my $this_right = ( $has_r and $has_new ) ? max( $right, $r->right ) :
-                            $has_r                ? $r->right
-                                                  : $right;
-
-         if( @rects and $this_left == $rects[-1]->left and $this_right == $rects[-1]->right ) {
-            $this_top = ( pop @rects )->top;
-         }
-
-         push @rects, Tickit::Rect->new(
-            top    => $this_top,
-            bottom => $this_bottom,
-            left   => $this_left,
-            right  => $this_right,
-         );
-      }
+      my @rects = $r->add( $rect );
 
       # Now we need to delete $r and insert all the candidate rects instead
       splice @{ $self->{rects} }, $idx, 1, ();
@@ -221,6 +183,37 @@ sub add
    # If we got this far then we need to add it
    my $new = Tickit::Rect->new( top => $top, bottom => $bottom, left => $left, right => $right );
    $self->_insert( $new );
+}
+
+=head2 $rectset->subtract( $rect )
+
+Removes any covered region that intersects with C<$rect> from the stored
+region list.
+
+=cut
+
+sub subtract
+{
+   my $self = shift;
+   my ( $rect ) = @_;
+
+   # Subtract a region by iterating each rect, and if the rect intersects,
+   # removing it from the stored list and inserting the left-overs
+
+   my @add;
+
+   my $idx;
+   for ( $idx = 0; $idx < @{ $self->{rects} }; $idx++ ) {
+      my $r = $self->{rects}[$idx];
+      next unless $r->intersects( $rect );
+
+      push @add, $r->subtract( $rect );
+
+      splice @{ $self->{rects} }, $idx, 1, ();
+      $idx--;
+   }
+
+   $self->add( $_ ) for @add;
 }
 
 =head2 $rectset->clear

@@ -30,11 +30,13 @@ struct XTermDriver {
   struct {
     unsigned int altscreen:1;
     unsigned int cursorvis:1;
+    unsigned int cursorblink:1;
     unsigned int mouse:1;
   } mode;
 
   struct {
     unsigned int bce:1;
+    unsigned int slrm:1;
   } cap;
 };
 
@@ -78,57 +80,75 @@ static void move_rel(TickitTermDriver *ttd, int downward, int rightward)
     tickit_termdrv_write_strf(ttd, "\e[%dD", -rightward);
 }
 
-static void insertch(TickitTermDriver *ttd, int count)
-{
-  if(count == 1)
-    tickit_termdrv_write_str(ttd, "\e[@", 3);
-  else if(count > 1)
-    tickit_termdrv_write_strf(ttd, "\e[%d@", count);
-}
-
-static void deletech(TickitTermDriver *ttd, int count)
-{
-  if(count == 1)
-    tickit_termdrv_write_str(ttd, "\e[P", 3);
-  else if(count > 1)
-    tickit_termdrv_write_strf(ttd, "\e[%dP", count);
-}
-
 static int scrollrect(TickitTermDriver *ttd, int top, int left, int lines, int cols, int downward, int rightward)
 {
+  struct XTermDriver *xd = (struct XTermDriver *)ttd;
+
   if(!downward && !rightward)
     return 1;
 
   int term_cols;
   tickit_term_get_size(ttd->tt, NULL, &term_cols);
 
-  if(left == 0 && cols == term_cols && rightward == 0) {
-    tickit_termdrv_write_strf(ttd, "\e[%d;%dr", top + 1, top + lines);
-    goto_abs(ttd, top, left);
-    if(downward > 0) {
-      if(downward > 1)
-        tickit_termdrv_write_strf(ttd, "\e[%dM", downward); /* DL */
-      else
-        tickit_termdrv_write_str(ttd, "\e[M", 3);
+  /* Use DECSLRM only for 1 line of insert/delete, because any more and it's
+   * likely better to use the generic system below
+   */
+  if((xd->cap.slrm && lines == 1 || left + cols == term_cols) 
+      && downward == 0) {
+    if(left + cols < term_cols)
+      tickit_termdrv_write_strf(ttd, "\e[;%ds", left + cols);
+
+    for(int line = top; line < top + lines; line++) {
+      goto_abs(ttd, line, left);
+      if(rightward > 1)
+        tickit_termdrv_write_strf(ttd, "\e[%d@", rightward);  /* DCH */
+      else if(rightward == 1)
+        tickit_termdrv_write_str(ttd, "\e[@", 3);             /* DCH1 */
+      else if(rightward == -1)
+        tickit_termdrv_write_str(ttd, "\e[P", 3);             /* ICH1 */
+      else if(rightward < -1)
+        tickit_termdrv_write_strf(ttd, "\e[%dP", -rightward); /* ICH */
+
+    if(left + cols < term_cols)
+      tickit_termdrv_write_strf(ttd, "\e[s");
     }
-    else {
-      if(downward < -1)
-        tickit_termdrv_write_strf(ttd, "\e[%dL", -downward); /* IL */
-      else
-        tickit_termdrv_write_str(ttd, "\e[L", 3);
-    }
-    tickit_termdrv_write_str(ttd, "\e[r", 3);
+
     return 1;
   }
 
-  if(left + cols == term_cols && downward == 0) {
-    for(int line = top; line < top + lines; line++) {
-      goto_abs(ttd, line, left);
-      if(rightward > 0)
-        insertch(ttd,  rightward);
-      else
-        deletech(ttd, -rightward);
-    }
+  if(xd->cap.slrm ||
+     (left == 0 && cols == term_cols && rightward == 0)) {
+    tickit_termdrv_write_strf(ttd, "\e[%d;%dr", top + 1, top + lines);
+
+    if(left > 0 || left + cols < term_cols)
+      tickit_termdrv_write_strf(ttd, "\e[%d;%ds", left + 1, left + cols);
+
+    goto_abs(ttd, top, left);
+
+    if(downward > 1)
+      tickit_termdrv_write_strf(ttd, "\e[%dM", downward);  /* DL */
+    else if(downward == 1)
+      tickit_termdrv_write_str(ttd, "\e[M", 3);            /* DL1 */
+    else if(downward == -1)
+      tickit_termdrv_write_str(ttd, "\e[L", 3);            /* IL1 */
+    else if(downward < -1)
+      tickit_termdrv_write_strf(ttd, "\e[%dL", -downward); /* IL */
+
+    if(rightward > 1)
+      tickit_termdrv_write_strf(ttd, "\e[%d'~", rightward);  /* DECDC */
+    else if(rightward == 1)
+      tickit_termdrv_write_str(ttd, "\e['~", 4);             /* DECDC1 */
+    else if(rightward == -1)
+      tickit_termdrv_write_str(ttd, "\e['}", 4);             /* DECIC1 */
+    if(rightward < -1)
+      tickit_termdrv_write_strf(ttd, "\e[%d'}", -rightward); /* DECIC */
+
+    tickit_termdrv_write_str(ttd, "\e[r", 3);
+
+    if(left > 0 || left + cols < term_cols)
+      tickit_termdrv_write_str(ttd, "\e[s", 3);
+
+    return 1;
   }
 
   return 0;
@@ -270,7 +290,7 @@ static void chpen(TickitTermDriver *ttd, const TickitPen *delta, const TickitPen
   tickit_termdrv_write_str(ttd, buffer, len);
 }
 
-static int setctl_int(TickitTermDriver *ttd, TickitTermDriverCtl ctl, int value)
+static int setctl_int(TickitTermDriver *ttd, TickitTermCtl ctl, int value)
 {
   struct XTermDriver *xd = (struct XTermDriver *)ttd;
 
@@ -282,6 +302,7 @@ static int setctl_int(TickitTermDriver *ttd, TickitTermDriverCtl ctl, int value)
       tickit_termdrv_write_str(ttd, value ? "\e[?1049h" : "\e[?1049l", 0);
       xd->mode.altscreen = !!value;
       return 1;
+
     case TICKIT_TERMCTL_CURSORVIS:
       if(!xd->mode.cursorvis == !value)
         return 1;
@@ -289,6 +310,15 @@ static int setctl_int(TickitTermDriver *ttd, TickitTermDriverCtl ctl, int value)
       tickit_termdrv_write_str(ttd, value ? "\e[?25h" : "\e[?25l", 0);
       xd->mode.cursorvis = !!value;
       return 1;
+
+    case TICKIT_TERMCTL_CURSORBLINK:
+      /* We don't actually know whether this was enabled initially, so best
+       * just to always apply this
+       */
+      tickit_termdrv_write_str(ttd, value ? "\e[?12h" : "\e[?12l", 0);
+      xd->mode.cursorblink = !!value;
+      return 1;
+
     case TICKIT_TERMCTL_MOUSE:
       if(!xd->mode.mouse == !value)
         return 1;
@@ -296,12 +326,43 @@ static int setctl_int(TickitTermDriver *ttd, TickitTermDriverCtl ctl, int value)
       tickit_termdrv_write_str(ttd, value ? "\e[?1002h\e[?1006h" : "\e[?1002l\e[?1006l", 0);
       xd->mode.mouse = !!value;
       return 1;
+
+    case TICKIT_TERMCTL_CURSORSHAPE:
+      tickit_termdrv_write_strf(ttd, "\e[%d q", value * 2 + (xd->mode.cursorblink ? -1 : 0));
+      return 1;
   }
 
   return 0;
 }
 
-static void destroy(TickitTermDriver *ttd)
+static void start(TickitTermDriver *ttd)
+{
+  // Enable DECSLRM
+  tickit_termdrv_write_strf(ttd, "\e[?69h");
+
+  // Find out if DECSLRM is actually supported
+  tickit_termdrv_write_strf(ttd, "\e[?69$p");
+}
+
+static void gotkey(TickitTermDriver *ttd, TermKey *tk, const TermKeyKey *key)
+{
+  struct XTermDriver *xd = (struct XTermDriver *)ttd;
+
+  if(key->type == TERMKEY_TYPE_MODEREPORT) {
+    int initial, mode, value;
+    termkey_interpret_modereport(tk, key, &initial, &mode, &value);
+
+    if(initial == '?') // DEC mode
+      switch(mode) {
+        case 69: // DECVSSM
+          if(value == 1 || value == 2)
+            xd->cap.slrm = 1;
+          break;
+      }
+  }
+}
+
+static void stop(TickitTermDriver *ttd)
 {
   struct XTermDriver *xd = (struct XTermDriver *)ttd;
 
@@ -311,12 +372,19 @@ static void destroy(TickitTermDriver *ttd)
     setctl_int(ttd, TICKIT_TERMCTL_CURSORVIS, 1);
   if(xd->mode.altscreen)
     setctl_int(ttd, TICKIT_TERMCTL_ALTSCREEN, 0);
+}
+
+static void destroy(TickitTermDriver *ttd)
+{
+  struct XTermDriver *xd = (struct XTermDriver *)ttd;
 
   free(xd);
 }
 
 TickitTermDriverVTable xterm_vtable = {
   .destroy    = destroy,
+  .start      = start,
+  .stop       = stop,
   .print      = print,
   .goto_abs   = goto_abs,
   .move_rel   = move_rel,
@@ -325,6 +393,7 @@ TickitTermDriverVTable xterm_vtable = {
   .clear      = ttd_clear,
   .chpen      = chpen,
   .setctl_int = setctl_int,
+  .gotkey     = gotkey,
 };
 
 static TickitTermDriver *new(TickitTerm *tt, const char *termtype)
@@ -338,6 +407,11 @@ static TickitTermDriver *new(TickitTerm *tt, const char *termtype)
   xd->mode.mouse     = 0;
 
   xd->cap.bce = 1;
+
+  /* This will be set to 1 later if the terminal responds appropriately to the
+   * DECRQM on DECVSSM
+   */
+  xd->cap.slrm = 0;
 
 #ifdef HAVE_UNIBILIUM
   {
