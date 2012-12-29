@@ -8,7 +8,7 @@ package Tickit::Utils;
 use strict;
 use warnings;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use Exporter 'import';
 our @EXPORT_OK = qw(
@@ -23,6 +23,8 @@ our @EXPORT_OK = qw(
    substrwidth
 
    align
+
+   bound
 );
 
 # XS code comes from Tickit itself
@@ -136,6 +138,21 @@ sub align
    my $before = int( $spare * $alignment );
 
    return ( $before, $value, $spare - $before );
+}
+
+=head2 $val = bound( $min, $val, $max )
+
+Returns the value of C<$val> bounded by the given minimum and maximum. Either
+limit may be left undefined, causing no limit of that kind to be applied.
+
+=cut
+
+sub bound
+{
+   my ( $min, $val, $max ) = @_;
+   $val = $min if defined $min and $val < $min;
+   $val = $max if defined $max and $val > $max;
+   return $val;
 }
 
 =head1 AUTHOR

@@ -32,6 +32,7 @@ struct XTermDriver {
     unsigned int cursorvis:1;
     unsigned int cursorblink:1;
     unsigned int mouse:1;
+    unsigned int keypad:1;
   } mode;
 
   struct {
@@ -330,9 +331,37 @@ static int setctl_int(TickitTermDriver *ttd, TickitTermCtl ctl, int value)
     case TICKIT_TERMCTL_CURSORSHAPE:
       tickit_termdrv_write_strf(ttd, "\e[%d q", value * 2 + (xd->mode.cursorblink ? -1 : 0));
       return 1;
-  }
 
-  return 0;
+    case TICKIT_TERMCTL_KEYPAD_APP:
+      if(!xd->mode.keypad == !value)
+        return 1;
+
+      tickit_termdrv_write_strf(ttd, value ? "\e=" : "\e>");
+      return 1;
+
+    default:
+      return 0;
+  }
+}
+
+static int setctl_str(TickitTermDriver *ttd, TickitTermCtl ctl, const char *value)
+{
+  switch(ctl) {
+    case TICKIT_TERMCTL_ICON_TEXT:
+      tickit_termdrv_write_strf(ttd, "\e]1;%s\e\\", value);
+      return 1;
+
+    case TICKIT_TERMCTL_TITLE_TEXT:
+      tickit_termdrv_write_strf(ttd, "\e]2;%s\e\\", value);
+      return 1;
+
+    case TICKIT_TERMCTL_ICONTITLE_TEXT:
+      tickit_termdrv_write_strf(ttd, "\e]0;%s\e\\", value);
+      return 1;
+
+    default:
+      return 0;
+  }
 }
 
 static void start(TickitTermDriver *ttd)
@@ -372,6 +401,8 @@ static void stop(TickitTermDriver *ttd)
     setctl_int(ttd, TICKIT_TERMCTL_CURSORVIS, 1);
   if(xd->mode.altscreen)
     setctl_int(ttd, TICKIT_TERMCTL_ALTSCREEN, 0);
+  if(xd->mode.keypad)
+    setctl_int(ttd, TICKIT_TERMCTL_KEYPAD_APP, 0);
 }
 
 static void destroy(TickitTermDriver *ttd)
@@ -393,6 +424,7 @@ TickitTermDriverVTable xterm_vtable = {
   .clear      = ttd_clear,
   .chpen      = chpen,
   .setctl_int = setctl_int,
+  .setctl_str = setctl_str,
   .gotkey     = gotkey,
 };
 

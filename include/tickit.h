@@ -97,6 +97,36 @@ int  tickit_pen_bind_event(TickitPen *tt, TickitEventType ev, TickitPenEventFn *
 void tickit_pen_unbind_event_id(TickitPen *tt, int id);
 
 TickitPenAttrType tickit_pen_attrtype(TickitPenAttr attr);
+const char *tickit_pen_attrname(TickitPenAttr attr);
+TickitPenAttr tickit_pen_lookup_attr(const char *name);
+
+/*
+ * TickitRect
+ */
+
+typedef struct {
+  int top;
+  int left;
+  int lines;
+  int cols;
+} TickitRect;
+
+void tickit_rect_init_sized(TickitRect *rect, int top, int left, int lines, int cols);
+void tickit_rect_init_bounds(TickitRect *rect, int top, int left, int bottom, int right);
+
+static inline int tickit_rect_bottom(const TickitRect *rect)
+{ return rect->top + rect->lines; }
+
+static inline int tickit_rect_right (const TickitRect *rect)
+{ return rect->left + rect->cols; }
+
+int tickit_rect_intersect(TickitRect *dst, const TickitRect *a, const TickitRect *b);
+
+int tickit_rect_intersects(const TickitRect *a, const TickitRect *b);
+int tickit_rect_contains(const TickitRect *large, const TickitRect *small);
+
+int tickit_rect_add(TickitRect ret[3], const TickitRect *a, const TickitRect *b);
+int tickit_rect_subtract(TickitRect ret[4], const TickitRect *orig, const TickitRect *hole);
 
 /*
  * TickitTerm
@@ -157,6 +187,10 @@ typedef enum {
   TICKIT_TERMCTL_MOUSE,
   TICKIT_TERMCTL_CURSORBLINK,
   TICKIT_TERMCTL_CURSORSHAPE,
+  TICKIT_TERMCTL_ICON_TEXT,
+  TICKIT_TERMCTL_TITLE_TEXT,
+  TICKIT_TERMCTL_ICONTITLE_TEXT,
+  TICKIT_TERMCTL_KEYPAD_APP,
 } TickitTermCtl;
 
 typedef enum {
@@ -166,11 +200,7 @@ typedef enum {
 } TickitTermCursorShape;
 
 int tickit_term_setctl_int(TickitTerm *tt, TickitTermCtl ctl, int value);
-
-/* These are deprecated, don't use them */
-void tickit_term_set_mode_altscreen(TickitTerm *tt, int on);
-void tickit_term_set_mode_cursorvis(TickitTerm *tt, int on);
-void tickit_term_set_mode_mouse(TickitTerm *tt, int on);
+int tickit_term_setctl_str(TickitTerm *tt, TickitTermCtl ctl, const char *value);
 
 /*
  * String handling utilities

@@ -1,5 +1,12 @@
 Revision history for Changes
 
+0.25    CHANGES:
+         * Removed Tickit::Widget::Frame and Tickit::Widget::Box, now they
+           have been moved to Tickit-Widgets dist.
+         * Added a new, better idea for Tickit::Widget::Box
+         * Allow Tickit->new( root => ... )
+         * Re-implement Tickit::Rect as a libtickit-backed structure object
+
 0.24    CHANGES:
          * Many improvements to Window scroll logic; allow scroll with
            terminal scrollrect even with obscuring floats

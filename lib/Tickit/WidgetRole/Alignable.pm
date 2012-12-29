@@ -7,8 +7,9 @@ package Tickit::WidgetRole::Alignable;
 
 use strict;
 use warnings;
+use base qw( Tickit::WidgetRole );
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use Carp;
 
@@ -30,7 +31,7 @@ to implement alignment of content within a possibly-larger space.
 The following methods are provided parametrically on the caller package when
 the module is imported by
 
- use Tickit::WidgetRole::Alignable name => NAME, style => STYLE
+ use Tickit::WidgetRole::Alignable name => NAME, style => STYLE, reshape => RESHAPE
 
 The parameters are
 
@@ -47,6 +48,12 @@ Optional. The direction, horizontal or vertical, that the alignment
 represents. Used to parse symbolic names into fractions. Defaults to C<'h'> if
 not provided.
 
+=item reshape => BOOL
+
+Optional. If true, the widget will be reshaped after the value has been set by
+calling the C<reshape> method. If false or absent then it will just be redrawn
+by calling C<redraw>.
+
 =back
 
 =cut
@@ -56,18 +63,20 @@ my %symbolics = (
    v => { top  => 0.0, middle => 0.5, bottom => 1.0 },
 );
 
-sub import
+sub export_subs_for
 {
-   my $pkg = caller;
+   my $class = shift;
    shift;
    my %args = @_;
 
    my $name = $args{name} || "align";
    my $dir  = $args{dir}  || "h";
 
+   my $post_set_method = $args{reshape} ? "reshape" : "redraw";
+
    my $symbolics = $symbolics{$dir} or croak "Unrecognised dir - $dir";
 
-   my %subs = (
+   return {
       "$name" => sub {
          my $self = shift;
          return $self->{$name};
@@ -81,7 +90,7 @@ sub import
 
          $self->{$name} = $align;
 
-         $self->redraw;
+         $self->$post_set_method;
       },
 
       "_${name}_allocation" => sub {
@@ -90,10 +99,7 @@ sub import
 
          return align( $value, $total, $self->$name );
       },
-   );
-
-   no strict 'refs';
-   *{"${pkg}::$_"} = $subs{$_} for keys %subs;
+   };
 }
 
 =head2 $align = $widget->NAME

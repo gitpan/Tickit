@@ -29,50 +29,6 @@ typedef struct Tickit__Pen {
   int                 event_id;
 } *Tickit__Pen;
 
-static TickitPenAttr lookup_pen_attr(const char *name)
-{
-  switch(name[0]) {
-    case 'a':
-      return streq(name+1,"f") ? TICKIT_PEN_ALTFONT
-                               : -1;
-    case 'b':
-      return name[1] == 0      ? TICKIT_PEN_BOLD
-           : streq(name+1,"g") ? TICKIT_PEN_BG
-                               : -1;
-    case 'f':
-      return streq(name+1,"g") ? TICKIT_PEN_FG
-                               : -1;
-    case 'i':
-      return name[1] == 0      ? TICKIT_PEN_ITALIC
-                               : -1;
-    case 'r':
-      return streq(name+1,"v") ? TICKIT_PEN_REVERSE
-                               : -1;
-    case 's':
-      return streq(name+1,"trike") ? TICKIT_PEN_STRIKE
-                               : -1;
-    case 'u':
-      return name[1] == 0      ? TICKIT_PEN_UNDER
-                               : -1;
-  }
-  return -1;
-}
-
-static const char *get_pen_attr_name(TickitPenAttr attr)
-{
-  switch(attr) {
-    case TICKIT_PEN_FG:      return "fg";
-    case TICKIT_PEN_BG:      return "bg";
-    case TICKIT_PEN_BOLD:    return "b";
-    case TICKIT_PEN_UNDER:   return "u";
-    case TICKIT_PEN_ITALIC:  return "i";
-    case TICKIT_PEN_REVERSE: return "rv";
-    case TICKIT_PEN_STRIKE:  return "strike";
-    case TICKIT_PEN_ALTFONT: return "af";
-  }
-  return NULL;
-}
-
 static SV *pen_get_attr(TickitPen *pen, TickitPenAttr attr)
 {
   switch(tickit_pen_attrtype(attr)) {
@@ -114,7 +70,7 @@ static TickitPen *pen_from_args(SV **args, int argcount)
     const char *name  = SvPV_nolen(args[i]);
     SV         *value = args[i+1];
 
-    TickitPenAttr attr = lookup_pen_attr(name);
+    TickitPenAttr attr = tickit_pen_lookup_attr(name);
     if(attr != -1)
       pen_set_attr(pen, attr, value);
   }
@@ -147,6 +103,21 @@ static void pen_event_fn(TickitPen *pen, TickitEventType ev, TickitEvent *args, 
     }
   }
 }
+
+static inline int minint(int a, int b) { return a < b ? a : b; }
+static inline int maxint(int a, int b) { return a > b ? a : b; }
+
+typedef TickitRect *Tickit__Rect;
+
+/* Really cheating and treading on Perl's namespace but hopefully it will be OK */
+SV *newSVrect(TickitRect *rect)
+{
+  TickitRect *self;
+  Newx(self, 1, TickitRect);
+  *self = *rect;
+  return sv_setref_pv(newSV(0), "Tickit::Rect", self);
+}
+#define mPUSHrect(rect) PUSHs(sv_2mortal(newSVrect(rect)))
 
 typedef struct Tickit__Term {
   TickitTerm *tt;
@@ -315,7 +286,7 @@ hasattr(self,attr)
   INIT:
     TickitPenAttr a;
   CODE:
-    if((a = lookup_pen_attr(attr)) == -1)
+    if((a = tickit_pen_lookup_attr(attr)) == -1)
       XSRETURN_UNDEF;
     RETVAL = tickit_pen_has_attr(self->pen, a);
   OUTPUT:
@@ -328,7 +299,7 @@ getattr(self,attr)
   INIT:
     TickitPenAttr a;
   CODE:
-    if((a = lookup_pen_attr(attr)) == -1)
+    if((a = tickit_pen_lookup_attr(attr)) == -1)
       XSRETURN_UNDEF;
     if(!tickit_pen_has_attr(self->pen, a))
       XSRETURN_UNDEF;
@@ -350,7 +321,7 @@ getattrs(self)
       EXTEND(SP, 2); count += 2;
 
       /* Because mPUSHp(str,0) creates a 0-length string */
-      mPUSHs(newSVpv(get_pen_attr_name(a), 0));
+      mPUSHs(newSVpv(tickit_pen_attrname(a), 0));
       mPUSHs(pen_get_attr(self->pen, a));
     }
     XSRETURN(count);
@@ -363,7 +334,7 @@ chattr(self,attr,value)
   INIT:
     TickitPenAttr a;
   CODE:
-    if((a = lookup_pen_attr(attr)) == -1)
+    if((a = tickit_pen_lookup_attr(attr)) == -1)
       XSRETURN_UNDEF;
     if(!SvOK(value)) {
       tickit_pen_clear_attr(self->pen, a);
@@ -379,7 +350,7 @@ chattrs(self,attrs)
     TickitPenAttr a;
   CODE:
     for(a = 0; a < TICKIT_N_PEN_ATTRS; a++) {
-      const char *name = get_pen_attr_name(a);
+      const char *name = tickit_pen_attrname(a);
       SV *val = hv_delete(attrs, name, strlen(name), 0);
       if(!val)
         continue;
@@ -397,7 +368,7 @@ delattr(self,attr)
   INIT:
     TickitPenAttr a;
   CODE:
-    if((a = lookup_pen_attr(attr)) == -1)
+    if((a = tickit_pen_lookup_attr(attr)) == -1)
       XSRETURN_UNDEF;
     tickit_pen_clear_attr(self->pen, a);
 
@@ -464,6 +435,163 @@ remove_on_changed(self,observer)
       tickit_pen_unbind_event_id(self->pen, self->event_id);
       self->event_id = 0;
     }
+
+MODULE = Tickit             PACKAGE = Tickit::Rect
+
+Tickit::Rect
+_new(package,top,left,lines,cols)
+  char *package
+  int top
+  int left
+  int lines
+  int cols
+  CODE:
+    Newx(RETVAL, 1, TickitRect);
+    tickit_rect_init_sized(RETVAL, top, left, lines, cols);
+  OUTPUT:
+    RETVAL
+
+void
+DESTROY(self)
+  Tickit::Rect self
+  CODE:
+    Safefree(self);
+
+Tickit::Rect
+intersect(self,other)
+  Tickit::Rect self
+  Tickit::Rect other
+  INIT:
+    TickitRect ret;
+  CODE:
+    if(!tickit_rect_intersect(&ret, self, other))
+      XSRETURN_UNDEF;
+
+    Newx(RETVAL, 1, TickitRect);
+    *RETVAL = ret;
+  OUTPUT:
+    RETVAL
+
+Tickit::Rect
+translate(self,downward,rightward)
+  Tickit::Rect self
+  int          downward
+  int          rightward
+  CODE:
+    Newx(RETVAL, 1, TickitRect);
+    tickit_rect_init_sized(RETVAL, self->top + downward, self->left + rightward,
+      self->lines, self->cols);
+  OUTPUT:
+    RETVAL
+
+int
+top(self)
+  Tickit::Rect self
+  CODE:
+    RETVAL = self->top;
+  OUTPUT:
+    RETVAL
+
+int
+left(self)
+  Tickit::Rect self
+  CODE:
+    RETVAL = self->left;
+  OUTPUT:
+    RETVAL
+
+int
+lines(self)
+  Tickit::Rect self
+  CODE:
+    RETVAL = self->lines;
+  OUTPUT:
+    RETVAL
+
+int
+cols(self)
+  Tickit::Rect self
+  CODE:
+    RETVAL = self->cols;
+  OUTPUT:
+    RETVAL
+
+int
+bottom(self)
+  Tickit::Rect self
+  CODE:
+    RETVAL = tickit_rect_bottom(self);
+  OUTPUT:
+    RETVAL
+
+int
+right(self)
+  Tickit::Rect self
+  CODE:
+    RETVAL = tickit_rect_right(self);
+  OUTPUT:
+    RETVAL
+
+bool
+equals(self,other,swap=0)
+  Tickit::Rect self
+  Tickit::Rect other
+  int          swap
+  CODE:
+    RETVAL = (self->top   == other->top) &&
+             (self->lines == other->lines) &&
+             (self->left  == other->left) &&
+             (self->cols  == other->cols);
+  OUTPUT:
+    RETVAL
+
+bool
+intersects(self,other)
+  Tickit::Rect self
+  Tickit::Rect other
+  CODE:
+    RETVAL = tickit_rect_intersects(self, other);
+  OUTPUT:
+    RETVAL
+
+bool
+contains(large,small)
+  Tickit::Rect large
+  Tickit::Rect small
+  CODE:
+    RETVAL = tickit_rect_contains(large, small);
+  OUTPUT:
+    RETVAL
+
+void
+add(x,y)
+  Tickit::Rect x
+  Tickit::Rect y
+  INIT:
+    int n_rects, i;
+    TickitRect rects[3];
+  PPCODE:
+    n_rects = tickit_rect_add(rects, x, y);
+
+    for(i = 0; i < n_rects; i++)
+      mPUSHrect(rects + i);
+
+    XSRETURN(n_rects);
+
+void
+subtract(self,hole)
+  Tickit::Rect self
+  Tickit::Rect hole
+  INIT:
+    int n_rects, i;
+    TickitRect rects[4];
+  PPCODE:
+    n_rects = tickit_rect_subtract(rects, self, hole);
+
+    for(i = 0; i < n_rects; i++)
+      mPUSHrect(rects + i);
+
+    XSRETURN(n_rects);
 
 MODULE = Tickit             PACKAGE = Tickit::StringPos
 
@@ -889,21 +1017,21 @@ set_mode_altscreen(self,on)
   Tickit::Term  self
   int           on
   CODE:
-    tickit_term_set_mode_altscreen(self->tt, on);
+    tickit_term_setctl_int(self->tt, TICKIT_TERMCTL_ALTSCREEN, on);
 
 void
 set_mode_cursorvis(self,on)
   Tickit::Term  self
   int           on
   CODE:
-    tickit_term_set_mode_cursorvis(self->tt, on);
+    tickit_term_setctl_int(self->tt, TICKIT_TERMCTL_CURSORVIS, on);
 
 void
 set_mode_mouse(self,on)
   Tickit::Term  self
   int           on
   CODE:
-    tickit_term_set_mode_mouse(self->tt, on);
+    tickit_term_setctl_int(self->tt, TICKIT_TERMCTL_MOUSE, on);
 
 MODULE = Tickit             PACKAGE = Tickit::Utils
 

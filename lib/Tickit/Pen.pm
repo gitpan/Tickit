@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use Carp;
 
@@ -139,8 +139,8 @@ Returns a key/value list of all the attributes
 
 =head2 $pen->chattr( $attr, $value )
 
-Change the value of an attribute. Setting C<undef> implies default value. To
-delete an attribute altogether, see instead C<delattr>.
+Change the value of an attribute. Setting C<undef> deletes the attribute
+entirely. See also C<delattr>.
 
 =cut
 

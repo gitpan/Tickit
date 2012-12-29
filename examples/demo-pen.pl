@@ -46,8 +46,4 @@ $vbox->add( Tickit::Widget::Static->new( text => "reverse video", rv => 1 ) );
 
 $vbox->add( Tickit::Widget::Static->new( text => "alternate font", af => 1 ) );
 
-my $tickit = Tickit->new();
-
-$tickit->set_root_widget( $vbox );
-
-$tickit->run;
+Tickit->new( root => $vbox )->run;

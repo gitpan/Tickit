@@ -7,8 +7,9 @@ package Tickit::WidgetRole::Penable;
 
 use strict;
 use warnings;
+use base qw( Tickit::WidgetRole );
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use Carp;
 
@@ -50,9 +51,9 @@ have on initialisation.
 
 =cut
 
-sub import
+sub export_subs_for
 {
-   my $pkg = caller;
+   my $class = shift;
    shift;
    my %args = @_;
 
@@ -63,7 +64,7 @@ sub import
 
    my $attr = "${name}_pen";
 
-   my %subs = (
+   return {
       "${name}_pen" => sub {
          my $self = shift;
          return $self->{$attr};
@@ -82,10 +83,7 @@ sub import
          $self->{$attr} = $newpen;
          $newpen->add_on_changed( $self, $name );
       },
-   );
-
-   no strict 'refs';
-   *{"${pkg}::$_"} = $subs{$_} for keys %subs;
+   }
 }
 
 =head2 $pen = $widget->NAME_pen

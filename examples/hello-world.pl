@@ -9,8 +9,9 @@ use Tickit::Widget::Box;
 use Tickit::Widget::Static;
 
 my $box = Tickit::Widget::Box->new(
-   h_border => 4, v_border => 2,
    bg => "green",
+   child_lines => '80%',
+   child_cols => '80%',
    child => Tickit::Widget::Static->new(
       text => "Hello, world!",
       align => "centre", valign => "middle",
@@ -18,6 +19,4 @@ my $box = Tickit::Widget::Box->new(
    ),
 );
 
-my $tickit = Tickit->new;
-$tickit->set_root_widget( $box );
-$tickit->run;
+Tickit->new( root => $box )->run;

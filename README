@@ -6,8 +6,6 @@ SYNOPSIS
      use Tickit::Widget::Box;
      use Tickit::Widget::Static;
 
-     my $tickit = Tickit->new;
-
      my $box = Tickit::Widget::Box->new(
         h_border => 4,
         v_border => 2,
@@ -20,8 +18,7 @@ SYNOPSIS
         ),
      );
 
-     $tickit->set_root_widget( $box );
-     $tickit->run;
+     Tickit->new( root => $box )->run;
 
 DESCRIPTION
     `Tickit' is a high-level toolkit for creating full-screen terminal-based
@@ -60,6 +57,10 @@ CONSTRUCTOR
             If defined, overrides locale detection to enable or disable
             UTF-8 mode. If not defined then this will be detected from the
             locale by using Perl's `${^UTF8LOCALE}' variable.
+
+    root => Tickit::Widget
+            If defined, sets the root widget using `set_root_widget' to the
+            one specified.
 
 METHODS
   $tickit->later( $code )

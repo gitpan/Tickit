@@ -1,4 +1,5 @@
 Tickit::Pen       T_PTROBJ
+Tickit::Rect      T_PTROBJ
 Tickit::StringPos T_PTROBJ_OR_NULL
 Tickit::Term      T_PTROBJ
 

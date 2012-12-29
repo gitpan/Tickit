@@ -8,7 +8,7 @@ package Tickit;
 use strict;
 use warnings;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use IO::Handle;
 
@@ -30,8 +30,6 @@ C<Tickit> - Terminal Interface Construction KIT
  use Tickit::Widget::Box;
  use Tickit::Widget::Static;
 
- my $tickit = Tickit->new;
-
  my $box = Tickit::Widget::Box->new(
     h_border => 4,
     v_border => 2,
@@ -44,8 +42,7 @@ C<Tickit> - Terminal Interface Construction KIT
     ),
  );
 
- $tickit->set_root_widget( $box );
- $tickit->run;
+ Tickit->new( root => $box )->run;
 
 =head1 DESCRIPTION
 
@@ -95,6 +92,11 @@ IO handle for terminal output. Will default to C<STDOUT>.
 If defined, overrides locale detection to enable or disable UTF-8 mode. If not
 defined then this will be detected from the locale by using Perl's
 C<${^UTF8LOCALE}> variable.
+
+=item root => Tickit::Widget
+
+If defined, sets the root widget using C<set_root_widget> to the one
+specified.
 
 =back
 
@@ -157,6 +159,8 @@ sub new
       my ( $term, $ev, $button, $line, $col ) = @_;
       $weakself->on_mouse( $ev, $button, $line, $col );
    } );
+
+   $self->set_root_widget( $args{root} ) if defined $args{root};
 
    return $self;
 }

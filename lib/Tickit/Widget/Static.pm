@@ -12,7 +12,7 @@ use base qw( Tickit::Widget );
 use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );
@@ -26,17 +26,13 @@ C<Tickit::Widget::Static> - a widget displaying static text
  use Tickit;
  use Tickit::Widget::Static;
  
- my $tickit = Tickit->new;
- 
  my $hello = Tickit::Widget::Static->new(
     text   => "Hello, world",
     align  => "centre",
     valign => "middle",
  );
  
- $tickit->set_root_widget( $hello );
- 
- $tickit->run;
+ Tickit->new( root => $hello )->run;
 
 =head1 DESCRIPTION
 

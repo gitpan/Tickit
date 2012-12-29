@@ -16,7 +16,7 @@ BEGIN {
    import constant CAN_UNICODE => $CAN_UNICODE;
 }
 
-use Test::More tests => 61;
+use Test::More tests => 66;
 
 # An invalid UTF-8 string
 my $BAD_UTF8 = do { no utf8; "foo\xA9bar" };
@@ -32,6 +32,7 @@ use Tickit::Utils qw(
    cols2chars
    substrwidth
    align
+   bound
 );
 use Tickit::StringPos;
 
@@ -161,3 +162,9 @@ is_deeply( [ align 10, 30, 1.0 ], [ 20, 10,  0 ], 'align 10 in 30 by 1.0' );
 
 is_deeply( [ align 30, 30, 0.0 ], [  0, 30,  0 ], 'align 30 in 30 by 0.0' );
 is_deeply( [ align 40, 30, 0.0 ], [  0, 30,  0 ], 'align 40 in 30 by 0.0' );
+
+is( bound( undef, 20, undef ), 20, 'bound with no limits' );
+is( bound(    10, 20, undef ), 20, 'bound with minimum' );
+is( bound(    10,  5, undef ), 10, 'bound at minimum' );
+is( bound( undef, 20,    40 ), 20, 'bound with maximum' );
+is( bound( undef, 50,    40 ), 40, 'bound at maximum' );

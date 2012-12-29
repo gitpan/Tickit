@@ -6,7 +6,6 @@ examples/ColourWidget.pm
 examples/demo-allkeys.pl
 examples/demo-expose.pl
 examples/demo-float.pl
-examples/demo-frame.pl
 examples/demo-input.pl
 examples/demo-pen.pl
 examples/demo-xterm256.pl
@@ -31,11 +30,11 @@ lib/Tickit/Test/MockTerm.pm
 lib/Tickit/Utils.pm
 lib/Tickit/Widget.pm
 lib/Tickit/Widget/Box.pm
-lib/Tickit/Widget/Frame.pm
 lib/Tickit/Widget/HBox.pm
 lib/Tickit/Widget/LinearBox.pm
 lib/Tickit/Widget/Static.pm
 lib/Tickit/Widget/VBox.pm
+lib/Tickit/WidgetRole.pm
 lib/Tickit/WidgetRole/Alignable.pm
 lib/Tickit/WidgetRole/Borderable.pm
 lib/Tickit/WidgetRole/Penable.pm
@@ -49,6 +48,7 @@ README
 src/hooklists.c
 src/hooklists.h
 src/pen.c
+src/rect.c
 src/string.c
 src/term.c
 src/termdriver-xterm.c
@@ -82,7 +82,6 @@ t/30widget-static.t
 t/40widget-box.t
 t/41widget-hbox.t
 t/41widget-vbox.t
-t/42widget-frame.t
 t/80tickit.t
 t/81tickit-input.t
 t/99pod.t

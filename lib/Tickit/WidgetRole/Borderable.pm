@@ -7,8 +7,9 @@ package Tickit::WidgetRole::Borderable;
 
 use strict;
 use warnings;
+use base qw( Tickit::WidgetRole );
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 =head1 NAME
 
@@ -31,15 +32,13 @@ imported by
 
 =cut
 
-sub import
+sub export_subs_for
 {
-   my $pkg = caller;
-
-   no strict 'refs';
-   foreach ( qw( _border_init set_v_border set_h_border set_border get_border_geom ),
-             map { $_, "set_$_" } qw( top_border bottom_border left_border right_border ) ) {
-      *{"${pkg}::$_"} = \&$_;
-   }
+   return {
+      map { +$_ => \&$_ } 
+         qw( _border_init set_v_border set_h_border set_border get_border_geom ),
+         map { $_, "set_$_" } qw( top_border bottom_border left_border right_border )
+   };
 }
 
 =head2 $widget->_border_init( $argsref )

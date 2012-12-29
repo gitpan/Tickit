@@ -45,8 +45,4 @@ foreach my $g ( 0 .. 23 ) {
    ) );
 }
 
-my $tickit = Tickit->new();
-
-$tickit->set_root_widget( $vbox );
-
-$tickit->run;
+Tickit->new( root => $vbox )->run;

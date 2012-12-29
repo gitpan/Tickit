@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-use Test::More tests => 15;
+use Test::More tests => 14;
 
 use_ok( 'Tickit' );
 
@@ -21,4 +21,3 @@ use_ok( 'Tickit::Widget::Static' );
 use_ok( 'Tickit::Widget::Box' );
 use_ok( 'Tickit::Widget::HBox' );
 use_ok( 'Tickit::Widget::VBox' );
-use_ok( 'Tickit::Widget::Frame' );
