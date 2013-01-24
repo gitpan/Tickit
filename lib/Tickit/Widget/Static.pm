@@ -12,7 +12,7 @@ use base qw( Tickit::Widget );
 use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );

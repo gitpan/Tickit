@@ -49,6 +49,7 @@ src/hooklists.c
 src/hooklists.h
 src/pen.c
 src/rect.c
+src/rectset.c
 src/string.c
 src/term.c
 src/termdriver-xterm.c
@@ -59,7 +60,7 @@ t/01rect.t
 t/02rectset.t
 t/03utils.t
 t/04pen.t
-t/06term-output.t
+t/05term-output.t
 t/06term-resize.t
 t/07term-input.t
 t/08mockterm.t

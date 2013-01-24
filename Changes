@@ -1,5 +1,10 @@
 Revision history for Changes
 
+0.26    CHANGES:
+         * Re-implement Tickit::RectSet as a libtickit-backed object
+         * Expose Tickit::Term->setctl_{int,str} methods
+         * New Tickit::Term->bind_event API
+
 0.25    CHANGES:
          * Removed Tickit::Widget::Frame and Tickit::Widget::Box, now they
            have been moved to Tickit-Widgets dist.

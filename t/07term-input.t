@@ -2,7 +2,8 @@
 
 use strict;
 
-use Test::More tests => 21;
+use Test::More tests => 33;
+use Test::Identity;
 
 use Tickit::Term;
 
@@ -14,7 +15,13 @@ $term->set_size( 25, 80 );
 is( $term->get_input_handle, undef, '$term->get_input_handle undef' );
 
 my ( $type, $str );
-$term->set_on_key( sub { ( undef, $type, $str ) = @_; } );
+$term->bind_event( key => sub {
+   my ( $term, $ev, $args ) = @_;
+   identical( $_[0], $term, '$_[0] is term for resize event' );
+   is( $ev, "key", '$ev is key' );
+   $type = $args->{type};
+   $str  = $args->{str};
+} );
 
 $term->input_push_bytes( "A" );
 
@@ -69,6 +76,14 @@ is( $term->check_timeout, undef, '$term has no timeout after timedout' );
 
 is( $type, "key",    '$type after push_bytes after timedout' );
 is( $str,  "Escape", '$str after push_bytes after timedout' );
+
+# Legacy event handling
+{
+   my ( $type, $str );
+   $term->set_on_key( sub { ( undef, $type, $str ) = @_; } );
+
+   $term->input_push_bytes( "A" );
+}
 
 {
    pipe( my $rd, my $wr ) or die "pipe() - $!";

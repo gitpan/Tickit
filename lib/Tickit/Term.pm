@@ -1,17 +1,20 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::Term;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 # Load the XS code
 require Tickit;
+
+# We export some constants
+use Exporter 'import';
 
 =head1 NAME
 
@@ -176,19 +179,97 @@ Flushes the output buffer to the terminal
 
 =cut
 
+=head2 $id = $term->bind_event( $ev, $code, $data )
+
+Installs a new event handler to watch for the event specified by C<$ev>,
+invoking the C<$code> reference when it occurs. C<$code> will be invoked with
+the given the terminal, the event name, a C<HASH> reference containing event
+arguments, and the C<$data> value. It returns an ID value that may be used to
+remove the handler by calling C<unbind_event_id>.
+
+ $code->( $term, $ev, $args, $data )
+
+The C<$args> hash will contain keys depending on the event type:
+
+=over 8
+
+=item key
+
+The hash will contain C<type> (a dualvar giving the key event type as an
+integer or string event name, C<text> or C<key>), and C<str> (a string
+containing the key event string).
+
+=item mouse
+
+The hash will contain C<type> (a dualvar giving the mouse event type as an
+integer or string event name, C<press>, C<drag>, C<release> or C<wheel>),
+C<button> (an integer for non-wheel events, or a dualvar for wheel events
+giving the wheel direction as C<up> or C<down>), and C<line> and C<col> as
+integers.
+
+=item resize
+
+The hash will contain C<lines> and C<cols> as integers.
+
+=back
+
+=cut
+
+=head2 $term->unbind_event_id( $id )
+
+Removes an event handler that returned the given C<$id> value.
+
+=cut
+
 =head2 $term->set_on_resize( $on_resize )
 
 =cut
 
+sub set_on_resize
+{
+   my $self = shift;
+   my ( $code ) = @_;
+
+   $self->unbind_event_id( delete $self->_event_ids->{resize} ) if exists $self->_event_ids->{resize};
+   $self->_event_ids->{resize} = $self->bind_event( resize => sub {
+      my ( undef, $ev, $args ) = @_;
+      $code->( $self, $args->{lines}, $args->{cols} );
+   } );
+}
+
 =head2 $term->set_on_key( $on_key )
 
 =cut
+
+sub set_on_key
+{
+   my $self = shift;
+   my ( $code ) = @_;
+
+   $self->unbind_event_id( delete $self->_event_ids->{key} ) if exists $self->_event_ids->{key};
+   $self->_event_ids->{key} = $self->bind_event( key => sub {
+      my ( undef, $ev, $args ) = @_;
+      $code->( $self, $args->{type}, $args->{str} );
+   } );
+}
 
 =head2 $term->set_on_mouse( $on_mouse )
 
 Set a new CODE references to handle events.
 
 =cut
+
+sub set_on_mouse
+{
+   my $self = shift;
+   my ( $code ) = @_;
+
+   $self->unbind_event_id( delete $self->_event_ids->{mouse} ) if exists $self->_event_ids->{mouse};
+   $self->_event_ids->{mouse} = $self->bind_event( mouse => sub {
+      my ( undef, $ev, $args ) = @_;
+      $code->( $self, $args->{type}, $args->{button}, $args->{line}, $args->{col} );
+   } );
+}
 
 =head2 $term->refresh_size
 
@@ -289,9 +370,67 @@ implemented by printing spaces. This removes the need for two cursor jumps.
 
 =cut
 
+=head2 $success = $term->setctl_int( $ctl, $value )
+
+Sets the value of an integer terminal control option. C<$ctl> should be one of
+the following options. They can be specified either as integers, using the
+following named constants, or as strings giving the part following C<TERMCTL_>
+in lower-case.
+
+=over 8
+
+=item TERMCTL_ALTSCREEN
+
+Enables DEC Alternate Screen mode
+
+=item TERMCTL_CURSORVIS
+
+Enables cursor visible mode
+
+=item TERMCTL_CURSORBLINK
+
+Enables cursor blinking mode
+
+=item TERMCTL_CURSORSHAPE
+
+Sets the shape of the cursor. C<$value> should be one of
+C<TERM_CURSORSHAPE_BLOCK>, C<TERM_CURSORSHAPE_UNDER> or
+C<TERM_CURSORSHAPE_LEFT_BAR>.
+
+=item TERMCTL_KEYPAD_APP
+
+Enables keypad application mode
+
+=item TERMCTL_MOUSE
+
+Enables mouse tracking mode
+
+=back
+
+=head2 $success = $term->setctl_str( $ctl, $value )
+
+Sets the value of a string terminal control option. C<$ctrl> should be one of
+the following options. They can be specified either as integers or strings, as
+for C<setctl_int>.
+
+=over 8
+
+=item TERMCTL_ICON_TEXT
+
+=item TERMCTL_TITLE_TEXT
+
+=item TERMCTL_ICONTITLE_TEXT
+
+Sets the terminal window icon text, title, or both.
+
+=back
+
+=cut
+
 =head2 $term->mode_altscreen( $on )
 
-Set or clear the DEC Alternate Screen mode
+Set or clear the DEC Alternate Screen mode. This method is deprecated in
+favour of C<setctl_int>.
 
 =cut
 
@@ -299,12 +438,13 @@ sub mode_altscreen
 {
    my $self = shift;
    my ( $on ) = @_;
-   $self->set_mode_altscreen( $on );
+   $self->setctl_int( altscreen => $on );
 }
 
 =head2 $term->mode_cursorvis( $on )
 
-Set or clear the cursor visible mode
+Set or clear the cursor visible mode. This method is deprecated in favour of
+C<setctl_int>.
 
 =cut
 
@@ -312,12 +452,13 @@ sub mode_cursorvis
 {
    my $self = shift;
    my ( $on ) = @_;
-   $self->set_mode_cursorvis( $on );
+   $self->setctl_int( cursorvis => $on );
 }
 
 =head2 $term->mode_mouse( $on )
 
-Set or clear the mouse tracking mode
+Set or clear the mouse tracking mode. This method is deprecated in favour of
+C<setctl_int>.
 
 =cut
 
@@ -325,7 +466,7 @@ sub mode_mouse
 {
    my $self = shift;
    my ( $on ) = @_;
-   $self->set_mode_mouse( $on );
+   $self->setctl_int( mouse => $on );
 }
 
 =head2 $term->input_push_bytes( $bytes )

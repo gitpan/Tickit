@@ -1,7 +1,7 @@
 /*  You may distribute under the terms of either the GNU General Public License
  *  or the Artistic License (the same terms as Perl itself)
  *
- *  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
+ *  (C) Paul Evans, 2011-2013 -- leonerd@leonerd.org.uk
  */
 
 
@@ -12,6 +12,84 @@
 #include <tickit.h>
 
 #define streq(a,b) (strcmp(a,b)==0)
+
+static TickitEventType tickit_name2ev(const char *name)
+{
+  switch(name[0]) {
+    case 'c':
+      return streq(name+1, "hange") ? TICKIT_EV_CHANGE
+                                    : -1;
+    case 'k':
+      return streq(name+1, "ey") ? TICKIT_EV_KEY
+                                 : -1;
+    case 'm':
+      return streq(name+1, "ouse") ? TICKIT_EV_MOUSE
+                                   : -1;
+    case 'r':
+      return streq(name+1, "esize") ? TICKIT_EV_RESIZE
+                                    : -1;
+  }
+  return -1;
+}
+
+static SV *newSVivpv(int iv, const char *pv)
+{
+  SV *sv = newSViv(iv);
+  if(pv) { sv_setpv(sv, pv); SvPOK_on(sv); }
+  return sv;
+}
+
+static SV *tickit_ev2sv(TickitEventType ev)
+{
+  const char *name = NULL;
+  switch(ev) {
+    case TICKIT_EV_CHANGE: name = "change"; break;
+    case TICKIT_EV_KEY:    name = "key";    break;
+    case TICKIT_EV_MOUSE:  name = "mouse";  break;
+    case TICKIT_EV_RESIZE: name = "resize"; break;
+  }
+  return newSVivpv(ev, name);
+}
+
+static SV *tickit_keyevtype2sv(int type)
+{
+  const char *name = NULL;
+  switch(type) {
+    case TICKIT_KEYEV_KEY:  name = "key";  break;
+    case TICKIT_KEYEV_TEXT: name = "text"; break;
+  }
+  return newSVivpv(type, name);
+}
+
+static SV *tickit_mouseevtype2sv(int type)
+{
+  const char *name = NULL;
+  switch(type) {
+    case TICKIT_MOUSEEV_PRESS:   name = "press";   break;
+    case TICKIT_MOUSEEV_DRAG:    name = "drag";    break;
+    case TICKIT_MOUSEEV_RELEASE: name = "release"; break;
+    case TICKIT_MOUSEEV_WHEEL:   name = "wheel";   break;
+  }
+  return newSVivpv(type, name);
+}
+
+static SV *tickit_mouseevbutton2sv(int type, int button)
+{
+  const char *name = NULL;
+  if(type == TICKIT_MOUSEEV_WHEEL)
+    switch(button) {
+      case TICKIT_MOUSEWHEEL_UP:   name = "up";   break;
+      case TICKIT_MOUSEWHEEL_DOWN: name = "down"; break;
+    }
+  return newSVivpv(button, name);
+}
+
+struct GenericEventData
+{
+  SV *self;
+  CV *code;
+  SV *data;
+};
 
 /* We need to keep our own pen observer list rather than use libtickit's event
  * binds, because we need to be able to remove them by observer reference
@@ -104,9 +182,6 @@ static void pen_event_fn(TickitPen *pen, TickitEventType ev, TickitEvent *args, 
   }
 }
 
-static inline int minint(int a, int b) { return a < b ? a : b; }
-static inline int maxint(int a, int b) { return a > b ? a : b; }
-
 typedef TickitRect *Tickit__Rect;
 
 /* Really cheating and treading on Perl's namespace but hopefully it will be OK */
@@ -119,6 +194,8 @@ SV *newSVrect(TickitRect *rect)
 }
 #define mPUSHrect(rect) PUSHs(sv_2mortal(newSVrect(rect)))
 
+typedef TickitRectSet *Tickit__RectSet;
+
 typedef struct Tickit__Term {
   TickitTerm *tt;
   SV         *input_handle;
@@ -126,85 +203,91 @@ typedef struct Tickit__Term {
   CV         *output_func;
 
   SV         *self;
-  CV         *on_resize;
-  CV         *on_key;
-  CV         *on_mouse;
+  HV         *event_ids;
 } *Tickit__Term;
 
-static void term_event_fn(TickitTerm *tt, TickitEventType ev, TickitEvent *args, void *data)
+static TickitTermCtl term_name2ctl(const char *name)
 {
-  Tickit__Term self = data;
+  switch(name[0]) {
+    case 'a':
+      return streq(name+1, "ltscreen") ? TICKIT_TERMCTL_ALTSCREEN
+                                       : -1;
+    case 'c':
+      return streq(name+1, "ursorblink") ? TICKIT_TERMCTL_CURSORBLINK
+           : streq(name+1, "ursorshape") ? TICKIT_TERMCTL_CURSORSHAPE
+           : streq(name+1, "ursorvis")   ? TICKIT_TERMCTL_CURSORVIS
+                                         : -1;
+    case 'i':
+      return streq(name+1, "con_text")      ? TICKIT_TERMCTL_ICON_TEXT
+           : streq(name+1, "contitle_text") ? TICKIT_TERMCTL_ICONTITLE_TEXT
+                                            : -1;
+    case 'k':
+      return streq(name+1, "eypad_app") ? TICKIT_TERMCTL_KEYPAD_APP
+                                        : -1;
+    case 'm':
+      return streq(name+1, "ouse") ? TICKIT_TERMCTL_MOUSE
+                                       : -1;
+    case 't':
+      return streq(name+1, "itle_text") ? TICKIT_TERMCTL_TITLE_TEXT
+                                        : -1;
+  }
+  return -1;
+}
 
-  if(ev & TICKIT_EV_RESIZE) {
+static void term_userevent_fn(TickitTerm *tt, TickitEventType ev, TickitEvent *args, void *user)
+{
+  struct GenericEventData *data = user;
+
+  if(ev & ~TICKIT_EV_UNBIND) {
+    HV *argshash = newHV();
+
+    switch(ev) {
+      case TICKIT_EV_KEY:
+        hv_store(argshash, "type",   4, tickit_keyevtype2sv(args->type), 0);
+        hv_store(argshash, "str",    3, newSVpvn_utf8(args->str, strlen(args->str), 1), 0);
+        break;
+
+      case TICKIT_EV_MOUSE:
+        hv_store(argshash, "type",   4, tickit_mouseevtype2sv(args->type), 0);
+        hv_store(argshash, "button", 6, newSViv(args->button), 0);
+        hv_store(argshash, "line",   4, newSViv(args->line),   0);
+        hv_store(argshash, "col",    3, newSViv(args->col),    0);
+        break;
+
+      case TICKIT_EV_RESIZE:
+        hv_store(argshash, "lines",  5, newSViv(args->lines),  0);
+        hv_store(argshash, "cols",   4, newSViv(args->cols),   0);
+        break;
+
+      // These don't happen to terminal
+      case TICKIT_EV_CHANGE:
+        SvREFCNT_dec(argshash);
+        return;
+    }
+
     dSP;
     ENTER;
     SAVETMPS;
 
     PUSHMARK(SP);
-    EXTEND(SP, 3);
-    PUSHs(self->self); // not mortal
-    mPUSHi(args->lines);
-    mPUSHi(args->cols);
+    EXTEND(SP, 4);
+    PUSHs(data->self);
+    mPUSHs(tickit_ev2sv(ev));
+    mPUSHs(newRV_noinc((SV*)argshash));
+    mPUSHs(newSVsv(data->data));
     PUTBACK;
 
-    call_sv((SV*)(self->on_resize), G_VOID);
+    call_sv((SV*)(data->code), G_VOID);
 
     FREETMPS;
     LEAVE;
   }
 
-  if(ev & TICKIT_EV_KEY) {
-    dSP;
-    ENTER;
-    SAVETMPS;
-
-    PUSHMARK(SP);
-    EXTEND(SP, 3);
-    PUSHs(self->self); // not mortal
-    switch(args->type) {
-      case TICKIT_KEYEV_KEY:  mPUSHp("key",  3); break;
-      case TICKIT_KEYEV_TEXT: mPUSHp("text", 4); break;
-    }
-    PUSHs(sv_2mortal(newSVpvn_utf8(args->str, strlen(args->str), 1)));
-    PUTBACK;
-
-    call_sv((SV*)(self->on_key), G_VOID);
-
-    FREETMPS;
-    LEAVE;
-  }
-
-  if(ev & TICKIT_EV_MOUSE) {
-    dSP;
-    ENTER;
-    SAVETMPS;
-
-    PUSHMARK(SP);
-    EXTEND(SP, 5);
-    PUSHs(self->self); // not mortal
-    switch(args->type) {
-      case TICKIT_MOUSEEV_PRESS:   mPUSHp("press",   5); break;
-      case TICKIT_MOUSEEV_DRAG:    mPUSHp("drag",    4); break;
-      case TICKIT_MOUSEEV_RELEASE: mPUSHp("release", 7); break;
-      case TICKIT_MOUSEEV_WHEEL:   mPUSHp("wheel",   5); break;
-    }
-    if(args->type == TICKIT_MOUSEEV_WHEEL) {
-      switch(args->button) {
-        case TICKIT_MOUSEWHEEL_UP:   mPUSHp("up",   2); break;
-        case TICKIT_MOUSEWHEEL_DOWN: mPUSHp("down", 4); break;
-      }
-    }
-    else {
-      mPUSHi(args->button);
-    }
-    mPUSHi(args->line);
-    mPUSHi(args->col);
-    PUTBACK;
-
-    call_sv((SV*)(self->on_mouse), G_VOID);
-
-    FREETMPS;
-    LEAVE;
+  if(ev & TICKIT_EV_UNBIND) {
+    SvREFCNT_dec(data->self);
+    SvREFCNT_dec(data->code);
+    SvREFCNT_dec(data->data);
+    Safefree(data);
   }
 }
 
@@ -238,6 +321,33 @@ static Tickit__StringPos new_stringpos(SV **svp)
   sv_setref_pv(*svp, "Tickit::StringPos", pos);
 
   return pos;
+}
+
+static void setup_constants(void)
+{
+  HV *stash;
+  AV *export;
+
+  stash = gv_stashpvn("Tickit::Term", 12, TRUE);
+  export = get_av("Tickit::Term::EXPORT_OK", TRUE);
+
+#define DO_CONSTANT(c) \
+  newCONSTSUB(stash, #c+7, newSViv(c)); \
+  av_push(export, newSVpv(#c+7, 0));
+
+  DO_CONSTANT(TICKIT_TERMCTL_ALTSCREEN)
+  DO_CONSTANT(TICKIT_TERMCTL_CURSORVIS)
+  DO_CONSTANT(TICKIT_TERMCTL_CURSORBLINK)
+  DO_CONSTANT(TICKIT_TERMCTL_CURSORSHAPE)
+  DO_CONSTANT(TICKIT_TERMCTL_ICON_TEXT)
+  DO_CONSTANT(TICKIT_TERMCTL_ICONTITLE_TEXT)
+  DO_CONSTANT(TICKIT_TERMCTL_KEYPAD_APP)
+  DO_CONSTANT(TICKIT_TERMCTL_MOUSE)
+  DO_CONSTANT(TICKIT_TERMCTL_TITLE_TEXT)
+
+  DO_CONSTANT(TICKIT_TERM_CURSORSHAPE_BLOCK)
+  DO_CONSTANT(TICKIT_TERM_CURSORSHAPE_UNDER)
+  DO_CONSTANT(TICKIT_TERM_CURSORSHAPE_LEFT_BAR)
 }
 
 MODULE = Tickit             PACKAGE = Tickit::Pen
@@ -593,6 +703,91 @@ subtract(self,hole)
 
     XSRETURN(n_rects);
 
+MODULE = Tickit             PACKAGE = Tickit::RectSet
+
+Tickit::RectSet
+new(package)
+  char *package
+  CODE:
+    RETVAL = tickit_rectset_new();
+  OUTPUT:
+    RETVAL
+
+void
+DESTROY(self)
+  Tickit::RectSet self
+  CODE:
+    tickit_rectset_destroy(self);
+
+void
+clear(self)
+  Tickit::RectSet self
+  CODE:
+    tickit_rectset_clear(self);
+
+void
+rects(self)
+  Tickit::RectSet self
+  INIT:
+    int n;
+    TickitRect *rects;
+    int i;
+  PPCODE:
+    n = tickit_rectset_rects(self);
+
+    if(GIMME_V != G_ARRAY) {
+      mPUSHi(n);
+      XSRETURN(1);
+    }
+
+    Newx(rects, n, TickitRect);
+    tickit_rectset_get_rects(self, rects, n);
+
+    EXTEND(SP, n);
+    for(i = 0; i < n; i++) {
+      mPUSHrect(rects + i);
+    }
+
+    Safefree(rects);
+
+    XSRETURN(n);
+
+void
+add(self,rect)
+  Tickit::RectSet self
+  Tickit::Rect rect
+  CODE:
+    tickit_rectset_add(self, rect);
+
+void
+subtract(self,rect)
+  Tickit::RectSet self
+  Tickit::Rect rect
+  CODE:
+    tickit_rectset_subtract(self, rect);
+
+bool
+intersects(self,r)
+  Tickit::RectSet self
+  Tickit::Rect r
+  INIT:
+    int i;
+  CODE:
+    RETVAL = tickit_rectset_intersects(self, r);
+  OUTPUT:
+    RETVAL
+
+bool
+contains(self,r)
+  Tickit::RectSet self
+  Tickit::Rect r
+  INIT:
+    int i;
+  CODE:
+    RETVAL = tickit_rectset_contains(self, r);
+  OUTPUT:
+    RETVAL
+
 MODULE = Tickit             PACKAGE = Tickit::StringPos
 
 SV *
@@ -715,9 +910,7 @@ _new(package,termtype)
     self->output_handle = NULL;
     self->output_func = NULL;
 
-    self->on_resize = NULL;
-    self->on_key    = NULL;
-    self->on_mouse  = NULL;
+    self->event_ids = newHV();
 
   OUTPUT:
     RETVAL
@@ -740,14 +933,8 @@ DESTROY(self)
     if(self->output_func)
       SvREFCNT_dec(self->output_func);
 
-    if(self->on_resize)
-      SvREFCNT_dec(self->on_resize);
-
-    if(self->on_key)
-      SvREFCNT_dec(self->on_key);
-
-    if(self->on_mouse)
-      SvREFCNT_dec(self->on_mouse);
+    if(self->event_ids)
+      SvREFCNT_dec(self->event_ids);
 
     Safefree(self);
 
@@ -852,38 +1039,43 @@ refresh_size(self)
   CODE:
     tickit_term_refresh_size(self->tt);
 
-void
-set_on_resize(self,code)
+int
+bind_event(self,ev,code,data = &PL_sv_undef)
   Tickit::Term  self
+  char         *ev
   CV           *code
+  SV           *data
+  INIT:
+    TickitEventType ev_e;
+    struct GenericEventData *user;
   CODE:
-    if(self->on_resize)
-      SvREFCNT_dec(self->on_resize);
+    ev_e = tickit_name2ev(ev);
+    if(ev_e == -1)
+      croak("Unrecognised event name '%s'", ev);
 
-    tickit_term_bind_event(self->tt, TICKIT_EV_RESIZE, term_event_fn, self);
-    self->on_resize = (CV*)SvREFCNT_inc(code);
+    Newx(user, 1, struct GenericEventData);
+    user->self = SvREFCNT_inc(self->self);
+    user->code = (CV*)SvREFCNT_inc(code);
+    user->data = newSVsv(data);
+
+    RETVAL = tickit_term_bind_event(self->tt, ev_e|TICKIT_EV_UNBIND, term_userevent_fn, user);
+  OUTPUT:
+    RETVAL
 
 void
-set_on_key(self,code)
+unbind_event_id(self,id)
   Tickit::Term  self
-  CV           *code
+  int           id
   CODE:
-    if(self->on_key)
-      SvREFCNT_dec(self->on_key);
+    tickit_term_unbind_event_id(self->tt, id);
 
-    tickit_term_bind_event(self->tt, TICKIT_EV_KEY, term_event_fn, self);
-    self->on_key = (CV*)SvREFCNT_inc(code);
-
-void
-set_on_mouse(self,code)
+SV *
+_event_ids(self)
   Tickit::Term  self
-  CV           *code
   CODE:
-    if(self->on_mouse)
-      SvREFCNT_dec(self->on_mouse);
-
-    tickit_term_bind_event(self->tt, TICKIT_EV_MOUSE, term_event_fn, self);
-    self->on_mouse = (CV*)SvREFCNT_inc(code);
+    RETVAL = newRV_inc((SV*)self->event_ids);
+  OUTPUT:
+    RETVAL
 
 void
 input_push_bytes(self,bytes)
@@ -1012,26 +1204,48 @@ erasech(self,count,moveend)
   CODE:
     tickit_term_erasech(self->tt, count, SvOK(moveend) ? SvIV(moveend) : -1);
 
-void
-set_mode_altscreen(self,on)
-  Tickit::Term  self
-  int           on
+int
+setctl_int(self,ctl,value)
+  Tickit::Term self
+  SV          *ctl
+  int          value
+  INIT:
+    TickitTermCtl ctl_e;
   CODE:
-    tickit_term_setctl_int(self->tt, TICKIT_TERMCTL_ALTSCREEN, on);
+    if(SvPOK(ctl)) {
+      ctl_e = term_name2ctl(SvPV_nolen(ctl));
+      if(ctl_e == -1)
+        croak("Unrecognised 'ctl' name '%s'", SvPV_nolen(ctl));
+    }
+    else if(SvIOK(ctl))
+      ctl_e = SvIV(ctl);
+    else
+      croak("Expected 'ctl' to be an integer or string");
 
-void
-set_mode_cursorvis(self,on)
-  Tickit::Term  self
-  int           on
-  CODE:
-    tickit_term_setctl_int(self->tt, TICKIT_TERMCTL_CURSORVIS, on);
+    RETVAL = tickit_term_setctl_int(self->tt, ctl_e, value);
+  OUTPUT:
+    RETVAL
 
-void
-set_mode_mouse(self,on)
-  Tickit::Term  self
-  int           on
+int
+setctl_str(self,ctl,value)
+  Tickit::Term self
+  SV          *ctl
+  char        *value
+  INIT:
+    TickitTermCtl ctl_e;
   CODE:
-    tickit_term_setctl_int(self->tt, TICKIT_TERMCTL_MOUSE, on);
+    if(SvPOK(ctl)) {
+      ctl_e = term_name2ctl(SvPV_nolen(ctl));
+      if(ctl_e == -1)
+        croak("Unrecognised 'ctl' name '%s'", SvPV_nolen(ctl));
+    }
+    else if(SvIOK(ctl))
+      ctl_e = SvIV(ctl);
+    else
+      croak("Expected 'ctl' to be an integer or string");
+    RETVAL = tickit_term_setctl_str(self->tt, ctl_e, value);
+  OUTPUT:
+    RETVAL
 
 MODULE = Tickit             PACKAGE = Tickit::Utils
 
@@ -1179,3 +1393,8 @@ void cols2chars(str,...)
     }
 
     XSRETURN(items - 1);
+
+MODULE = Tickit  PACKAGE = Tickit
+
+BOOT:
+  setup_constants();

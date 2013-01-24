@@ -112,7 +112,7 @@ typedef struct {
 } TickitRect;
 
 void tickit_rect_init_sized(TickitRect *rect, int top, int left, int lines, int cols);
-void tickit_rect_init_bounds(TickitRect *rect, int top, int left, int bottom, int right);
+void tickit_rect_init_bounded(TickitRect *rect, int top, int left, int bottom, int right);
 
 static inline int tickit_rect_bottom(const TickitRect *rect)
 { return rect->top + rect->lines; }
@@ -127,6 +127,26 @@ int tickit_rect_contains(const TickitRect *large, const TickitRect *small);
 
 int tickit_rect_add(TickitRect ret[3], const TickitRect *a, const TickitRect *b);
 int tickit_rect_subtract(TickitRect ret[4], const TickitRect *orig, const TickitRect *hole);
+
+/*
+ * TickitRectSet
+ */
+
+typedef struct TickitRectSet TickitRectSet;
+
+TickitRectSet *tickit_rectset_new(void);
+void tickit_rectset_destroy(TickitRectSet *trs);
+
+void tickit_rectset_clear(TickitRectSet *trs);
+
+size_t tickit_rectset_rects(const TickitRectSet *trs);
+size_t tickit_rectset_get_rects(const TickitRectSet *trs, TickitRect rects[], size_t n);
+
+void tickit_rectset_add(TickitRectSet *trs, const TickitRect *rect);
+void tickit_rectset_subtract(TickitRectSet *trs, const TickitRect *rect);
+
+int tickit_rectset_intersects(const TickitRectSet *trs, const TickitRect *rect);
+int tickit_rectset_contains(const TickitRectSet *trs, const TickitRect *rect);
 
 /*
  * TickitTerm

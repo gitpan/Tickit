@@ -25,13 +25,15 @@ my $tickit = Tickit->new();
 $tickit->set_root_widget( $vbox );
 
 # Mass hackery
-$tickit->term->set_on_key( sub {
-   my ( undef, $type, $str ) = @_;
+$tickit->term->bind_event( key => sub {
+   my ( undef, $ev, $args ) = @_;
+   my ( $type, $str ) = @{$args}{qw( type str )};
    $keydisplay->set_text( "$type $str" );
 } );
 
-$tickit->term->set_on_mouse( sub {
-   my ( undef, $type, $button, $line, $col ) = @_;
+$tickit->term->bind_event( mouse => sub {
+   my ( undef, $ev, $args ) = @_;
+   my ( $type, $button, $line, $col ) = @{$args}{qw( type button line col )};
    $mousedisplay->set_text( "$type button $button at ($line,$col)" );
 } );
 
