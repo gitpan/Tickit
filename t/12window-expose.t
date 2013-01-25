@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 19;
+use Test::More tests => 20;
 
 use Tickit::Test;
 
@@ -105,3 +105,17 @@ is_deeply( \@exposed_rects,
    [ Tickit::Rect->new( top => 0, left => 5, lines => 1, cols => 10 ) ],
    'Exposed regions after expose separate root+win'
 );
+
+{
+   my $subwin = $rootwin->make_sub( 2, 2, 20, 50 );
+
+   my $exposed = 0;
+   $subwin->set_on_expose( sub { $exposed++ } );
+
+   for ( 1 .. 100 ) {
+      $subwin->expose( Tickit::Rect->new( top => 1, left => 1, lines => 3, cols => 20 ) );
+      flush_tickit;
+   }
+
+   is( $exposed, 100, '$exposed 100 times' );
+}

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::WidgetRole );
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 =head1 NAME
 

@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 use Exporter 'import';
 

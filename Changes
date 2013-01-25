@@ -1,5 +1,11 @@
 Revision history for Changes
 
+0.27    BUGFIXES:
+         * Important bugfix to bundled libtickit:
+            + Fix resize logic in tickit_rectset_add() so it doesn't grow
+              the object arbitrarily until it fails
+
+VERSION 0.26 IS CRITICALLY BROKEN. DO NOT USE IT.
 0.26    CHANGES:
          * Re-implement Tickit::RectSet as a libtickit-backed object
          * Expose Tickit::Term->setctl_{int,str} methods

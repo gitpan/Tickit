@@ -14,6 +14,8 @@ use Test::HexString;
 use Tickit::Term;
 use Tickit::Pen;
 
+$SIG{PIPE} = "IGNORE";
+
 my $stream = "";
 sub stream_is
 {
