@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 
 use Carp;
 
@@ -177,6 +177,7 @@ sub remove
    if( $c ) {
       my $child = $c->[0];
       $child->set_parent( undef );
+      $child->window->close if $child->window;
    }
 
    $self->children_changed if $self->can( "children_changed" );

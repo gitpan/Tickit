@@ -249,7 +249,7 @@ static void term_userevent_fn(TickitTerm *tt, TickitEventType ev, TickitEvent *a
 
       case TICKIT_EV_MOUSE:
         hv_store(argshash, "type",   4, tickit_mouseevtype2sv(args->type), 0);
-        hv_store(argshash, "button", 6, newSViv(args->button), 0);
+        hv_store(argshash, "button", 6, tickit_mouseevbutton2sv(args->type, args->button), 0);
         hv_store(argshash, "line",   4, newSViv(args->line),   0);
         hv_store(argshash, "col",    3, newSViv(args->col),    0);
         break;

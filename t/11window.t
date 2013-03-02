@@ -103,7 +103,7 @@ is( $geom_changed, 2, '$reshaped is 2 after reposition' );
 is_refcount( $win, 2, '$win has refcount 2 at EOF' );
 is_refcount( $rootwin, 3, '$rootwin has refcount 3 before $win drop' );
 
-undef $subwin;
-undef $win;
+$subwin->close; undef $subwin;
+$win->close; undef $win;
 
 is_refcount( $rootwin, 2, '$rootwin has refcount 3 at EOF' );

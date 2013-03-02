@@ -64,6 +64,8 @@ is( $pos->columns, 80, '$pos->columns is 80 for print under floating window' );
                'Display for print sibling under floating window' );
 
    is( $pos->columns, 50, '$pos->columns is 50 for print sibling under floating window' );
+
+   $win->close;
 }
 
 $rootfloat->goto( 0, 0 );

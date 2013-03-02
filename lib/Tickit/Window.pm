@@ -1,14 +1,15 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::Window;
 
 use strict;
 use warnings;
+use 5.010; # //
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 
 use Carp;
 
@@ -19,7 +20,9 @@ use Tickit::Rect;
 use Tickit::RectSet;
 use Tickit::Utils qw( string_countmore );
 
-use constant FLOAT_ALL_THE_WINDOWS => $ENV{TICKIT_FLOAT_ALL_THE_WINDOWS};
+use constant FLOAT_ALL_THE_WINDOWS => $ENV{TICKIT_FLOAT_ALL_THE_WINDOWS} // 1;
+
+use constant WEAKEN_CHILDREN => 1;
 
 =head1 NAME
 
@@ -58,17 +61,13 @@ other siblings, and any drawing that happens within it overwrites that of its
 non-floating siblings. Any drawing on a non-floating sibling that happens
 within the area of a float is obscured by the contents of the floating window.
 
-At the current version, floating and non-floating child windows have a
-different implementation. However, these two differing implementations will be
-merged in a later version, at which point all child windows will implement
-obscuring and z-ordering behaviour; the only difference then will be the order
-in which the child windows are traversed.
+To disable the new shared implementation of floating and non-floating windows
+for legacy bug-testing purposes, set the environment variable
+C<TICKIT_FLOAT_ALL_THE_WINDOWS> to a false value ("0" or empty string)
 
-To enable this shared implementation for unit-testing purposes, or to test if
-it will work correctly in future, set the environment variable
-C<TICKIT_FLOAT_ALL_THE_WINDOWS> to some true value
+ $ TICKIT_FLOAT_ALL_THE_WINDOWS=0 ./Build test
 
- $ TICKIT_FLOAT_ALL_THE_WINDOWS=1 ./Build test
+This variable will be removed in a later version.
 
 =cut
 
@@ -108,6 +107,50 @@ sub _init
 
 =cut
 
+=head2 $win->close
+
+Removes the window from its parent and clears any event handlers set using any
+of the C<set_on_*> methods. Also recursively closes any child windows.
+
+Currently this is an optional method, as child windows are stored as weakrefs,
+so should be destroyed when the last reference to them is dropped. Widgets
+should make sure to call this method anyway, because this will be changed in a
+future version.
+
+=cut
+
+sub DESTROY
+{
+   my $self = shift;
+   $self->close;
+}
+
+sub close
+{
+   my $self = shift;
+
+   $self->set_on_geom_changed( undef );
+   $self->set_on_key( undef );
+   $self->set_on_mouse( undef );
+   $self->set_on_expose( undef );
+   $self->set_on_focus( undef );
+
+   $self->{parent}->_remove( $self ) if $self->{parent};
+   $_->close for @{ $self->{child_windows} };
+}
+
+sub _remove
+{
+   my $self = shift;
+   my ( $child ) = @_;
+
+   my $children = $self->{child_windows};
+   for( my $i = 0; $i < @$children; ) {
+      $i++, next if $children->[$i] != $child;
+      splice @$children, $i, 1, ();
+   }
+}
+
 =head2 $sub = $win->make_sub( $top, $left, $lines, $cols )
 
 Constructs a new sub-window starting at the given coordinates of this window.
@@ -130,7 +173,7 @@ sub make_sub
 
    $self->_reap_dead_children;
    push @{ $self->{child_windows} }, $sub;
-   weaken $self->{child_windows}[-1];
+   weaken $self->{child_windows}[-1] if WEAKEN_CHILDREN;
 
    return $sub;
 }
@@ -175,7 +218,7 @@ sub make_float
    $self->_reap_dead_children;
    # floats go first
    unshift @{ $self->{child_windows} }, $sub;
-   weaken $self->{child_windows}[0];
+   weaken $self->{child_windows}[0] if WEAKEN_CHILDREN;
 
    return $sub;
 }
@@ -1362,7 +1405,8 @@ sub _requeue_focus
       $self->{focus_child}->_lose_focus;
    }
 
-   weaken( $self->{focus_child} = $focuswin );
+   $self->{focus_child} = $focuswin;
+   weaken $self->{focus_child} if WEAKEN_CHILDREN;
 
    if( my $parent = $self->parent ) {
       $parent->_requeue_focus( $self );

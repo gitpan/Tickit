@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 17;
+use Test::More tests => 18;
 
 use Tickit::Test;
 
@@ -143,6 +143,21 @@ is_display( [ [TEXT("A longer piece of text for the static",bg=>4,b=>1),
                BLANK(2,bg=>4,b=>1),
                TEXT("New Widget",bg=>4,b=>1)] ],
             'Display after force_size' );
+
+resize_term( 30, 60 );
+$win->clear;
+
+flush_tickit;
+
+is_display( [ [TEXT("A longer piece of text for t",bg=>4,b=>1),
+               BLANK(2,bg=>4,b=>1),
+               TEXT("Widget",fg=>5,bg=>4,b=>1),
+               BLANK(2,bg=>4,b=>1),
+               TEXT("Widget 2",bg=>4,b=>1),
+               BLANK(2,bg=>4,b=>1),
+               BLANK(4,bg=>4,b=>1),
+               TEXT("New Widg",bg=>4,b=>1)] ],
+            'Display after resize too small' );
 
 $widget->set_window( undef );
 

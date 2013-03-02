@@ -177,6 +177,8 @@ drain_termlog;
                  ( [BLANK(10), BLANK(2,bg=>4), TEXT("Foo",fg=>3,bg=>4,b=>1), BLANK(25,bg=>4)] ) x 1,
                  ( [BLANK(10), BLANK(30,bg=>4)] ) x 1 ],
                'Display with correct pen' );
+
+   $subwin->close;
 }
 
 # Hidden windows
@@ -230,7 +232,13 @@ drain_termlog;
    is_display( [ BLANKLINES(4),
                  [BLANK(10), TEXT("Content from Window 2")] ],
               'Display after print with $win1 hidden' );
+
+   $win1->close;
+   $win2->close;
 }
+
+$win->close; undef $win;
+flush_tickit;
 
 # Scrollable window probably needs to be fullwidth
 {
@@ -291,4 +299,6 @@ drain_termlog;
               'Exposed area after ->scroll upward' );
 
    undef @exposed_rects;
+
+   $win->close;
 }

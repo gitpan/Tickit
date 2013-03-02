@@ -8,7 +8,7 @@ package Tickit::RectSet;
 use strict;
 use warnings;
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 
 use List::Util qw( min max );
 
@@ -85,12 +85,6 @@ that it may be that the rect requires two or more regions in the set to
 completely cover it.
 
 =cut
-
-# TODO:
-#  Consider some sort of bitmap-based system in the C implementation
-#  Or rather, store per line of the main rectangle, a list of start/stop column
-#  numbers for window obscurings. Render it once for the rectset, and use it to
-#  generate a possibly-new set of rectangles as the output answer.
 
 =head1 AUTHOR
 

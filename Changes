@@ -1,5 +1,13 @@
 Revision history for Changes
 
+0.28    CHANGES:
+         * Added $window->close method
+         * Make FLOAT_ALL_THE_WINDOWS behaviour default
+
+        BUGFIXES:
+         * Ensure HBox can handle out-of-space
+         * Correctly convert mouse wheel direction in args hash
+
 0.27    BUGFIXES:
          * Important bugfix to bundled libtickit:
             + Fix resize logic in tickit_rectset_add() so it doesn't grow

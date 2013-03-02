@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 
 use List::Util qw( sum );
 
@@ -116,7 +116,7 @@ sub redistribute_child_windows
    my $total = $self->get_total_quota( $window );
 
    # First determine how many spare lines
-   my $spare = $total;
+   my $base_total = 0;
    my $expand_total = 0;
 
    my %base;
@@ -131,44 +131,66 @@ sub redistribute_child_windows
 
       $base{$child} = $base;
 
-      $spare -= $base;
+      $base_total += $base;
       $expand_total += $opts{expand};
    } );
 
    # Account for spacing
-   $spare -= $n_gaps * $self->{spacing};
+   my $allocatable = $total - $n_gaps * $self->{spacing};
+   my $spare = $allocatable - $base_total;
 
-   my $err = 0;
+   if( $spare >= 0 ) {
+      my $err = 0;
 
-   # This algorithm tries to allocate spare quota roughly evenly to the
-   # children. It keeps track of rounding errors in $err, to ensure that
-   # rounding-down-to-int() errors don't leave us some spare amount
+      # This algorithm tries to allocate spare quota roughly evenly to the
+      # children. It keeps track of rounding errors in $err, to ensure that
+      # rounding-down-to-int() errors don't leave us some spare amount
 
-   my $current = 0;
+      my $current = 0;
 
-   $self->foreach_child( sub {
-      my ( $child, %opts ) = @_;
+      $self->foreach_child( sub {
+         my ( $child, %opts ) = @_;
 
-      if( $current >= $total ) {
-         $self->set_child_window( $child, undef, undef, undef );
-         return; # next
-      }
+         if( $current >= $total ) {
+            $self->set_child_window( $child, undef, undef, undef );
+            return; # next
+         }
 
-      my $extra = $expand_total ? ( $spare * $opts{expand} / $expand_total ) : 0;
-      $err += $extra - int($extra);
+         my $extra = $expand_total ? ( $spare * $opts{expand} / $expand_total ) : 0;
+         $err += $extra - int($extra);
 
-      $extra = int($extra);
-      $extra++, $err-- if $err >= 1;
+         $extra = int($extra);
+         $extra++, $err-- if $err >= 1;
 
-      my $amount = $base{$child} + $extra;
-      if( $current + $amount > $total ) {
-         $amount = $total - $current; # All remaining space
-      }
+         my $amount = $base{$child} + $extra;
+         if( $current + $amount > $total ) {
+            $amount = $total - $current; # All remaining space
+         }
 
-      $self->set_child_window( $child, $current, $amount, $window );
+         $self->set_child_window( $child, $current, $amount, $window );
 
-      $current += $amount + $self->{spacing};
-   } );
+         $current += $amount + $self->{spacing};
+      } );
+   }
+   elsif( $allocatable > 0 ) {
+      my $err = 0;
+
+      my $current = 0;
+
+      $self->foreach_child( sub {
+         my ( $child, %opts ) = @_;
+
+         my $amount = $base{$child} * $allocatable / $base_total;
+         $err += $amount - int($amount);
+         $amount++, $err-- if $err >= 1;
+
+         $amount = int($amount);
+
+         $self->set_child_window( $child, $current, $amount, $window );
+
+         $current += $amount + $self->{spacing};
+      } );
+   }
 }
 
 =head1 AUTHOR

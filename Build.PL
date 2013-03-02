@@ -98,6 +98,7 @@ my $build = Module::Build->new(
    requires => {
       'Exporter' => '5.57',
       'List::MoreUtils' => 0,
+      'perl' => '5.010', # //
    },
    configure_requires => {
       'ExtUtils::PkgConfig' => 0,
