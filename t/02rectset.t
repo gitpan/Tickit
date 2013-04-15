@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 106;
+use Test::More;
 
 use Tickit::RectSet;
 
@@ -54,10 +55,10 @@ sub _newrect
 {
    local $_ = shift;
 
-   m/^(\d+),(\d+)\+(\d+)x(\d+)$/ and return 
+   m/^(\d+),(\d+)\+(\d+)x(\d+)$/ and return
       Tickit::Rect->new( left => $1, top => $2, cols => $3, lines => $4 );
 
-   m/^(\d+),(\d+)\.\.(\d+),(\d+)$/ and return 
+   m/^(\d+),(\d+)\.\.(\d+),(\d+)$/ and return
       Tickit::Rect->new( left => $1, top => $2, right => $3, bottom => $4 );
 
    die "Unrecognised rectangle spec $_\n";
@@ -93,6 +94,8 @@ while( <DATA> ) {
       is_deeply( [ $rectset->rects ], \@outputrects, "Output for $name $input" );
    }
 }
+
+done_testing;
 
 __DATA__
 
@@ -199,4 +202,4 @@ subtract 10,10..30,15 15,8..25,12 => 10,10..15,12 25,10..30,12 10,12..30,15
 subtract 10,10..30,15 15,13..25,18 => 10,10..30,13 10,13..15,15 25,13..30,15
 
 # Remove entirely
-subtract 10,10..30,15 8,8..32,17 => 
+subtract 10,10..30,15 8,8..32,17 =>

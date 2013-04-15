@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::Static;
 
@@ -12,7 +12,7 @@ use base qw( Tickit::Widget );
 use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );
@@ -25,13 +25,13 @@ C<Tickit::Widget::Static> - a widget displaying static text
 
  use Tickit;
  use Tickit::Widget::Static;
- 
+
  my $hello = Tickit::Widget::Static->new(
     text   => "Hello, world",
     align  => "centre",
     valign => "middle",
  );
- 
+
  Tickit->new( root => $hello )->run;
 
 =head1 DESCRIPTION
@@ -67,6 +67,10 @@ Optional. Defaults to C<0.0> if unspecified.
 
 Optional. Defaults to C<0.0> if unspecified.
 
+=item on_click => CODE
+
+Optional. Defaults to C<undef> if unspecified.
+
 =back
 
 For more details see the accessors below.
@@ -83,6 +87,8 @@ sub new
    $self->set_text( $args{text} );
    $self->set_align( $args{align} || 0 );
    $self->set_valign( $args{valign} || 0 );
+
+   $self->set_on_click( $args{on_click} );
 
    return $self;
 }
@@ -146,6 +152,14 @@ See also L<Tickit::WidgetRole::Alignable>.
 
 =cut
 
+sub set_on_click
+{
+   my $self = shift;
+   my ( $on_click ) = @_;
+
+   $self->{on_click} = $on_click;
+}
+
 use constant CLEAR_BEFORE_RENDER => 0;
 
 sub render
@@ -175,6 +189,17 @@ sub render
    }
 
    $win->goto( $_, 0 ), $win->erasech( $cols ) for $above + $lines .. $rect->bottom - 1;
+}
+
+sub on_mouse
+{
+   my $self = shift;
+   my ( $ev, $button, $line, $col ) = @_;
+
+   return unless $ev eq "press" and $button == 1;
+   return unless my $on_click = $self->{on_click};
+
+   $on_click->( $self, $line, $col );
 }
 
 =head1 AUTHOR

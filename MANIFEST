@@ -24,6 +24,8 @@ lib/Tickit/Rect.pm
 lib/Tickit/RectSet.pm
 lib/Tickit/SingleChildWidget.pm
 lib/Tickit/StringPos.pm
+lib/Tickit/Style.pm
+lib/Tickit/Style/Parser.pm
 lib/Tickit/Term.pm
 lib/Tickit/Test.pm
 lib/Tickit/Test/MockTerm.pm
@@ -76,9 +78,10 @@ t/17window-float.t
 t/18window-popup.t
 t/20widget.t
 t/21widget-window.t
-t/22widget-parent.t
+t/22widget-container.t
 t/23widget-input.t
 t/24widget-clear.t
+t/25widget-style.t
 t/30widget-static.t
 t/40widget-box.t
 t/41widget-hbox.t

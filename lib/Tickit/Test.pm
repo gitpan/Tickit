@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use Exporter 'import';
 
@@ -274,7 +274,7 @@ sub is_termlog
       my $want_line = shift @want_log;
       my $got_line  = shift @got_log;
 
-      if( $want_line and $want_line->[0] eq "chpen_bg" and 
+      if( $want_line and $want_line->[0] eq "chpen_bg" and
           $got_line  and $got_line->[0] eq "chpen" ) {
          $got_line = [ chpen_bg => $got_line->[1]->{bg} ];
       }

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget::LinearBox );
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use List::Util qw( sum max );
 
@@ -22,7 +22,7 @@ C<Tickit::Widget::HBox> - distribute child widgets in a horizontal row
  use Tickit;
  use Tickit::Widget::HBox;
  use Tickit::Widget::Static;
- 
+
  my $hbox = Tickit::Widget::HBox->new;
 
  foreach my $position (qw( left centre right )) {
@@ -35,7 +35,7 @@ C<Tickit::Widget::HBox> - distribute child widgets in a horizontal row
        expand => 1
     );
  }
- 
+
  Tickit->new( root => $hbox )->run;
 
 =head1 DESCRIPTION

@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
 # We need a UTF-8 locale to force libtermkey into UTF-8 handling, even if the
 # system locale is not
@@ -11,7 +12,7 @@ BEGIN {
    $ENV{TERM} = "xterm";
 }
 
-use Test::More tests => 4;
+use Test::More;
 
 use Tickit;
 
@@ -66,3 +67,5 @@ syswrite( $my_wr, "\e[M !!" );
 $tickit->tick;
 
 is_deeply( \@mouse_events, [ [ press => 1, 0, 0 ] ], 'on_mouse @0,0' );
+
+done_testing;

@@ -10,7 +10,7 @@ use warnings;
 
 use Carp;
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 # Load the XS code
 require Tickit;
@@ -58,7 +58,7 @@ sub new
    my $class = shift;
    my %args;
    if( @_ == 1 ) {
-      @args{qw(left top right bottom)} = 
+      @args{qw(left top right bottom)} =
          $_[0] =~ m/^\((\d+),(\d+)\)..\((\d+),(\d+)\)$/ or croak "Unrecognised Tickit::Rect string '$_[0]'";
    }
    else {

@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 33;
+use Test::More;
 use Test::Identity;
 
 use Tickit::Term;
@@ -93,3 +94,5 @@ is( $str,  "Escape", '$str after push_bytes after timedout' );
    isa_ok( $term, "Tickit::Term", '$term isa Tickit::Term' );
    is( $term->get_input_handle, $rd, '$term->get_input_handle is $rd' );
 }
+
+done_testing;

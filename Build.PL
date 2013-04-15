@@ -98,7 +98,9 @@ my $build = Module::Build->new(
    requires => {
       'Exporter' => '5.57',
       'List::MoreUtils' => 0,
+      'Parser::MGC' => 0,
       'perl' => '5.010', # //
+      'Struct::Dumb' => 0,
    },
    configure_requires => {
       'ExtUtils::PkgConfig' => 0,
@@ -121,7 +123,7 @@ my $build = Module::Build->new(
       'Test::Fatal' => 0,
       'Test::HexString' => 0,
       'Test::Identity' => 0,
-      'Test::More' => 0,
+      'Test::More' => '0.88', # done_testing
       'Test::Refcount' => 0,
    },
    auto_configure_requires => 1,

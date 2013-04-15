@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 41;
+use Test::More;
 use Test::Identity;
 use Test::Refcount;
 
@@ -127,6 +128,8 @@ $norv_pen->default_from( Tickit::Pen->new( rv => 1 ) );
 is_deeply( { $norv_pen->getattrs },
            { rv => '' },
            'pen ->default_from does not overwrite defined-but-false attributes' );
+
+done_testing;
 
 package PenObserver;
 

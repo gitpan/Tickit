@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::SingleChildWidget;
 
@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use Carp;
 
@@ -49,7 +49,7 @@ sub new
 
    my $self = $class->SUPER::new( %args );
 
-   $self->add( $args{child} ) if exists $args{child};
+   $self->set_child( $args{child} ) if exists $args{child};
 
    return $self;
 }
@@ -67,24 +67,46 @@ Returns the contained child widget.
 sub child
 {
    my $self = shift;
-   return ( $self->children )[0];
+   return $self->{child};
 }
 
+sub children
+{
+   my $self = shift;
+   my $child = $self->child;
+   return $child ? ( $child ) : () if wantarray;
+   return $child ? 1 : 0;
+}
+
+=head2 $widget->set_child( $child )
+
+Sets the child widget, or C<undef> to remove.
+
+=cut
+
+sub set_child
+{
+   my $self = shift;
+   my ( $child ) = @_;
+
+   if( my $old_child = $self->child ) {
+      undef $self->{child};
+      $self->SUPER::remove( $old_child );
+   }
+
+   $self->{child} = $child;
+
+   if( $child ) {
+      $self->SUPER::add( $child );
+   }
+}
+
+# TODO: This probably isn't needed any more and should be deleted soon
 sub add
 {
    my $self = shift;
    croak "Already have a child; cannot add another" if $self->child;
-   $self->SUPER::add( @_ );
-}
-
-sub window_lost
-{
-   my $self = shift;
-
-   my $child = $self->child;
-   $child->set_window( undef ) if $child;
-
-   $self->SUPER::window_lost( @_ );
+   $self->set_child( $_[0] );
 }
 
 =head1 AUTHOR

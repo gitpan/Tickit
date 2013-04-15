@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::ContainerWidget;
 
@@ -9,11 +9,14 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use Carp;
 
+use Scalar::Util qw( refaddr );
 use List::MoreUtils qw( firstidx );
+
+use constant CLEAR_BEFORE_RENDER => 0;
 
 =head1 NAME
 
@@ -27,125 +30,32 @@ other widgets
 =head1 DESCRIPTION
 
 This class acts as an abstract base class for widgets that contain at leaast
-one other widget object.
-
-It maintains an ordered list of child widgets, and associates a hash of
-named/value pairs as options for each child. Concrete subclasses of this base
-can use these options to implement their required behaviour.
+one other widget object. It provides storage for a hash of "options"
+associated with each child widget.
 
 =cut
 
 sub new
 {
    my $class = shift;
+
+   foreach my $method (qw( children )) {
+      $class->can( $method ) or
+         croak "$class cannot ->$method - do you subclass and implement it?";
+   }
+
    my $self = $class->SUPER::new( @_ );
 
-   $self->{children} = [];
+   $self->{child_opts} = {};
 
    return $self;
 }
 
-=head1 METHODS
-
-=cut
-
-sub render { }
-
-=head2 @children = $widget->children
-
-In scalar context, returns the number of contained children. In list context,
-returns a list of all the child widgets.
-
-=cut
-
-sub children
-{
-   my $self = shift;
-
-   return @{ $self->{children} } unless wantarray;
-   return map { $_->[0] } @{ $self->{children} };
-}
-
-sub _any2index
-{
-   my $self = shift;
-
-   if( ref $_[0] ) {
-      my $child = shift;
-      my $index = firstidx { $_ == $child } $self->children;
-      return $index if defined $index;
-      croak "Unable to find child $child";
-   }
-   else {
-      my $index = shift;
-      return $index if $index >= 0 and $index < $self->children;
-      croak "Index $index out of bounds";
-   }
-}
-
-=head2 %opts = $widget->child_opts( $child_or_index )
-
-Returns the options currently set for the given child, specified either by
-reference or by index.
-
-=cut
-
-sub child_opts
-{
-   my $self = shift;
-   my $index = $self->_any2index( shift );
-
-   return unless defined $index;
-
-   return %{ $self->{children}[$index][1] };
-}
-
-=head2 $widget->set_child_opts( $child_or_index, %newopts )
-
-Sets new options on the given child, specified either by reference or by
-index. Any options whose value is given as C<undef> are deleted.
-
-=cut
-
-sub set_child_opts
-{
-   my $self = shift;
-   my $index = $self->_any2index( shift );
-   my %newopts = @_;
-
-   return unless defined $index;
-
-   my $opts = $self->{children}[$index][1];
-
-   foreach ( keys %newopts ) {
-      defined $newopts{$_} ? ( $opts->{$_} = $newopts{$_} ) : ( delete $opts->{$_} );
-   }
-
-   $self->children_changed if $self->can( "children_changed" );
-}
-
-=head2 $widget->foreach_child( \&code )
-
-Executes the code block once for each stored child, in order. The code block
-is passed the child widget and the options, as key/value pairs
-
- $code->( $child, %opts )
-
-=cut
-
-sub foreach_child
-{
-   my $self = shift;
-   my ( $code ) = @_;
-
-   foreach my $c ( @{ $self->{children} } ) {
-      $code->( $c->[0], %{ $c->[1] } );
-   }
-}
-
 =head2 $widget->add( $child, %opts )
 
-Adds the widget as a new child of this one, with the given options
+Sets the child widget's parent, stores the options for the child, and calls
+the C<children_changed> method. The concrete implementation will have to
+implement storage of this child widget.
 
 =cut
 
@@ -156,28 +66,69 @@ sub add
 
    $child->set_parent( $self );
 
-   push @{ $self->{children} }, [ $child, \%opts ];
+   $self->{child_opts}{refaddr $child} = \%opts;
 
    $self->children_changed if $self->can( "children_changed" );
 }
 
 =head2 $widget->remove( $child_or_index )
 
-Removes the given child widget if present, by reference or index
+Removes the child widget's parent, and calls the C<children_changed> method.
+The concrete implementation will have to remove this child from its storage.
 
 =cut
 
 sub remove
 {
    my $self = shift;
-   my $index = $self->_any2index( shift );
+   my ( $child ) = @_;
 
-   my ( $c ) = splice @{ $self->{children} }, $index, 1, ();
+   $child->set_parent( undef );
+   $child->window->close if $child->window;
+   $child->set_window( undef );
 
-   if( $c ) {
-      my $child = $c->[0];
-      $child->set_parent( undef );
-      $child->window->close if $child->window;
+   delete $self->{child_opts}{refaddr $child};
+
+   $self->children_changed if $self->can( "children_changed" );
+}
+
+=head2 %opts = $widget->child_opts( $child )
+
+=head2 $opts = $widget->child_opts( $child )
+
+Returns the options currently set for the given child as a key/value list in
+list context, or as a HASH reference in scalar context. The HASH reference in
+scalar context is the actual hash used to store the options - modifications to
+it will be preserved.
+
+=cut
+
+sub child_opts
+{
+   my $self = shift;
+   my ( $child ) = @_;
+
+   my $opts = $self->{child_opts}{refaddr $child};
+   return $opts if !wantarray;
+   return %$opts;
+}
+
+=head2 $widget->set_child_opts( $child, %newopts )
+
+Sets new options on the given child. Any options whose value is given as
+C<undef> are deleted.
+
+=cut
+
+sub set_child_opts
+{
+   my $self = shift;
+   my ( $child, %newopts ) = @_;
+
+   my $opts = $self->{child_opts}{refaddr $child};
+
+   foreach ( keys %newopts ) {
+      defined $newopts{$_} ? ( $opts->{$_} = $newopts{$_} ) : ( delete $opts->{$_} );
    }
 
    $self->children_changed if $self->can( "children_changed" );
@@ -187,7 +138,22 @@ sub remove
 # classes might call
 sub child_resized {}
 
+sub window_lost
+{
+   my $self = shift;
+
+   $_->set_window( undef ) for $self->children;
+
+   $self->SUPER::window_lost( @_ );
+}
+
 =head1 SUBCLASS METHODS
+
+=head2 @children = $widget->children
+
+Required. Should return a list of all the contained child widgets. The order
+is not specified. This method is used by C<window_lost> to remove the windows
+from all the child widgets automatically.
 
 =head2 $widget->render( %args )
 

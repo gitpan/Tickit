@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget::LinearBox );
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use List::Util qw( sum max );
 
@@ -22,7 +22,7 @@ C<Tickit::Widget::VBox> - distribute child widgets in a vertical column
  use Tickit;
  use Tickit::Widget::VBox;
  use Tickit::Widget::Static;
- 
+
  my $vbox = Tickit::Widget::VBox->new;
 
  foreach my $position (qw( top middle bottom )) {
@@ -35,7 +35,7 @@ C<Tickit::Widget::VBox> - distribute child widgets in a vertical column
        expand => 1
     );
  }
- 
+
  Tickit->new( root => $vbox )->run;
 
 =head1 DESCRIPTION

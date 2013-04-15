@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 51;
+use Test::More;
 use Test::Identity;
 use Test::Refcount;
 
@@ -224,3 +225,5 @@ is( $win->cols, 100, '$win->cols is 100 after term resize' );
 is( $geom_changed, 1, '$reshaped is 1 after term resize' );
 
 is_refcount( $win, 2, '$win has refcount 2 before dropping Tickit' );
+
+done_testing;

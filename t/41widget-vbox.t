@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 17;
+use Test::More;
 
 use Tickit::Test;
 
@@ -123,6 +124,20 @@ is_display( [ [TEXT("A longer piece of text for the static",bg=>4,b=>1), TEXT(""
               [TEXT("New Widget",bg=>4,b=>1), TEXT("",bg=>4)] ],
             'Display after force_size' );
 
+$widget->set_child( 0, Tickit::Widget::Static->new( text => "A new Static" ) );
+
+flush_tickit;
+
+is_display( [ [TEXT("A new Static",bg=>4,b=>1), TEXT("",bg=>4)],
+              [TEXT("Widget 1",fg=>5,bg=>4,b=>1), TEXT("",bg=>4)],
+              BLANKLINES(24,bg=>4),
+              [TEXT("Widget 2",bg=>4,b=>1), TEXT("",bg=>4)],
+              BLANKLINES(2,bg=>4),
+              [TEXT("New Widget",bg=>4,b=>1), TEXT("",bg=>4)] ],
+            'Display after force_size' );
+
 $widget->set_window( undef );
 
 ok( !defined $statics[0]->window, '$static has no window after ->set_window undef' );
+
+done_testing;

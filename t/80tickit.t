@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 7;
+use Test::More;
 use Test::HexString;
 use Test::Refcount;
 
@@ -34,7 +35,7 @@ sub stream_is
    my ( $expect, $name ) = @_;
 
    my $stream = "";
-   do { 
+   do {
       sysread( $my_rd, $stream, 8192, length $stream );
    } while length $stream < length $expect and $stream eq substr( $expect, 0, length $stream );
 
@@ -71,6 +72,8 @@ stream_is(
    "\e[2J\e[13;38H\e[mHello"            , # Widget
    'root widget rendered'
 );
+
+done_testing;
 
 package TestWidget;
 

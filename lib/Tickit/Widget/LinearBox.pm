@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::LinearBox;
 
@@ -9,7 +9,11 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
+
+use Carp;
+
+use Tickit::Utils qw( distribute );
 
 use List::Util qw( sum );
 
@@ -22,7 +26,8 @@ C<Tickit::Widget::LinearBox> - abstract base class for C<HBox> and C<VBox>
 This class is a base class for both L<Tickit::Widget::HBox> and
 L<Tickit::Widget::VBox>. It is not intended to be used directly.
 
-It implements the following child widget options:
+It maintains an ordered list of child widgets, and implements the following
+child widget options:
 
 =over 8
 
@@ -54,9 +59,120 @@ sub new
 
    my $self = $class->SUPER::new( %args );
 
+   $self->{children} = [];
    $self->{spacing} = $args{spacing} || 0;
 
    return $self;
+}
+
+=head1 METHODS
+
+=cut
+
+=head2 @children = $widget->children
+
+In scalar context, returns the number of contained children. In list context,
+returns a list of all the child widgets.
+
+=cut
+
+sub children
+{
+   my $self = shift;
+
+   return @{ $self->{children} };
+}
+
+sub _any2index
+{
+   my $self = shift;
+
+   if( ref $_[0] ) {
+      my $child = shift;
+      my $index = firstidx { $_ == $child } $self->children;
+      return $index if defined $index;
+      croak "Unable to find child $child";
+   }
+   else {
+      my $index = shift;
+      return $index if $index >= 0 and $index < $self->children;
+      croak "Index $index out of bounds";
+   }
+}
+
+=head2 %opts = $widget->child_opts( $child_or_index )
+
+Returns the options currently set for the given child, specified either by
+reference or by index.
+
+=cut
+
+sub child_opts
+{
+   my $self = shift;
+   my $child = ref $_[0] ? shift : $self->{children}[shift];
+
+   return unless $child;
+
+   return $self->SUPER::child_opts( $child );
+}
+
+=head2 $widget->set_child( $index, $child )
+
+Replaces the child widget at the given index with the given new one;
+preserving any options that are set on it.
+
+=cut
+
+sub set_child
+{
+   my $self = shift;
+   my ( $index, $child ) = @_;
+
+   my $old_child = $self->{children}[$index];
+
+   my %opts;
+   if( $old_child ) {
+      %opts = $self->child_opts( $old_child );
+
+      local $self->{suppress_redistribute} = 1;
+      $self->SUPER::remove( $old_child );
+   }
+
+   $self->{children}[$index] = $child;
+
+   $self->SUPER::add( $child, %opts );
+}
+
+=head2 $widget->set_child_opts( $child_or_index, %newopts )
+
+Sets new options on the given child, specified either by reference or by
+index. Any options whose value is given as C<undef> are deleted.
+
+=cut
+
+sub set_child_opts
+{
+   my $self = shift;
+   my $child = ref $_[0] ? shift : $self->{children}[shift];
+
+   return unless $child;
+
+   return $self->SUPER::set_child_opts( $child, @_ );
+}
+
+sub render
+{
+   my $self = shift;
+   my %args = @_;
+
+   my $window = $self->window or return;
+   my $rect = $args{rect};
+
+   foreach my $line ( $rect->linerange ) {
+      $window->goto( $line, $rect->left );
+      $window->erasech( $rect->cols );
+   }
 }
 
 sub reshape
@@ -65,24 +181,39 @@ sub reshape
    $self->redistribute_child_windows;
 }
 
-sub window_lost
-{
-   my $self = shift;
+=head2 $widget->add( $child, %opts )
 
-   $_->set_window( undef ) for $self->children;
+Adds the widget as a new child of this one, with the given options
 
-   $self->SUPER::window_lost( @_ );
-}
+=cut
 
 sub add
 {
    my $self = shift;
    my ( $child, %opts ) = @_;
 
-   $self->SUPER::add( $child, 
+   push @{ $self->{children} }, $child;
+
+   $self->SUPER::add( $child,
       expand     => $opts{expand} || 0,
       force_size => $opts{force_size},
    );
+}
+
+=head2 $widget->remove( $child_or_index )
+
+Removes the given child widget if present, by reference or index
+
+=cut
+
+sub remove
+{
+   my $self = shift;
+   my $index = $self->_any2index( shift );
+
+   my ( $child ) = splice @{ $self->{children} }, $index, 1, ();
+
+   $self->SUPER::remove( $child ) if $child;
 }
 
 sub children_changed
@@ -106,90 +237,38 @@ sub child_resized
 sub redistribute_child_windows
 {
    my $self = shift;
+   $self->{suppress_redistribute} and return;
 
    my $window = $self->window;
 
    return unless $self->children;
 
-   my $n_gaps = $self->children - 1;
+   my @buckets;
+   foreach my $child ( $self->children ) {
+      my %opts = $self->child_opts( $child );
 
-   my $total = $self->get_total_quota( $window );
+      push @buckets, {
+         fixed => $self->{spacing},
+      } if @buckets; # gap
 
-   # First determine how many spare lines
-   my $base_total = 0;
-   my $expand_total = 0;
-
-   my %base;
-
-   $self->foreach_child( sub {
-      my ( $child, %opts ) = @_;
-
-      my $base = defined $opts{force_size} ? $opts{force_size} 
+      my $base = defined $opts{force_size} ? $opts{force_size}
                                            : $self->get_child_base( $child );
       warn "Child $child did not define a base size for $self\n", $base = 0
          unless defined $base;
 
-      $base{$child} = $base;
-
-      $base_total += $base;
-      $expand_total += $opts{expand};
-   } );
-
-   # Account for spacing
-   my $allocatable = $total - $n_gaps * $self->{spacing};
-   my $spare = $allocatable - $base_total;
-
-   if( $spare >= 0 ) {
-      my $err = 0;
-
-      # This algorithm tries to allocate spare quota roughly evenly to the
-      # children. It keeps track of rounding errors in $err, to ensure that
-      # rounding-down-to-int() errors don't leave us some spare amount
-
-      my $current = 0;
-
-      $self->foreach_child( sub {
-         my ( $child, %opts ) = @_;
-
-         if( $current >= $total ) {
-            $self->set_child_window( $child, undef, undef, undef );
-            return; # next
-         }
-
-         my $extra = $expand_total ? ( $spare * $opts{expand} / $expand_total ) : 0;
-         $err += $extra - int($extra);
-
-         $extra = int($extra);
-         $extra++, $err-- if $err >= 1;
-
-         my $amount = $base{$child} + $extra;
-         if( $current + $amount > $total ) {
-            $amount = $total - $current; # All remaining space
-         }
-
-         $self->set_child_window( $child, $current, $amount, $window );
-
-         $current += $amount + $self->{spacing};
-      } );
+      push @buckets, {
+         base   => $base,
+         expand => $opts{expand},
+         child  => $child,
+      };
    }
-   elsif( $allocatable > 0 ) {
-      my $err = 0;
 
-      my $current = 0;
+   distribute( $self->get_total_quota( $window ), @buckets );
 
-      $self->foreach_child( sub {
-         my ( $child, %opts ) = @_;
+   foreach my $b ( @buckets ) {
+      my $child = $b->{child} or next;
 
-         my $amount = $base{$child} * $allocatable / $base_total;
-         $err += $amount - int($amount);
-         $amount++, $err-- if $err >= 1;
-
-         $amount = int($amount);
-
-         $self->set_child_window( $child, $current, $amount, $window );
-
-         $current += $amount + $self->{spacing};
-      } );
+      $self->set_child_window( $child, $b->{start}, $b->{value}, $window );
    }
 }
 

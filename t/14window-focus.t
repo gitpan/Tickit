@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 19;
+use Test::More;
 use Test::Refcount;
 
 use Tickit::Test;
@@ -71,3 +72,5 @@ $otherwin->focus( 0, 0 );
 
 ok( !$win->is_focused, '$win->is_focused false after ->focus on other window' );
 is( $focused, "out", '$focused is "out" after ->focus on other window' );
+
+done_testing;

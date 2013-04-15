@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 5;
+use Test::More;
 use Test::Refcount;
 
 use Tickit::Test;
@@ -32,6 +33,8 @@ pressmouse( press => 1, 4, 3 );
 is_deeply( \@mouse_events, [ [ press => 1, 4, 3 ] ], 'on_mouse abs@3,4' );
 
 is_oneref( $widget, '$widget has refcount 1 at EOF' );
+
+done_testing;
 
 package TestWidget;
 

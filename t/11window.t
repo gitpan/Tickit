@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 50;
+use Test::More;
 use Test::Identity;
 use Test::Refcount;
 
@@ -107,3 +108,5 @@ $subwin->close; undef $subwin;
 $win->close; undef $win;
 
 is_refcount( $rootwin, 2, '$rootwin has refcount 3 at EOF' );
+
+done_testing;

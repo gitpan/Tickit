@@ -1,6 +1,8 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
+
 use Test::Builder::Tester tests => 11;
 use Tickit::Test;
 
@@ -37,7 +39,7 @@ $term->print( "hello!" );
 
 test_out( "ok 1 - Termlog after goto+print" );
 is_termlog( [ GOTO(2,2),
-              PRINT("hello!") ], 
+              PRINT("hello!") ],
             'Termlog after goto+print' );
 test_test( 'is_termlog non-empty pass' );
 

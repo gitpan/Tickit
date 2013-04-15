@@ -1,19 +1,21 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use Carp;
 use Scalar::Util qw( weaken );
+use List::MoreUtils qw( all );
 
 use Tickit::Pen;
+use Tickit::Style;
 
 =head1 NAME
 
@@ -42,7 +44,32 @@ Constructs a new C<Tickit::Widget> object. Must be called on a subclass that
 implements the required methods; see the B<SUBCLASS METHODS> section below.
 
 Any pen attributes present in C<%args> will be used to set the default values
-on the widget's pen object.
+on the widget's pen object, other than the following:
+
+=over 8
+
+=item class => STRING
+
+=item classes => ARRAY of STRING
+
+If present, gives the C<Tickit::Style> class name or names applied to this
+widget.
+
+=item style => HASH
+
+If present, gives a set of "direct applied" style to the Widget. This is
+treated as an extra set of style definitions that apply more directly than any
+of the style classes or the default definitions.
+
+The hash should contain style keys, optionally suffixed by style tags, giving
+values.
+
+ style => {
+   'fg'        => 3,
+   'fg:active' => 5,
+ }
+
+=back
 
 =cut
 
@@ -56,8 +83,24 @@ sub new
          croak "$class cannot ->$method - do you subclass and implement it?";
    }
 
+   $class->CLEAR_BEFORE_RENDER and
+      carp "Constructing a $class with CLEAR_BEFORE_RENDER";
+
    my $self = bless {
+      classes => delete $args{classes} // [ delete $args{class} ],
    }, $class;
+
+   if( my $style = delete $args{style} ) {
+      my $tagset = $self->{style_direct} = Tickit::Style::_Tagset->new;
+      foreach my $key ( keys %$style ) {
+         my $value = $style->{$key};
+
+         my %tags;
+         $tags{$1}++ while $key =~ s/:([A-Z0-9_]+)//i;
+
+         $tagset->merge( \%tags, { $key => $value } );
+      }
+   }
 
    $self->set_pen( Tickit::Pen->new_from_attrs( \%args ) );
 
@@ -67,6 +110,192 @@ sub new
 =head1 METHODS
 
 =cut
+
+=head2 @classes = $widget->style_classes
+
+Returns a list of the style class names this Widget has.
+
+=cut
+
+sub style_classes
+{
+   my $self = shift;
+   return @{ $self->{classes} };
+}
+
+=head2 $widget->set_style_tag( $tag, $value )
+
+Sets the (boolean) state of the named style tag. After calling this method,
+the C<get_style_*> methods may return different results, but no resizing or
+redrawing is automatically performed; the widget should do this itself. It may
+find the C<on_style_changed_values> method useful for this.
+
+=cut
+
+# This is cached, so will need invalidating on style loads
+my %KEYS_BY_TYPE_CLASS_TAG;
+Tickit::Style::on_style_load( sub { undef %KEYS_BY_TYPE_CLASS_TAG } );
+
+sub set_style_tag
+{
+   my $self = shift;
+   my ( $tag, $value ) = @_;
+
+   # Early-return on no change
+   return if !$self->{style_tag}{$tag} == !$value;
+
+   ( my $type = ref $self ) =~ s/^Tickit::Widget:://;
+
+   # Work out what style keys might depend on this tag
+   my %keys;
+
+   if( $self->{style_direct} ) {
+      KEYSET: foreach my $keyset ( $self->{style_direct}->keysets ) {
+         $keyset->tags->{$tag} or next KEYSET;
+
+         $keys{$_}++ for keys %{ $keyset->style };
+      }
+   }
+
+   foreach my $class ( $self->style_classes, undef ) {
+      my $keys = $KEYS_BY_TYPE_CLASS_TAG{$type}{$class//""}{$tag} ||= do {
+         my $tagset = Tickit::Style::_ref_tagset( $type, $class );
+
+         my %keys;
+         KEYSET: foreach my $keyset ( $tagset->keysets ) {
+            $keyset->tags->{$tag} or next KEYSET;
+
+            $keys{$_}++ for keys %{ $keyset->style };
+         }
+
+         [ keys %keys ];
+      };
+
+      $keys{$_}++ for @$keys;
+   }
+
+   my @keys = keys %keys;
+
+   my %values;
+   my $code = $self->can( "on_style_changed_values" );
+   if( $code ) {
+      my @old_values = $self->get_style_values( @keys );
+      $values{$keys[$_]}[0] = $old_values[$_] for 0 .. $#keys;
+   }
+
+   $self->{style_tag}{$tag} = !!$value;
+
+   if( $code ) {
+      my @new_values = $self->get_style_values( @keys );
+      $values{$keys[$_]}[1] = $new_values[$_] for 0 .. $#keys;
+
+      $self->$code( %values );
+   }
+}
+
+=head2 @values = $widget->get_style_values( @keys )
+
+=head2 $value = $widget->get_style_values( $key )
+
+Returns a list of values for the given keys of the currently-applied style.
+For more detail see the L<Tickit::Style> documentation. Returns just one value
+in scalar context.
+
+=cut
+
+sub get_style_values
+{
+   my $self = shift;
+   my @keys = @_;
+
+   ( my $type = ref $self ) =~ s/^Tickit::Widget:://;
+
+   my @set = ( 0 ) x @keys;
+   my @values = ( undef ) x @keys;
+
+   my $tags = $self->{style_tag};
+   my $cache = $self->{style_cache}{join "|", sort grep { $tags->{$_} } keys %$tags} ||= {};
+
+   foreach my $i ( 0 .. $#keys ) {
+      next unless exists $cache->{$keys[$i]};
+
+      $set[$i] = 1;
+      $values[$i] = $cache->{$keys[$i]};
+   }
+
+   my @classes = ( $self->style_classes, undef );
+   my $tagset = $self->{style_direct};
+
+   while( !all { $_ } @set and @classes ) {
+      # First time around this uses the direct style, if set. Thereafter uses
+      # the style classes in order, finally the unclassed base.
+      defined $tagset or $tagset = Tickit::Style::_ref_tagset( $type, shift @classes );
+
+      KEYSET: foreach my $keyset ( $tagset->keysets ) {
+         $tags->{$_} or next KEYSET for keys %{ $keyset->tags };
+
+         my $style = $keyset->style;
+
+         foreach ( 0 .. $#keys ) {
+            exists $style->{$keys[$_]} or next;
+            $set[$_] and next;
+
+            $values[$_] = $style->{$keys[$_]};
+            $set[$_] = 1;
+         }
+      }
+
+      undef $tagset;
+   }
+
+   foreach my $i ( 0 .. $#keys ) {
+      next if exists $cache->{$keys[$i]};
+
+      $cache->{$keys[$i]} = $values[$i];
+   }
+
+   return @values if wantarray;
+   return $values[0];
+}
+
+=head2 $pen = $widget->get_style_pen( $prefix )
+
+A shortcut to calling C<get_style_values> to collect up the pen attributes,
+and form a L<Tickit::Pen> object from them. If C<$prefix> is supplied, it will
+be prefixed on the pen attribute names with an underscore (which would be read
+from the stylesheet file as a hypen).
+
+=cut
+
+sub get_style_pen
+{
+   my $self = shift;
+   my $class = ref $self;
+   my ( $prefix ) = @_;
+
+   my @keys = map { defined $prefix ? "${prefix}_$_" : $_ } @Tickit::Pen::ALL_ATTRS;
+
+   my %attrs;
+   @attrs{@Tickit::Pen::ALL_ATTRS} = $self->get_style_values( @keys );
+
+   # TODO: definitely want to cache this one
+   my $pen = Tickit::Pen->new( %attrs );
+   return $pen;
+}
+
+=head2 $text = $widget->get_style_text
+
+A shortcut to calling C<get_style_values> for a single key called C<"text">.
+
+=cut
+
+sub get_style_text
+{
+   my $self = shift;
+   my $class = ref $self;
+
+   return $self->get_style_values( "text" ) // croak "$class style does not define text";
+}
 
 =head2 $widget->set_window( $window )
 
@@ -297,6 +526,11 @@ sub set_pen
    $self->{pen}->remove_on_changed( $self ) if $self->{pen};
    $self->{pen} = $newpen;
    $newpen->add_on_changed( $self );
+
+   if( $self->window ) {
+      $self->window->set_pen( $newpen );
+      $self->redraw;
+   }
 }
 
 sub on_pen_changed
@@ -324,15 +558,9 @@ the contained L<Tickit::Window> object obtained from C<< $widget->window >>.
 
 Will be passed hints on the region of the window that requires rendering; the
 method implementation may choose to use this information to restrict drawing,
-or it may ignore it entirely.
-
-Before this method is called, the window area will be cleared if the
-(optional) object method C<CLEAR_BEFORE_RENDER> returns true. Subclasses may
-wish to override this and return false if their C<render> method will
-completely redraw the window expose area anyway, for better performance and
-less display flicker.
-
- use constant CLEAR_BEFORE_RENDER => 0;
+or it may ignore it entirely. Container widget should make sure to restrict
+drawing to only this rectangle, however, as they may otherwise overwrite
+content of contained widgets that will not be redrawn.
 
 =over 8
 
@@ -391,6 +619,17 @@ Optional. If provided, this method will be set as the C<on_mouse> callback for
 any window set on the widget. By providing this method a subclass can
 implement widgets that respond to user input.
 
+=head2 $widget->on_style_changed_values( %values )
+
+Optional. If provided, this method will be called by C<set_style_tag> to
+inform the widget which style keys may have changed values, as a result of the
+tag change. The style values are passed in ARRAY references of two elements,
+containing the old and new values.
+
+The C<%values> hash may contain false positives in some cases, if the old and
+the new value are actually the same, but it still appears from the style
+definitions that certain keys are changed.
+
 =cut
 
 =head1 EXAMPLES
@@ -403,20 +642,20 @@ containing the bare minimum of functionallity. It displays the fixed string
 
  package HelloWorldWidget;
  use base 'Tickit::Widget';
- 
+
  sub lines {  1 }
  sub cols  { 12 }
- 
+
  sub render
  {
     my $self = shift;
     my $win = $self->window;
- 
+
     $win->clear;
     $win->goto( 0, 0 );
     $win->print( "Hello, world" );
  }
- 
+
  1;
 
 The C<lines> and C<cols> methods tell the container of the widget what its
@@ -430,10 +669,38 @@ position the text in the centre rather than the top left corner.
  {
     my $self = shift;
     my $win = $self->window;
- 
+
     $win->clear;
     $win->goto( ( $win->lines - 1 ) / 2, ( $win->cols - 12 ) / 2 );
     $win->print( "Hello, world" );
+ }
+
+A further improvement restricts rendering to only the lines specified by the
+C<rect> argument, and also ensures not to double-print the line.
+
+ sub render
+ {
+    my $self = shift;
+    my %args = @_;
+    my $win = $self->window;
+    my $rect = $args{rect};
+
+    my $content_line = int( ( $win->lines - 1 ) / 2 );
+
+    foreach my $line ( $rect->top .. $content_line - 1 ) {
+       $win->goto( $line, $rect->left );
+       $win->erasech( $rect->cols );
+    }
+
+    if( $rect->top <= $content_line and $content_line < $rect->bottom ) {
+       $win->goto( $content_line, ( $win->cols - 12 ) / 2 );
+       $win->print( "Hello, world" );
+    }
+
+    foreach my $line ( $content_line + 1 .. $rect->bottom - 1 ) {
+       $win->goto( $line, $rect->left );
+       $win->erasech( $rect->cols );
+    }
  }
 
 =head2 Reacting To User Input
@@ -444,29 +711,29 @@ change the pen foreground colour.
 
  package ColourWidget;
  use base 'Tickit::Widget';
- 
+
  my $text = "Press 0 to 7 to change the colour of this text";
- 
+
  sub lines { 1 }
  sub cols  { length $text }
- 
+
  sub render
  {
     my $self = shift;
     my $win = $self->window;
- 
+
     $win->clear;
     $win->goto( ( $win->lines - $self->lines ) / 2, ( $win->cols - $self->cols ) / 2 );
     $win->print( $text );
- 
+
     $win->focus( 0, 0 );
  }
- 
+
  sub on_key
  {
     my $self = shift;
     my ( $type, $str ) = @_;
- 
+
     if( $type eq "text" and $str =~ m/[0-7]/ ) {
        $self->pen->chattr( fg => $str );
        $self->redraw;
@@ -475,7 +742,7 @@ change the pen foreground colour.
 
     return 0;
  }
- 
+
  1;
 
 The C<render> method sets the focus at the window's top left corner to ensure
@@ -493,37 +760,37 @@ list of the last 10 mouse clicks and renders them with an C<X>.
 
  package ClickerWidget;
  use base 'Tickit::Widget';
- 
+
  # In a real Widget this would be stored in an attribute of $self
  my @points;
- 
+
  sub lines { 1 }
  sub cols  { 1 }
- 
+
  sub render
  {
     my $self = shift;
     my $win = $self->window;
- 
+
     $win->clear;
     foreach my $point ( @points ) {
        $win->goto( $point->[0], $point->[1] );
        $win->print( "X" );
     }
  }
- 
+
  sub on_mouse
  {
     my $self = shift;
     my ( $ev, $button, $line, $col ) = @_;
- 
+
     return unless $ev eq "press" and $button == 1;
- 
+
     push @points, [ $line, $col ];
     shift @points while @points > 10;
     $self->redraw;
  }
- 
+
  1;
 
 This time there is no need to set the window focus, because mouse events do

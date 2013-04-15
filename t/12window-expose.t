@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 20;
+use Test::More;
 
 use Tickit::Test;
 
@@ -119,3 +120,5 @@ is_deeply( \@exposed_rects,
 
    is( $exposed, 100, '$exposed 100 times' );
 }
+
+done_testing;

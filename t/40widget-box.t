@@ -1,8 +1,10 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 12;
+use Test::More;
+use Test::Identity;
 
 use Tickit::Test;
 
@@ -18,6 +20,9 @@ my $widget = Tickit::Widget::Box->new(
 );
 
 ok( defined $widget, 'defined $widget' );
+
+is( scalar $widget->children, 1, 'scalar $widget->children' );
+identical( ( $widget->children )[0], $widget->child, '$widget->children[0]' );
 
 $child_lines = 3; $child_cols = 10;
 
@@ -68,6 +73,8 @@ flush_tickit;
 
 is( $child_render_rect, Tickit::Rect->new( top => 0, left => 0, lines => 20, cols => 30 ),
    'child render rect with top-left alignment' );
+
+done_testing;
 
 package TestWidget;
 

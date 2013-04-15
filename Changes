@@ -1,5 +1,19 @@
 Revision history for Changes
 
+0.29    CHANGES:
+         * Added Tickit::Style, and the ability to set state-sensitive style
+           information on widgets
+         * Added on_click event to Tickit::Widget::Static
+         * Redraw a widget after pen change
+         * Added Tickit::Utils::distribute()
+         * Improvements and modifications to the way ContainerWidget works
+           + can ->set_child directly
+           + more abstract container logic that doesn't enforce an ordering
+           + just stores per-child options
+         * Return a Tickit::StringPos from $win->erasech
+         * Abort if $win->print is given non-Unicode text
+         * Warn if CLEAR_BEFORE_RENDER is still set
+
 0.28    CHANGES:
          * Added $window->close method
          * Make FLOAT_ALL_THE_WINDOWS behaviour default

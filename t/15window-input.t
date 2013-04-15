@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 13;
+use Test::More;
 
 use Tickit::Test;
 
@@ -104,3 +105,5 @@ undef @handlers;
 presskey( text => "E" );
 
 is_deeply( \@handlers, [qw( win otherwin )], 'hidden windows do not receive input events' );
+
+done_testing;

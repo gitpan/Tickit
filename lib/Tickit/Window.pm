@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use Carp;
 
@@ -136,7 +136,7 @@ sub close
    $self->set_on_focus( undef );
 
    $self->{parent}->_remove( $self ) if $self->{parent};
-   $_->close for @{ $self->{child_windows} };
+   defined and $_->close for @{ $self->{child_windows} };
 }
 
 sub _remove
@@ -146,7 +146,7 @@ sub _remove
 
    my $children = $self->{child_windows};
    for( my $i = 0; $i < @$children; ) {
-      $i++, next if $children->[$i] != $child;
+      $i++, next if defined $children->[$i] and $children->[$i] != $child;
       splice @$children, $i, 1, ();
    }
 }
@@ -407,7 +407,7 @@ sub change_geometry
    $lines > 0 or croak 'lines zero or negative';
    $cols  > 0 or croak 'cols zero or negative';
 
-   if( !defined $self->{top} or 
+   if( !defined $self->{top} or
        $self->{lines} != $lines or $self->{cols} != $cols or
        $self->{top} != $top or $self->{left} != $left ) {
       $self->{lines} = $lines;
@@ -1058,7 +1058,8 @@ sub print
 
       my $prev_cp  = $pos->codepoints;
       my $prev_col = $pos->columns;
-      string_countmore( $text, $pos, Tickit::StringPos->limit_columns( $cols + $pos->columns ), $pos->bytes );
+      defined string_countmore( $text, $pos, Tickit::StringPos->limit_columns( $cols + $pos->columns ), $pos->bytes ) or
+         croak "Encountered non-Unicode text in ->print; bailing out";
 
       # TODO: This would be more efficient in bytes, but 'use bytes' breaks
       # the UTF-8ness of the return value
@@ -1091,9 +1092,9 @@ sub print
    return $pos;
 }
 
-=head2 $win->erasech( $count, $moveend, $pen )
+=head2 $pos = $win->erasech( $count, $moveend, $pen )
 
-=head2 $win->erasech( $count, $moveend, %attrs )
+=head2 $pos = $win->erasech( $count, $moveend, %attrs )
 
 Erase C<$count> columns forwards. If C<$moveend> is true, the cursor will be
 placed at the end of the erased region. If defined but false, it will not move
@@ -1102,6 +1103,11 @@ option it can implement most efficiently.
 
 If a C<Tickit::Pen> or pen attributes are provided, they are used to override
 the background colour for the erased region.
+
+Returns a L<Tickit::StringPos> object giving the total count of string
+printed, including in obscured sections covered by other windows, or clipped
+by window boundaries. Only the C<columns> field will be valid; the others will
+be C<-1>.
 
 =cut
 
@@ -1127,6 +1133,7 @@ sub erasech
    my ( $abs_top, $abs_left );
    my $need_flush = 0;
 
+   my $orig_count = $count;
    while( $count ) {
       my ( $vis, $len ) = $self->_get_span_visibility( $line, $self->{output_column} );
 
@@ -1157,6 +1164,9 @@ sub erasech
 
    $self->root->_needs_flush if $need_flush;
    $self->{output_needs_goto} = $need_goto;
+
+   return if !defined wantarray;
+   return Tickit::StringPos->limit_columns( $orig_count );
 }
 
 =head2 $win->clearrect( $rect )
@@ -1328,7 +1338,7 @@ sub scrollrect
 
          return 0 unless $self->{expose_after_scroll};
 
-         $visible->subtract( Tickit::Rect->new( 
+         $visible->subtract( Tickit::Rect->new(
             top    => $line,
             bottom => $line+1,
             left   => $col,
@@ -1547,7 +1557,7 @@ use overload
       my $self = shift;
       return $self;
    },
-   fallback => 1; 
+   fallback => 1;
 
 =head1 AUTHOR
 

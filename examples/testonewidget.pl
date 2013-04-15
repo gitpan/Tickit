@@ -13,14 +13,10 @@ GetOptions(
    'file=s'   => \$file,
 ) or exit 1;
 
-my $tickit = Tickit->new;
-
 defined $file or ( $file = "$widgetclass.pm" ) =~ s{::}{/}g;
 
 require $file;
 
 my $widget = $widgetclass->new;
 
-$tickit->set_root_widget( $widget );
-
-$tickit->run;
+Tickit->new( root => $widget )->run;

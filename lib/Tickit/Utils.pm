@@ -1,14 +1,14 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011-2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::Utils;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use Exporter 'import';
 our @EXPORT_OK = qw(
@@ -25,6 +25,8 @@ our @EXPORT_OK = qw(
    align
 
    bound
+
+   distribute
 );
 
 # XS code comes from Tickit itself
@@ -153,6 +155,145 @@ sub bound
    $val = $min if defined $min and $val < $min;
    $val = $max if defined $max and $val > $max;
    return $val;
+}
+
+=head2 distribute( $total, @buckets )
+
+Given a total amount of quota, and a list of buckets, distributes the quota
+among the buckets according to the values given in them.
+
+Each value in the C<@buckets> list is a C<HASH> reference which will be
+modified by the function. On entry, the following keys are inspected.
+
+=over 8
+
+=item base => INT
+
+If present, this bucket shall be a flexible bucket containing initially this
+quantity of quota, but may be allocated more, or less, depending on the value
+of the C<expand> key, and how much spare is remaining.
+
+=item expand => INT
+
+For a C<base> flexible bucket, the relative distribution of C<expand> value
+among the flexible buckets determines how the spare quota is distributed among
+them. If absent, defaults to 0.
+
+=item fixed => INT
+
+If present, this bucket shall be of the exact fixed size given.
+
+=back
+
+On return, the bucket hashes will be modified to contain two more keys:
+
+=over 8
+
+=item value => INT
+
+The amount of quota allocated to this bucket. For C<fixed> buckets, this will
+be the fixed value. For C<base> buckets, this may include extra spare quota
+distributed in proportion to the C<expand> value, or may be reduced in order
+to fit the total.
+
+=item start => INT
+
+Gives the cumulative amount of quota allocated to each previous bucket. The
+first bucket's C<start> value will be 0, the second will be the C<value>
+allocated to the first, and so on.
+
+=back
+
+The bucket hashes will not otherwise be modified; the caller may place any
+extra keys in the hashes as required.
+
+=cut
+
+sub distribute
+{
+   my ( $total, @buckets ) = @_;
+
+   my $base_total = 0;
+   my $expand_total = 0;
+   my $fixed_total = 0;
+
+   foreach my $b ( @buckets ) {
+      if( defined $b->{base} ) {
+         $base_total   += $b->{base};
+         $expand_total += $b->{expand} || 0;
+      }
+      elsif( defined $b->{fixed} ) {
+         $fixed_total += $b->{fixed};
+      }
+   }
+
+   my $allocatable = $total - $fixed_total;
+   my $spare = $allocatable - $base_total;
+
+   if( $spare >= 0 ) {
+      my $err = 0;
+
+      # This algorithm tries to allocate spare quota roughly evenly to the
+      # buckets. It keeps track of rounding errors in $err, to ensure that
+      # rounding-down-to-int() errors don't leave us some spare amount
+
+      my $current = 0;
+
+      foreach my $b ( @buckets ) {
+         die "ARG: ran out of quota" if( $current > $total );
+
+         my $amount;
+         if( defined $b->{base} ) {
+            my $extra = $expand_total ? ( $spare * ( $b->{expand} || 0 ) / $expand_total ) : 0;
+            $err += $extra - int($extra);
+
+            $extra = int($extra);
+            $extra++, $err-- if $err >= 1;
+
+            $amount = $b->{base} + $extra;
+         }
+         elsif( defined $b->{fixed} ) {
+            $amount = $b->{fixed};
+         }
+
+         if( $current + $amount > $total ) {
+            $amount = $total - $current; # All remaining space
+         }
+
+         $b->{start} = $current;
+         $b->{value} = $amount;
+
+         $current += $amount;
+      }
+   }
+   elsif( $allocatable > 0 ) {
+      # Divide it best we can
+
+      my $err = 0;
+
+      my $current = 0;
+
+      foreach my $b ( @buckets ) {
+         my $amount;
+
+         if( $b->{base} ) {
+            $amount = $b->{base} * $allocatable / $base_total;
+
+            $err += $amount - int($amount);
+            $amount++, $err-- if $err >= 1;
+
+            $amount = int($amount);
+         }
+         elsif( $b->{fixed} ) {
+            $amount = $b->{fixed};
+         }
+
+         $b->{start} = $current;
+         $b->{value} = $amount;
+
+         $current += $amount;
+      }
+   }
 }
 
 =head1 AUTHOR

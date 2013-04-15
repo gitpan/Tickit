@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 4;
+use Test::More;
 
 use Tickit::Test;
 
@@ -11,7 +12,17 @@ use Tickit::Widget;
 my $win = mk_window;
 
 {
-   my $widget = WidgetWithClear->new;
+   my $warnings = "";
+
+   my $widget = do {
+      local $SIG{__WARN__} = sub { $warnings .= join "", @_ };
+      WidgetWithClear->new;
+   };
+
+   like( $warnings,
+         qr/^Constructing a WidgetWithClear with CLEAR_BEFORE_RENDER at /,
+         'Constructing a Widget with CLEAR_BEFORE_RENDER yields a warning');
+
    $widget->set_window( $win );
 
    flush_tickit;
@@ -50,6 +61,8 @@ my $win = mk_window;
                  [TEXT("Junk")] ],
                  'Display not cleared of junk by widget without clear' );
 }
+
+done_testing;
 
 package WidgetBase;
 use base qw( Tickit::Widget );

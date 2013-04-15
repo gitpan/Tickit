@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 57;
+use Test::More;
 
 use Tickit::Rect;
 
@@ -192,3 +193,5 @@ ok( !$rect->intersects( Tickit::Rect->new( top => 12, left => 10, lines => 3, co
                 Tickit::Rect->new( "(10,18)..(20,20)" ) ],
               '$r->subtract hole' );
 }
+
+done_testing;

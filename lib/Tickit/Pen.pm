@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use Carp;
 
@@ -214,7 +214,7 @@ sub STRING
    my $self = shift;
 
    return ref($self) . "={" . join( ",", map {
-      $self->hasattr($_) ? "$_=" . $self->getattr($_) : () 
+      $self->hasattr($_) ? "$_=" . $self->getattr($_) : ()
    } @ALL_ATTRS ) . "}";
 }
 

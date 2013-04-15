@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 12;
+use Test::More;
 use Test::Identity;
 
 use Tickit::Term;
@@ -49,3 +50,5 @@ $term->set_size( 25, 80 );
    is( $lines,  40, '$lines to on_resize after set_size' );
    is( $cols,  120, '$cols to on_resize after set_size' );
 }
+
+done_testing;

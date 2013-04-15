@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
 BEGIN {
    # We need to force TERM=xterm so that we can guarantee the right byte
@@ -8,7 +9,7 @@ BEGIN {
    $ENV{TERM} = "xterm";
 }
 
-use Test::More tests => 37;
+use Test::More;
 use Test::HexString;
 
 use Tickit::Term;
@@ -169,3 +170,5 @@ stream_is( "\e[24;3m", '$term->setpen( Tickit::Pen )' );
    isa_ok( $term, "Tickit::Term", '$term isa Tickit::Term' );
    is( $term->get_output_handle, $wr, '$term->get_output_handle is $wr' );
 }
+
+done_testing;

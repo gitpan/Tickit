@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 9;
+use Test::More;
 use Test::Refcount;
 
 my $widget = TestWidget->new;
@@ -31,6 +32,8 @@ is( $widget->pen->getattr('u'), 1, '$widget pen defines u as 1' );
 }
 
 is_oneref( $widget, '$widget has refcount 1 at EOF' );
+
+done_testing;
 
 package TestWidget;
 

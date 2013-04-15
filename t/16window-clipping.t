@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 44;
+use Test::More;
 
 use Tickit::Test;
 
@@ -285,3 +286,5 @@ is_display( [ BLANKLINES(10),
               [BLANK(20), TEXT("nt for lin") ],
               [BLANK(20), TEXT("nt for lin") ] ],
             'Display for clipped nested window' );
+
+done_testing;

@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
 # These tests depend on a locale that knows about Unicode
 BEGIN {
@@ -16,7 +17,7 @@ BEGIN {
    import constant CAN_UNICODE => $CAN_UNICODE;
 }
 
-use Test::More tests => 66;
+use Test::More;
 
 # An invalid UTF-8 string
 my $BAD_UTF8 = do { no utf8; "foo\xA9bar" };
@@ -33,6 +34,7 @@ use Tickit::Utils qw(
    substrwidth
    align
    bound
+   distribute
 );
 use Tickit::StringPos;
 
@@ -168,3 +170,44 @@ is( bound(    10, 20, undef ), 20, 'bound with minimum' );
 is( bound(    10,  5, undef ), 10, 'bound at minimum' );
 is( bound( undef, 20,    40 ), 20, 'bound with maximum' );
 is( bound( undef, 50,    40 ), 40, 'bound at maximum' );
+
+{
+   my @buckets = (
+      { base => 10, expand => 1 },
+      { base => 10, expand => 2 },
+      { base => 20 },
+   );
+
+   distribute( 40, @buckets );
+   is_deeply( \@buckets,
+              [ { base => 10, expand => 1, value => 10, start =>  0, },
+                { base => 10, expand => 2, value => 10, start => 10, },
+                { base => 20,              value => 20, start => 20, } ],
+              'distribute exact' );
+
+   distribute( 50, @buckets );
+   is_deeply( \@buckets,
+              [ { base => 10, expand => 1, value => 13, start =>  0, },
+                { base => 10, expand => 2, value => 17, start => 13, },
+                { base => 20,              value => 20, start => 30, } ],
+              'distribute spare' );
+
+   distribute( 30, @buckets );
+   is_deeply( \@buckets,
+              [ { base => 10, expand => 1, value =>  7, start =>  0, },
+                { base => 10, expand => 2, value =>  8, start =>  7, },
+                { base => 20,              value => 15, start => 15, } ],
+              'distribute short' );
+
+   push @buckets, { fixed => 3 };
+
+   distribute( 30, @buckets );
+   is_deeply( \@buckets,
+              [ { base => 10, expand => 1, value =>  6, start =>  0, },
+                { base => 10, expand => 2, value =>  7, start =>  6, },
+                { base => 20,              value => 14, start => 13, },
+                { fixed => 3,              value =>  3, start => 27, } ],
+              'distribute short with fixed' );
+}
+
+done_testing;

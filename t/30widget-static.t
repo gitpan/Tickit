@@ -1,8 +1,10 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 21;
+use Test::More;
+use Test::Identity;
 
 use Tickit::Test;
 
@@ -111,3 +113,18 @@ $static->set_text( "" );
 
 is( $static->lines, 1, 'Static with empty text still consumes 1 line' );
 is( $static->cols,  0, 'Static with empty text consumes 0 columns defined' );
+
+flush_tickit;
+
+my ( $clicked, $line, $col );
+$static->set_on_click( sub { ( $clicked, $line, $col ) = @_; } );
+
+pressmouse( "press", 1, 0, 12 );
+
+flush_tickit;
+
+identical( $clicked, $static, '$self for Static on_click event' );
+is( $line, 0, '$line for Static on_click event' );
+is( $col, 12, '$col for Static on_click event' );
+
+done_testing;

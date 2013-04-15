@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 17;
+use Test::More;
 use Tickit::Test;
 
 my $term = mk_term lines => 3, cols => 10;
@@ -67,3 +68,5 @@ $term->goto( 0, 3 );
 $term->erasech( 5 );
 is_display( [ "ABC     IJ", "ABCDEFGHIJ", "ABCDEFGHIJ" ],
             'Display after ->erasech' );
+
+done_testing;

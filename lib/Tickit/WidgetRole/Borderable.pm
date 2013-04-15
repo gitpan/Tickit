@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::WidgetRole );
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 =head1 NAME
 
@@ -35,7 +35,7 @@ imported by
 sub export_subs_for
 {
    return {
-      map { +$_ => \&$_ } 
+      map { +$_ => \&$_ }
          qw( _border_init set_v_border set_h_border set_border get_border_geom ),
          map { $_, "set_$_" } qw( top_border bottom_border left_border right_border )
    };

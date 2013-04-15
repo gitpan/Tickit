@@ -12,7 +12,7 @@ use base qw( Tickit::SingleChildWidget );
 
 use Tickit::Utils qw( bound );
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 =head1 NAME
 
@@ -114,6 +114,20 @@ sub cols
 {
    my $self = shift;
    return bound( $self->child_cols_min, $self->child->cols, $self->child_cols_max );
+}
+
+sub render
+{
+   my $self = shift;
+   my %args = @_;
+
+   my $window = $self->window or return;
+   my $rect = $args{rect};
+
+   foreach my $line ( $rect->linerange ) {
+      $window->goto( $line, $rect->left );
+      $window->erasech( $rect->cols );
+   }
 }
 
 =head1 METHODS

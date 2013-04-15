@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 5;
+use Test::More;
 use Test::Identity;
 use Test::Refcount;
 
@@ -38,3 +39,5 @@ $popupwin->set_on_mouse( sub {
 pressmouse( press => 1, 5, 12 );
 
 is_deeply( \@mouse_events, [ [ press => 1, -7, -10 ] ] );
+
+done_testing;

@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 23;
+use Test::More;
 use Test::Refcount;
 
 use Tickit::Test;
@@ -128,3 +129,5 @@ $rootfloat->show;
                 Tickit::Rect->new( top => 22, left =>  0, lines => 3, cols => 80 ), ],
               'Exposed regions after scroll with floats' );
 }
+
+done_testing;

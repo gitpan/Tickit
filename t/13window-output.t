@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
-use Test::More tests => 53;
+use Test::More;
 
 use Tickit::Test;
 
@@ -23,7 +24,7 @@ is_termlog( [ GOTO(5,13),
 is_display( [ BLANKLINES(5),
               [BLANK(13), TEXT("Hello")] ],
             'Display' );
- 
+
 $win->pen->chattr( b => 1 );
 
 is_deeply( { $win->pen->getattrs },
@@ -38,8 +39,12 @@ is_deeply( { $win->get_effective_pen->getattrs },
 
 is( $win->get_effective_penattr( 'b' ), 1, '$win has effective pen b 1' );
 
+my $pos;
+
 $win->goto( 2, 3 );
-$win->print( "Hello" );
+$pos = $win->print( "Hello" );
+
+is( $pos->columns, 5, '$pos->columns from print' );
 
 is_termlog( [ GOTO(5,13),
               SETPEN(b => 1),
@@ -72,7 +77,9 @@ is_display( [ BLANKLINES(5),
 
 $win->pen->chattr( bg => 4 );
 
-$win->erasech( 4, 0 );
+$pos = $win->erasech( 4, 0 );
+
+is( $pos->columns, 4, '$pos->columns from erasech' );
 
 is_termlog( [ SETBG(4),
               ERASECH(4) ],
@@ -302,3 +309,5 @@ flush_tickit;
 
    $win->close;
 }
+
+done_testing;
