@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
 
 use Carp;
 
@@ -23,9 +23,30 @@ C<Tickit::Pen> - store a collection of rendering attributes
 
 =head1 DESCRIPTION
 
-Stores rendering attributes for text to display.
+A pen instance stores a collection of rendering attributes for text to
+display. It comes in two forms, mutable and immutable. Both types of pen are
+subclasses of the base C<Tickit::Pen> class.
 
-Supports the following named pen attributes:
+An immutable pen is an instance of C<Tickit::Pen::Immutable>. Its attributes
+are set by the constructor and are fixed thereafter. Methods are provided to
+query the presence or value of attributes, and to fetch the entire set as a
+hash.
+
+A mutable pen is an instance of C<Tickit::Pen::Mutable>. Its attributes may be
+set by the constructor, and can be changed at any time. As well as supporting
+the same query methods as immutable pens, more methods are provided to change
+or remove them. Mutable pens also support the concept of observers; other
+objects that will be informed when pen attributes are changed.
+
+While mutable pens may initially seem more useful, they can complicate logic
+due to their shared referential nature. If the same mutable pen is shared
+across multiple places, care needs to be taken to redraw anything that depends
+on it if it is ever changed. If pens need sharing, especially if results are
+cached for performance, consider using immutable pens to simplify the logic.
+
+=head2 Attributes
+
+The following named pen attributes are supported:
 
 =over 8
 
@@ -37,8 +58,7 @@ Foreground or background colour. C<COL> may be an integer or one of the eight
 colour names. A colour name may optionally be prefixed by C<hi-> for the
 high-intensity version (may not be supported by all terminals). Some terminals
 may support a palette of 256 colours instead, some 16, and some only 8. The
-C<Pen> object will not check this as it cannot be reliably detected in all
-cases.
+pen object will not check this as it cannot be reliably detected in all cases.
 
 =item b => BOOL
 
@@ -71,13 +91,27 @@ alternate font attributes.
 
 Returns a new pen, initialised from the given attributes.
 
+Currently this method returns a C<Tickit::Pen::Mutable>, though this may
+change in a future version. It is provided for backward-compatibility for code
+that expects to be able to construct a C<Tickit::Pen> directly.
+
+=head2 $pen = Tickit::Pen::Immutable->new( %attrs )
+
+=head2 $pen = Tickit::Pen::Mutable->new( %attrs )
+
+Return a new immutable, or mutable pen, initialised from the given attributes.
+
 =cut
 
 sub new
 {
    my $class = shift;
    my %attrs = @_;
-   my $self = $class->new_from_attrs( \%attrs );
+
+   # Default to mutable for now
+   $class = "Tickit::Pen::Mutable" if $class eq __PACKAGE__;
+
+   my $self = $class->_new( \%attrs );
    croak "Unrecognised pen attributes " . join( ", ", sort keys %attrs ) if %attrs;
    return $self;
 }
@@ -87,6 +121,16 @@ sub new
 Returns a new pen, initialised from keys in the given HASH reference. Used
 keys are deleted from the hash.
 
+Currently this method returns a C<Tickit::Pen::Mutable>, though this may
+change in a future version. It is provided for backward-compatibility for code
+that expects to be able to construct a C<Tickit::Pen> directly.
+
+=head2 $pen = Tickit::Pen::Immutable->new_from_attrs( $attrs )
+
+=head2 $pen = Tickit::Pen::Mutable->new_from_attrs( $attrs )
+
+Return a new immutable, or mutable pen, initialised from the given attributes.
+
 =cut
 
 sub new_from_attrs
@@ -94,28 +138,35 @@ sub new_from_attrs
    my $class = shift;
    my ( $attrs ) = @_;
 
-   my $self = $class->_new;
+   # Default to mutable for now
+   $class = "Tickit::Pen::Mutable" if $class eq __PACKAGE__;
 
-   $self->chattrs( $attrs );
-
-   return $self;
+   return $class->_new( $attrs );
 }
 
 =head2 $pen = $orig->clone
 
-Returns a new pen, initialised by copying the attributes of the original.
+Returns a new mutable pen, initialised by copying the attributes of the
+original.
 
 =cut
 
 sub clone
 {
    my $orig = shift;
-   my $new = (ref $orig)->new;
-   $new->copy_from( $orig );
-   return $new;
+   return Tickit::Pen::Mutable->new_from_attrs( { $orig->getattrs } );
 }
 
-=head1 METHODS
+=head1 METHODS ON ALL PENS
+
+The following query methods apply to both immutable and mutable pens.
+
+=cut
+
+=head2 $mutable = $pen->mutable
+
+Returns true on C<Tickit::Pen::Mutable> and false on
+C<Tickit::Pen::Immutable>.
 
 =cut
 
@@ -134,6 +185,12 @@ Returns the current value of the given attribute
 =head2 %values = $pen->getattrs
 
 Returns a key/value list of all the attributes
+
+=cut
+
+=head1 METHODS ON MUTABLE PENS
+
+The following mutation methods exist on mutable pens.
 
 =cut
 
@@ -220,6 +277,16 @@ sub STRING
 
 use Scalar::Util qw( refaddr );
 use overload '==' => sub { refaddr($_[0]) == refaddr($_[1]) };
+
+package Tickit::Pen::Immutable;
+use base qw( Tickit::Pen );
+use constant mutable => 0;
+
+package Tickit::Pen::Mutable;
+use base qw( Tickit::Pen );
+use constant mutable => 1;
+
+# Adds further methods in XS
 
 =head1 AUTHOR
 

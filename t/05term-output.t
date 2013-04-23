@@ -11,6 +11,7 @@ BEGIN {
 
 use Test::More;
 use Test::HexString;
+use Test::Refcount;
 
 use Tickit::Term;
 use Tickit::Pen;
@@ -161,6 +162,9 @@ stream_is( "\e[4m", '$term->chpen( Tickit::Pen )' );
 
 $term->setpen( Tickit::Pen->new( i => 1 ) );
 stream_is( "\e[24;3m", '$term->setpen( Tickit::Pen )' );
+
+is_oneref( $term, '$term has refcount 1 before EOF' );
+undef $term;
 
 {
    pipe( my $rd, my $wr ) or die "pipe() - $!";

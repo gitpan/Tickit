@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
 
 use Exporter 'import';
 
@@ -208,7 +208,7 @@ sub resize_term
    $tickit->rootwin->resize( $tickit->lines, $tickit->cols );
 }
 
-=head2 presskey( $type, $str )
+=head2 presskey( $type, $str, $mod )
 
 Fire a key event
 
@@ -216,13 +216,12 @@ Fire a key event
 
 sub presskey
 {
-   my ( $type, $str ) = @_;
+   my ( $type, $str, $mod ) = @_;
 
-   # TODO: See if we'll ever need to fake a Term::TermKey::Key event object
-   $tickit->on_key( $type, $str, undef );
+   $tickit->on_key( $type, $str, $mod||0 );
 }
 
-=head2 pressmouse( $ev, $button, $line, $col )
+=head2 pressmouse( $ev, $button, $line, $col, $mod )
 
 Fire a mouse button event
 
@@ -230,9 +229,9 @@ Fire a mouse button event
 
 sub pressmouse
 {
-   my ( $ev, $button, $line, $col ) = @_;
+   my ( $ev, $button, $line, $col, $mod ) = @_;
 
-   $tickit->on_mouse( $ev, $button, $line, $col );
+   $tickit->on_mouse( $ev, $button, $line, $col, $mod||0 );
 }
 
 =head1 TEST FUNCTIONS

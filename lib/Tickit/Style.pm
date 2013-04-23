@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
 
 use Carp;
 
@@ -202,7 +202,7 @@ sub style_definition
    die "Expected '\$tags' to be 'base' or a set of :tag names" unless $tags eq "base" or $tags eq "";
 
    ( my $type = $class ) =~ s/^Tickit::Widget:://;
-   _ref_tagset( $type, undef )->merge( \%tags, \%definition );
+   _ref_tagset( $type, undef )->merge_with_tags( \%tags, \%definition );
 }
 
 my @ON_STYLE_LOAD;
@@ -216,7 +216,7 @@ sub _load_style
       my $type = $def->type;
       $TAGSETS_BY_TYPE_CLASS{$type} ||= {};
       my $tagset = _ref_tagset( $type, $def->class );
-      $tagset->merge( $def->tags, $def->style );
+      $tagset->merge_with_tags( $def->tags, $def->style );
    }
 
    foreach my $code ( @ON_STYLE_LOAD ) {
@@ -296,7 +296,28 @@ sub new
    return bless [], $class;
 }
 
+sub add
+{
+   my $self = shift;
+   my ( $key, $value ) = @_;
+
+   my %tags;
+   $tags{$1}++ while $key =~ s/:([A-Z0-9_]+)//i;
+
+   $self->merge_with_tags( \%tags, { $key => $value } );
+}
+
 sub merge
+{
+   my $self = shift;
+   my ( $other ) = @_;
+
+   foreach my $keyset ( $other->keysets ) {
+      $self->merge_with_tags( $keyset->tags, $keyset->style );
+   }
+}
+
+sub merge_with_tags
 {
    my $self = shift;
    my ( $tags, $style ) = @_;
@@ -305,12 +326,15 @@ sub merge
    @$self = ( $keyset ) and return if !@$self;
 
    # First see if we have to merge an existing one
-   KEYSET: foreach my $d ( @$self ) {
-      $d->tags->{$_} or next KEYSET for keys %$tags;
-      $tags->{$_} or next KEYSET for keys %{ $d->tags };
+   KEYSET: foreach my $keyset ( @$self ) {
+      $keyset->tags->{$_} or next KEYSET for keys %$tags;
+      $tags->{$_} or next KEYSET for keys %{ $keyset->tags };
 
       # Merge
-      $d->style->{$_} = $style->{$_} for keys %$style;
+      foreach my $key ( keys %$style ) {
+         defined $style->{$key} ? $keyset->style->{$key} = $style->{$key}
+                                : delete $keyset->style->{$key};
+      }
       return;
    }
 

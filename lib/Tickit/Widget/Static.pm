@@ -8,14 +8,17 @@ package Tickit::Widget::Static;
 use strict;
 use warnings;
 use base qw( Tickit::Widget );
+use Tickit::Style;
 
 use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
 
 use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );
+
+use constant WIDGET_PEN_FROM_STYLE => 1;
 
 =head1 NAME
 
@@ -39,6 +42,14 @@ C<Tickit::Widget::Static> - a widget displaying static text
 This class provides a widget which displays a single piece of static text. The
 text may contain more than one line, separated by linefeed (C<\n>) characters.
 No other control sequences are allowed in the string.
+
+=head1 STYLE
+
+The default style pen is used as the widget pen.
+
+Note that while the widget pen is mutable and changes to it will result in
+immediate redrawing, any changes made will be lost if the widget style is
+changed.
 
 =cut
 

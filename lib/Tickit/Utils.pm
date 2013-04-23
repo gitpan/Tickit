@@ -8,7 +8,9 @@ package Tickit::Utils;
 use strict;
 use warnings;
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
+
+use Carp;
 
 use Exporter 'import';
 our @EXPORT_OK = qw(
@@ -209,9 +211,18 @@ extra keys in the hashes as required.
 
 =cut
 
+sub _assert_int
+{
+   my ( $name, $value ) = @_;
+   $value == int $value or croak "'$name' value must be an integer";
+   return $value;
+}
+
 sub distribute
 {
    my ( $total, @buckets ) = @_;
+
+   _assert_int total => $total;
 
    my $base_total = 0;
    my $expand_total = 0;
@@ -219,11 +230,11 @@ sub distribute
 
    foreach my $b ( @buckets ) {
       if( defined $b->{base} ) {
-         $base_total   += $b->{base};
-         $expand_total += $b->{expand} || 0;
+         $base_total   += _assert_int base => $b->{base};
+         $expand_total += _assert_int expand => $b->{expand} || 0;
       }
       elsif( defined $b->{fixed} ) {
-         $fixed_total += $b->{fixed};
+         $fixed_total += _assert_int fixed => $b->{fixed};
       }
    }
 
@@ -244,11 +255,16 @@ sub distribute
 
          my $amount;
          if( defined $b->{base} ) {
-            my $extra = $expand_total ? ( $spare * ( $b->{expand} || 0 ) / $expand_total ) : 0;
-            $err += $extra - int($extra);
+            my $extra = 0;
+            if( $expand_total ) {
+               $extra = $spare * ( $b->{expand} || 0 );
 
-            $extra = int($extra);
-            $extra++, $err-- if $err >= 1;
+               # Avoid floating point divisions
+               $err += $extra % $expand_total;
+               $extra = do { use integer; $extra / $expand_total };
+
+               $extra++, $err -= $expand_total if $err >= $expand_total;
+            }
 
             $amount = $b->{base} + $extra;
          }

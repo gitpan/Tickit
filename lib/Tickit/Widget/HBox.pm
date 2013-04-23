@@ -8,10 +8,13 @@ package Tickit::Widget::HBox;
 use strict;
 use warnings;
 use base qw( Tickit::Widget::LinearBox );
+use Tickit::Style;
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
 
 use List::Util qw( sum max );
+
+use constant WIDGET_PEN_FROM_STYLE => 1;
 
 =head1 NAME
 
@@ -40,7 +43,18 @@ C<Tickit::Widget::HBox> - distribute child widgets in a horizontal row
 
 =head1 DESCRIPTION
 
-This container widget distributes its children in a horizontal row.
+This subclass of L<Tickit::Widget::LinearBox> distributes its children in a
+horizontal row. Its height will be the height of the tallest child, and its
+width will be the sum of the widths of all the children, plus the inter-child
+spacing.
+
+=head1 STYLE
+
+The default style pen is used as the widget pen.
+
+Note that while the widget pen is mutable and changes to it will result in
+immediate redrawing, any changes made will be lost if the widget style is
+changed.
 
 =cut
 

@@ -156,6 +156,22 @@ static TickitPen *pen_from_args(SV **args, int argcount)
   return pen;
 }
 
+static void pen_set_attrs(TickitPen *pen, HV *attrs)
+{
+  TickitPenAttr a;
+  for(a = 0; a < TICKIT_N_PEN_ATTRS; a++) {
+    const char *name = tickit_pen_attrname(a);
+    SV *val = hv_delete(attrs, name, strlen(name), 0);
+    if(!val)
+      continue;
+
+    if(!SvOK(val))
+      tickit_pen_clear_attr(pen, a);
+    else
+      pen_set_attr(pen, a, val);
+  }
+}
+
 static void pen_event_fn(TickitPen *pen, TickitEventType ev, TickitEvent *args, void *data)
 {
   Tickit__Pen self = data;
@@ -245,6 +261,7 @@ static void term_userevent_fn(TickitTerm *tt, TickitEventType ev, TickitEvent *a
       case TICKIT_EV_KEY:
         hv_store(argshash, "type",   4, tickit_keyevtype2sv(args->type), 0);
         hv_store(argshash, "str",    3, newSVpvn_utf8(args->str, strlen(args->str), 1), 0);
+        hv_store(argshash, "mod",    3, newSViv(args->mod), 0);
         break;
 
       case TICKIT_EV_MOUSE:
@@ -252,6 +269,7 @@ static void term_userevent_fn(TickitTerm *tt, TickitEventType ev, TickitEvent *a
         hv_store(argshash, "button", 6, tickit_mouseevbutton2sv(args->type, args->button), 0);
         hv_store(argshash, "line",   4, newSViv(args->line),   0);
         hv_store(argshash, "col",    3, newSViv(args->col),    0);
+        hv_store(argshash, "mod",    3, newSViv(args->mod), 0);
         break;
 
       case TICKIT_EV_RESIZE:
@@ -353,8 +371,9 @@ static void setup_constants(void)
 MODULE = Tickit             PACKAGE = Tickit::Pen
 
 SV *
-_new(package)
+_new(package, attrs)
   char *package
+  HV   *attrs
   INIT:
     Tickit__Pen  self;
     TickitPen   *pen;
@@ -365,8 +384,11 @@ _new(package)
 
     Newx(self, 1, struct Tickit__Pen);
     RETVAL = newSV(0);
-    sv_setref_pv(RETVAL, "Tickit::Pen", self);
+    sv_setref_pv(RETVAL, package, self);
     self->self = newSVsv(RETVAL);
+    sv_rvweaken(self->self); // AVoid a cycle
+
+    pen_set_attrs(pen, attrs);
 
     self->pen = pen;
     self->observers = NULL;
@@ -436,6 +458,8 @@ getattrs(self)
     }
     XSRETURN(count);
 
+MODULE = Tickit             PACKAGE = Tickit::Pen::Mutable
+
 void
 chattr(self,attr,value)
   Tickit::Pen  self
@@ -456,20 +480,8 @@ void
 chattrs(self,attrs)
   Tickit::Pen  self
   HV          *attrs
-  INIT:
-    TickitPenAttr a;
   CODE:
-    for(a = 0; a < TICKIT_N_PEN_ATTRS; a++) {
-      const char *name = tickit_pen_attrname(a);
-      SV *val = hv_delete(attrs, name, strlen(name), 0);
-      if(!val)
-        continue;
-
-      if(!SvOK(val))
-        tickit_pen_clear_attr(self->pen, a);
-      else
-        pen_set_attr(self->pen, a, val);
-    }
+    pen_set_attrs(self->pen, attrs);
 
 void
 delattr(self,attr)
@@ -904,6 +916,7 @@ _new(package,termtype)
     RETVAL = newSV(0);
     sv_setref_pv(RETVAL, "Tickit::Term", self);
     self->self = newSVsv(RETVAL);
+    sv_rvweaken(self->self); // Avoid a cycle
 
     self->tt = tt;
     self->input_handle  = NULL;
@@ -935,6 +948,8 @@ DESTROY(self)
 
     if(self->event_ids)
       SvREFCNT_dec(self->event_ids);
+
+    SvREFCNT_dec(self->self);
 
     Safefree(self);
 
@@ -1120,13 +1135,15 @@ print(self,text)
   CODE:
     tickit_term_print(self->tt, SvPVutf8_nolen(text));
 
-void
+bool
 goto(self,line,col)
   Tickit::Term  self
   SV           *line
   SV           *col
   CODE:
-    tickit_term_goto(self->tt, SvOK(line) ? SvIV(line) : -1, SvOK(col) ? SvIV(col) : -1);
+    RETVAL = tickit_term_goto(self->tt, SvOK(line) ? SvIV(line) : -1, SvOK(col) ? SvIV(col) : -1);
+  OUTPUT:
+    RETVAL
 
 void
 move(self,downward,rightward)

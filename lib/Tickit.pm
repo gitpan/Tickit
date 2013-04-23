@@ -8,17 +8,21 @@ package Tickit;
 use strict;
 use warnings;
 
-our $VERSION = '0.29';
+BEGIN {
+   our $VERSION = '0.29_001';
+}
 
 use IO::Handle;
 
-use Tickit::Term;
-use Tickit::Window;
-
 use Scalar::Util qw( weaken );
 
-require XSLoader;
-XSLoader::load( __PACKAGE__, $VERSION );
+BEGIN {
+   require XSLoader;
+   XSLoader::load( __PACKAGE__, our $VERSION );
+}
+
+use Tickit::Term;
+use Tickit::Window;
 
 =head1 NAME
 
@@ -150,14 +154,14 @@ sub new
 
    $term->set_on_key( sub {
       $weakself or return;
-      my ( $term, $type, $str, $key ) = @_;
-      $weakself->on_key( $type, $str, $key );
+      shift; # term
+      $weakself->on_key( @_ );
    } );
 
    $term->set_on_mouse( sub {
       $weakself or return;
-      my ( $term, $ev, $button, $line, $col ) = @_;
-      $weakself->on_mouse( $ev, $button, $line, $col );
+      shift; # term
+      $weakself->on_mouse( @_ );
    } );
 
    $self->set_root_widget( $args{root} ) if defined $args{root};
@@ -263,9 +267,9 @@ sub _SIGWINCH
 sub on_key
 {
    my $self = shift;
-   my ( $type, $str, $key ) = @_;
+   my ( $type, $str, $mod ) = @_;
 
-   $self->rootwin->_handle_key( $type, $str, $key ) and return;
+   $self->rootwin->_handle_key( @_ ) and return;
 
    if( exists $self->{key_binds}{$str} ) {
       $self->{key_binds}{$str}->( $self, $str ) and return;
@@ -305,9 +309,8 @@ sub bind_key
 sub on_mouse
 {
    my $self = shift;
-   my ( $ev, $button, $line, $col ) = @_;
 
-   $self->rootwin->_handle_mouse( $ev, $button, $line, $col ) and return;
+   $self->rootwin->_handle_mouse( @_ ) and return;
 }
 
 =head2 $tickit->rootwin

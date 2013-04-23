@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
 
 # Load the XS code
 require Tickit;
@@ -109,21 +109,21 @@ be passed the C<Tickit::Term> instance, and the new size.
 
 Optional. Event handler function for when a key is pressed. Will be passed the
 C<Tickit::Term> instance, a type string (either C<text> for unmodified Unicode
-or C<key> for special keys or modified Unicode) and a string containing a
-representation of the text or key.
+or C<key> for special keys or modified Unicode), a string containing a
+representation of the text or key, and a modifier bitmask.
 
- $on_key->( $term, $type, $str )
+ $on_key->( $term, $type, $str, $mod )
 
 =item on_mouse => CODE
 
 Optional. Event handler function for when a mouse button is pressed or
 released, or the cursor dragged with a button pressed. Will be passed the
 C<Tickit::Term> instance, a string indicating C<press>, C<drag>, C<release> or
-C<wheel>, the button number or wheel direction, and the 0-based line and
-column index. For C<wheel> events, the direction will be one of C<up> or
-C<down>.
+C<wheel>, the button number or wheel direction, the 0-based line and column
+index, and a modifier bitmask. For C<wheel> events, the direction will be one
+of C<up> or C<down>.
 
- $on_mouse->( $term, $ev, $button_dir, $line, $col )
+ $on_mouse->( $term, $ev, $button_dir, $line, $col, $mod )
 
 =back
 
@@ -196,16 +196,17 @@ The C<$args> hash will contain keys depending on the event type:
 =item key
 
 The hash will contain C<type> (a dualvar giving the key event type as an
-integer or string event name, C<text> or C<key>), and C<str> (a string
-containing the key event string).
+integer or string event name, C<text> or C<key>), C<str> (a string containing
+the key event string), and C<mod> (an integer bitmask indicating the modifier
+state).
 
 =item mouse
 
 The hash will contain C<type> (a dualvar giving the mouse event type as an
 integer or string event name, C<press>, C<drag>, C<release> or C<wheel>),
 C<button> (an integer for non-wheel events, or a dualvar for wheel events
-giving the wheel direction as C<up> or C<down>), and C<line> and C<col> as
-integers.
+giving the wheel direction as C<up> or C<down>), C<line> and C<col> as
+integers, and C<mod> (an integer bitmask indicating the modifier state).
 
 =item resize
 
@@ -304,10 +305,14 @@ Print the given text to the terminal at the current cursor position
 
 =cut
 
-=head2 $term->goto( $line, $col )
+=head2 $success = $term->goto( $line, $col )
 
 Move the cursor to the given position on the screen. If only one parameter is
 defined, does not alter the other. Both C<$line> and C<$col> are 0-based.
+
+Note that not all terminals can support these partial moves. This method
+returns a boolean indicating success; if the terminal could not perform the
+move it will need to be retried using a fully-specified call.
 
 =cut
 

@@ -54,6 +54,7 @@ src/rect.c
 src/rectset.c
 src/string.c
 src/term.c
+src/termdriver-ti.c
 src/termdriver-xterm.c
 src/termdriver.h
 src/unicode.h

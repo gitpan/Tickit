@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
 
 use Carp;
 
@@ -19,8 +19,6 @@ use Tickit::Pen;
 use Tickit::Rect;
 use Tickit::RectSet;
 use Tickit::Utils qw( string_countmore );
-
-use constant FLOAT_ALL_THE_WINDOWS => $ENV{TICKIT_FLOAT_ALL_THE_WINDOWS} // 1;
 
 use constant WEAKEN_CHILDREN => 1;
 
@@ -60,14 +58,6 @@ By comparison, any window created by C<make_float> is considered to sit
 other siblings, and any drawing that happens within it overwrites that of its
 non-floating siblings. Any drawing on a non-floating sibling that happens
 within the area of a float is obscured by the contents of the floating window.
-
-To disable the new shared implementation of floating and non-floating windows
-for legacy bug-testing purposes, set the environment variable
-C<TICKIT_FLOAT_ALL_THE_WINDOWS> to a false value ("0" or empty string)
-
- $ TICKIT_FLOAT_ALL_THE_WINDOWS=0 ./Build test
-
-This variable will be removed in a later version.
 
 =cut
 
@@ -165,7 +155,6 @@ sub make_sub
 
    my $sub = bless {
       parent  => $self,
-      float   => FLOAT_ALL_THE_WINDOWS,
    }, ref $self;
    $sub->_init;
 
@@ -209,7 +198,6 @@ sub make_float
 
    my $sub = bless {
       parent  => $self,
-      float   => 1,
    }, ref $self;
    $sub->_init;
 
@@ -439,13 +427,12 @@ sub set_on_geom_changed
 Set the callback to invoke whenever a key is pressed while this window, or one
 of its child windows, has the input focus.
 
- $handled = $on_key->( $win, $type, $str, $key )
+ $handled = $on_key->( $win, $type, $str, $mod )
 
 C<$type> will be C<text> for normal unmodified Unicode, or C<key> for special
 keys or modified Unicode. C<$str> will be the UTF-8 string for C<text> events,
 or the textual description of the key as rendered by L<Term::TermKey> for
-C<key> events. C<$key> will be the underlying C<Term::TermKey::Key> event
-structure.
+C<key> events. C<$mod> will be a bitmask of the modifier state.
 
 The invoked code should return a true value if it considers the keypress dealt
 with, or false to pass it up to its parent window.
@@ -511,12 +498,12 @@ sub _handle_key
 Set the callback to invoke whenever a mouse event is received within the
 window's rectangle.
 
- $handled = $on_mouse->( $win, $ev, $buttons, $line, $col )
+ $handled = $on_mouse->( $win, $ev, $buttons, $line, $col, $mod )
 
 C<$ev> will be C<press>, C<drag> or C<release>. The button number will be in
 C<$button>, though may not be present for C<release> events. C<$line> and
 C<$col> are 0-based. Behaviour of events involving more than one mouse button
-is not well-specified by terminals.
+is not well-specified by terminals. C<$mod> is a bitmask of modifier state.
 
 The invoked code should return a true value if it considers the mouse event
 dealt with, or false to pass it up to its parent window. The mouse event is
@@ -534,7 +521,7 @@ sub set_on_mouse
 sub _handle_mouse
 {
    my $self = shift;
-   my ( $ev, $button, $line, $col ) = @_;
+   my ( $ev, $button, $line, $col, @more ) = @_;
 
    return 0 unless $self->is_visible;
 
@@ -550,12 +537,12 @@ sub _handle_mouse
             next if $child_col  < 0 or $child_col  >= $child->cols;
          }
 
-         return 1 if $child->_handle_mouse( $ev, $button, $child_line, $child_col );
+         return 1 if $child->_handle_mouse( $ev, $button, $child_line, $child_col, @more );
       }
    }
 
    if( my $on_mouse = $self->{on_mouse} ) {
-      return $on_mouse->( $self, $ev, $button, $line, $col );
+      return $on_mouse->( $self, @_ );
    }
 
    return 0;
@@ -935,12 +922,9 @@ sub _get_span_visibility
          $len = $remains if $len > $remains;
       }
 
-      # Now obscure any floats. Floats always come first so we can stop at the
-      # first non-float for efficiency
       $win->_reap_dead_children;
       foreach my $child ( @{ $win->{child_windows} } ) {
          last if $prev and $child == $prev;
-         last unless $child->{float};
          next unless $child->{visible};
          next if $child->top > $line or $child->bottom <= $line;
 

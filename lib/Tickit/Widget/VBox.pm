@@ -8,10 +8,13 @@ package Tickit::Widget::VBox;
 use strict;
 use warnings;
 use base qw( Tickit::Widget::LinearBox );
+use Tickit::Style;
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
 
 use List::Util qw( sum max );
+
+use constant WIDGET_PEN_FROM_STYLE => 1;
 
 =head1 NAME
 
@@ -40,7 +43,18 @@ C<Tickit::Widget::VBox> - distribute child widgets in a vertical column
 
 =head1 DESCRIPTION
 
-This container widget distributes its children in a vertical column.
+This subclass of L<Tickit::Widget::LinearBox> distributes its children in a
+vertical column. Its width will be the width of the widest child, and its
+height will be the sum of the heights of all the children, plus the
+inter-child spacing.
+
+=head1 STYLE
+
+The default style pen is used as the widget pen.
+
+Note that while the widget pen is mutable and changes to it will result in
+immediate redrawing, any changes made will be lost if the widget style is
+changed.
 
 =cut
 

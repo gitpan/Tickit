@@ -9,6 +9,7 @@
 #include "hooklists.h"
 #include "termdriver.h"
 
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +24,12 @@
 #define SECOND 1000000
 
 #include <termkey.h>
+
+static TickitTermDriverProbe *driver_probes[] = {
+  &tickit_termdrv_probe_xterm,
+  &tickit_termdrv_probe_ti,
+  NULL,
+};
 
 struct TickitTerm {
   int                   outfd;
@@ -106,23 +113,37 @@ TickitTerm *tickit_term_new_for_termtype(const char *termtype)
   tt->lines = 25;
   tt->cols  = 80;
 
+  tt->hooks = NULL;
+
+  for(int i = 0; driver_probes[i]; i++) {
+    TickitTermDriver *driver = (*driver_probes[i]->new)(tt, termtype);
+    if(!driver)
+      continue;
+
+    tt->driver = driver;
+    break;
+  }
+
+  if(!tt->driver) {
+    errno = ENOENT;
+    goto abort_free;
+  }
+
   /* Initially empty because we don't necessarily know the initial state
    * of the terminal
    */
   tt->pen = tickit_pen_new();
 
-  tt->hooks = NULL;
-
   tt->termtype = strdup(termtype);
-
-  /* TODO: driver integration */
-  tt->driver = (*xterm_probe.new)(tt, termtype);
-  /* /TODO */
 
   // Can't 'start' yet until we have an output method
   tt->started = 0;
 
   return tt;
+
+abort_free:
+  free(tt);
+  return NULL;
 }
 
 void tickit_term_free(TickitTerm *tt)
@@ -307,12 +328,15 @@ static void got_key(TickitTerm *tt, TermKey *tk, TermKeyKey *key)
       args.button -= (4 - TICKIT_MOUSEWHEEL_UP);
     }
 
+    args.mod = key->modifiers;
+
     run_events(tt, TICKIT_EV_MOUSE, &args);
   }
   else if(key->type == TERMKEY_TYPE_UNICODE && !key->modifiers) {
     /* Unmodified unicode */
     args.type = TICKIT_KEYEV_TEXT;
     args.str  = key->utf8;
+    args.mod  = key->modifiers;
 
     run_events(tt, TICKIT_EV_KEY, &args);
   }
@@ -324,6 +348,7 @@ static void got_key(TickitTerm *tt, TermKey *tk, TermKeyKey *key)
 
     args.type = TICKIT_KEYEV_KEY;
     args.str  = buffer;
+    args.mod  = key->modifiers;
 
     run_events(tt, TICKIT_EV_KEY, &args);
   }
@@ -498,9 +523,9 @@ void tickit_term_print(TickitTerm *tt, const char *str)
   (*tt->driver->vtable->print)(tt->driver, str);
 }
 
-void tickit_term_goto(TickitTerm *tt, int line, int col)
+int tickit_term_goto(TickitTerm *tt, int line, int col)
 {
-  (*tt->driver->vtable->goto_abs)(tt->driver, line, col);
+  return (*tt->driver->vtable->goto_abs)(tt->driver, line, col);
 }
 
 void tickit_term_move(TickitTerm *tt, int downward, int rightward)

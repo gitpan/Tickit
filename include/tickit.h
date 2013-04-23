@@ -34,12 +34,19 @@ enum {
   TICKIT_MOUSEWHEEL_DOWN,
 };
 
+enum {
+  TICKIT_MOD_SHIFT = 0x01,
+  TICKIT_MOD_ALT   = 0x02,
+  TICKIT_MOD_CTRL  = 0x04,
+};
+
 typedef struct {
   int         lines, cols; // RESIZE
   int         type;        // KEY, MOUSE
   const char *str;         // KEY
   int         button;      // MOUSE
   int         line, col;   // MOUSE
+  int         mod;         // KEY, MOUSE
 } TickitEvent;
 
 /*
@@ -190,7 +197,7 @@ int  tickit_term_bind_event(TickitTerm *tt, TickitEventType ev, TickitTermEventF
 void tickit_term_unbind_event_id(TickitTerm *tt, int id);
 
 void tickit_term_print(TickitTerm *tt, const char *str);
-void tickit_term_goto(TickitTerm *tt, int line, int col);
+int  tickit_term_goto(TickitTerm *tt, int line, int col);
 void tickit_term_move(TickitTerm *tt, int downward, int rightward);
 int  tickit_term_scrollrect(TickitTerm *tt, int top, int left, int lines, int cols, int downward, int rightward);
 

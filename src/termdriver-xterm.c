@@ -14,15 +14,12 @@
  * didn't pollute our namespace so we'll provide some functions here and then
  * #undef the name pollution
  */
-static inline int terminfo_bce(void)     { return back_color_erase; }
 static inline int terminfo_lines(void)   { return lines; }
 static inline int terminfo_columns(void) { return columns; }
 
-# undef back_color_erase
 # undef lines
 # undef columns
 #endif
-
 
 struct XTermDriver {
   TickitTermDriver driver;
@@ -36,7 +33,6 @@ struct XTermDriver {
   } mode;
 
   struct {
-    unsigned int bce:1;
     unsigned int slrm:1;
   } cap;
 };
@@ -46,7 +42,7 @@ static void print(TickitTermDriver *ttd, const char *str)
   tickit_termdrv_write_str(ttd, str, strlen(str));
 }
 
-static void goto_abs(TickitTermDriver *ttd, int line, int col)
+static int goto_abs(TickitTermDriver *ttd, int line, int col)
 {
   if(line != -1 && col > 0)
     tickit_termdrv_write_strf(ttd, "\e[%d;%dH", line+1, col+1);
@@ -58,6 +54,8 @@ static void goto_abs(TickitTermDriver *ttd, int line, int col)
     tickit_termdrv_write_strf(ttd, "\e[%dG", col+1);
   else if(col != -1)
     tickit_termdrv_write_str(ttd, "\e[G", 3);
+
+  return 1;
 }
 
 static void move_rel(TickitTermDriver *ttd, int downward, int rightward)
@@ -109,10 +107,10 @@ static int scrollrect(TickitTermDriver *ttd, int top, int left, int lines, int c
         tickit_termdrv_write_str(ttd, "\e[P", 3);             /* ICH1 */
       else if(rightward < -1)
         tickit_termdrv_write_strf(ttd, "\e[%dP", -rightward); /* ICH */
+    }
 
     if(left + cols < term_cols)
       tickit_termdrv_write_strf(ttd, "\e[s");
-    }
 
     return 1;
   }
@@ -157,15 +155,13 @@ static int scrollrect(TickitTermDriver *ttd, int top, int left, int lines, int c
 
 static void erasech(TickitTermDriver *ttd, int count, int moveend)
 {
-  struct XTermDriver *xd = (struct XTermDriver *)ttd;
-
   if(count < 1)
     return;
 
-  /* Even if the terminal can do bce, only use ECH if we're not in
-   * reverse-video mode. Most terminals don't do rv+ECH properly
+  /* Only use ECH if we're not in reverse-video mode. xterm doesn't do rv+ECH
+   * properly
    */
-  if(xd->cap.bce && !tickit_pen_get_bool_attr(tickit_termdrv_current_pen(ttd), TICKIT_PEN_REVERSE)) {
+  if(!tickit_pen_get_bool_attr(tickit_termdrv_current_pen(ttd), TICKIT_PEN_REVERSE)) {
     if(count == 1)
       tickit_termdrv_write_str(ttd, "\e[X", 3);
     else
@@ -412,7 +408,7 @@ static void destroy(TickitTermDriver *ttd)
   free(xd);
 }
 
-TickitTermDriverVTable xterm_vtable = {
+static TickitTermDriverVTable xterm_vtable = {
   .destroy    = destroy,
   .start      = start,
   .stop       = stop,
@@ -430,6 +426,16 @@ TickitTermDriverVTable xterm_vtable = {
 
 static TickitTermDriver *new(TickitTerm *tt, const char *termtype)
 {
+  if(strncmp(termtype, "xterm", 5) != 0)
+    return NULL;
+
+  switch(termtype[5]) {
+    case 0: case '-':
+      break;
+    default:
+      return NULL;
+  }
+
   struct XTermDriver *xd = malloc(sizeof(struct XTermDriver));
   xd->driver.vtable = &xterm_vtable;
   xd->driver.tt = tt;
@@ -437,8 +443,6 @@ static TickitTermDriver *new(TickitTerm *tt, const char *termtype)
   xd->mode.altscreen = 0;
   xd->mode.cursorvis = 1;
   xd->mode.mouse     = 0;
-
-  xd->cap.bce = 1;
 
   /* This will be set to 1 later if the terminal responds appropriately to the
    * DECRQM on DECVSSM
@@ -449,8 +453,6 @@ static TickitTermDriver *new(TickitTerm *tt, const char *termtype)
   {
     unibi_term *ut = unibi_from_term(termtype);
     if(ut) {
-      xd->cap.bce = unibi_get_bool(ut, unibi_back_color_erase);
-
       tickit_term_set_size(tt, unibi_get_num(ut, unibi_lines), unibi_get_num(ut, unibi_columns));
 
       unibi_destroy(ut);
@@ -460,8 +462,6 @@ static TickitTermDriver *new(TickitTerm *tt, const char *termtype)
   {
     int err;
     if(setupterm((char*)termtype, 1, &err) == OK) {
-      xd->cap.bce = terminfo_bce();
-
       tickit_term_set_size(tt, terminfo_lines(), terminfo_columns());
     }
   }
@@ -470,6 +470,6 @@ static TickitTermDriver *new(TickitTerm *tt, const char *termtype)
   return (TickitTermDriver*)xd;
 }
 
-TickitTermDriverProbe xterm_probe = {
+TickitTermDriverProbe tickit_termdrv_probe_xterm = {
   .new = new,
 };

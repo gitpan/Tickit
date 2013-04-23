@@ -127,4 +127,21 @@ identical( $clicked, $static, '$self for Static on_click event' );
 is( $line, 0, '$line for Static on_click event' );
 is( $col, 12, '$col for Static on_click event' );
 
+# Style integration
+{
+   my $static = Tickit::Widget::Static->new(
+      text => "Label",
+      style => {
+         fg          => "red",
+         'fg:active' => "white",
+      },
+   );
+
+   is_deeply( { $static->pen->getattrs }, { fg => 1 }, 'Styled Static pen initially' );
+
+   $static->set_style_tag( active => 1 );
+
+   is_deeply( { $static->pen->getattrs }, { fg => 7 }, 'Styled Static pen with tag' );
+}
+
 done_testing;

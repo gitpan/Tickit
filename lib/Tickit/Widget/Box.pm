@@ -9,10 +9,13 @@ use strict;
 use warnings;
 use 5.010; # //
 use base qw( Tickit::SingleChildWidget );
+use Tickit::Style;
 
 use Tickit::Utils qw( bound );
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
+
+use constant WIDGET_PEN_FROM_STYLE => 1;
 
 =head1 NAME
 
@@ -54,6 +57,14 @@ If the Box is given more space to use than the child widget will consume, the
 child will be placed somewhere within the space, at a position that is
 controllable using the C<align> and C<valign> properties, as defined by
 L<Tickit::WidgetRole::Alignable>.
+
+=head1 STYLE
+
+The default style pen is used as the widget pen.
+
+Note that while the widget pen is mutable and changes to it will result in
+immediate redrawing, any changes made will be lost if the widget style is
+changed.
 
 =cut
 

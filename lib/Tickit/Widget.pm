@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.29';
+our $VERSION = '0.29_001';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -16,6 +16,10 @@ use List::MoreUtils qw( all );
 
 use Tickit::Pen;
 use Tickit::Style;
+
+use constant PEN_ATTR_MAP => { map { $_ => 1 } @Tickit::Pen::ALL_ATTRS };
+
+use constant WIDGET_PEN_FROM_STYLE => 0;
 
 =head1 NAME
 
@@ -90,19 +94,23 @@ sub new
       classes => delete $args{classes} // [ delete $args{class} ],
    }, $class;
 
+   if( $class->WIDGET_PEN_FROM_STYLE ) {
+      $args{$_} and $args{style}{$_} = delete $args{$_} for @Tickit::Pen::ALL_ATTRS;
+   }
+
    if( my $style = delete $args{style} ) {
       my $tagset = $self->{style_direct} = Tickit::Style::_Tagset->new;
       foreach my $key ( keys %$style ) {
-         my $value = $style->{$key};
-
-         my %tags;
-         $tags{$1}++ while $key =~ s/:([A-Z0-9_]+)//i;
-
-         $tagset->merge( \%tags, { $key => $value } );
+         $tagset->add( $key, $style->{$key} );
       }
    }
 
-   $self->set_pen( Tickit::Pen->new_from_attrs( \%args ) );
+   if( $class->WIDGET_PEN_FROM_STYLE ) {
+      $self->set_pen( $self->get_style_pen->clone );
+   }
+   else {
+      $self->set_pen( Tickit::Pen->new_from_attrs( \%args ) );
+   }
 
    return $self;
 }
@@ -147,13 +155,13 @@ sub set_style_tag
    ( my $type = ref $self ) =~ s/^Tickit::Widget:://;
 
    # Work out what style keys might depend on this tag
-   my %keys;
+   my %values;
 
    if( $self->{style_direct} ) {
       KEYSET: foreach my $keyset ( $self->{style_direct}->keysets ) {
          $keyset->tags->{$tag} or next KEYSET;
 
-         $keys{$_}++ for keys %{ $keyset->style };
+         $values{$_} ||= [] for keys %{ $keyset->style };
       }
    }
 
@@ -171,26 +179,24 @@ sub set_style_tag
          [ keys %keys ];
       };
 
-      $keys{$_}++ for @$keys;
+      $values{$_} ||= [] for @$keys;
    }
 
-   my @keys = keys %keys;
+   my @keys = keys %values;
 
-   my %values;
-   my $code = $self->can( "on_style_changed_values" );
-   if( $code ) {
-      my @old_values = $self->get_style_values( @keys );
-      $values{$keys[$_]}[0] = $old_values[$_] for 0 .. $#keys;
-   }
+   my @old_values = $self->get_style_values( @keys );
+   $values{$keys[$_]}[0] = $old_values[$_] for 0 .. $#keys;
 
    $self->{style_tag}{$tag} = !!$value;
 
-   if( $code ) {
-      my @new_values = $self->get_style_values( @keys );
-      $values{$keys[$_]}[1] = $new_values[$_] for 0 .. $#keys;
+   $self->_style_changed_values( \%values );
+}
 
-      $self->$code( %values );
-   }
+sub _style_tags
+{
+   my $self = shift;
+   my $tags = $self->{style_tag};
+   return join "|", sort grep { $tags->{$_} } keys %$tags;
 }
 
 =head2 @values = $widget->get_style_values( @keys )
@@ -214,7 +220,7 @@ sub get_style_values
    my @values = ( undef ) x @keys;
 
    my $tags = $self->{style_tag};
-   my $cache = $self->{style_cache}{join "|", sort grep { $tags->{$_} } keys %$tags} ||= {};
+   my $cache = $self->{style_cache}{$self->_style_tags} ||= {};
 
    foreach my $i ( 0 .. $#keys ) {
       next unless exists $cache->{$keys[$i]};
@@ -261,9 +267,31 @@ sub get_style_values
 =head2 $pen = $widget->get_style_pen( $prefix )
 
 A shortcut to calling C<get_style_values> to collect up the pen attributes,
-and form a L<Tickit::Pen> object from them. If C<$prefix> is supplied, it will
-be prefixed on the pen attribute names with an underscore (which would be read
-from the stylesheet file as a hypen).
+and form a L<Tickit::Pen::Immutable> object from them. If C<$prefix> is
+supplied, it will be prefixed on the pen attribute names with an underscore
+(which would be read from the stylesheet file as a hypen). Note that the
+returned pen instance is immutable, and may be cached.
+
+If the class constant method C<WIDGET_PEN_FROM_STYLE> takes a true value, then
+extra logic is applied to the constructor and during style changes, to set the
+widget pen from the default style pen. Furthermore, plain attributes given to
+the constructor that take the names of pen attributes will be set on the
+widget's direct-applied style. This has the overall effect of unifying the
+widget pen with the default style pen, and additionally allowing further
+customisation for state changes or style classes.
+
+It is likely that this behaviour will become the default in some future
+version with the eventual aim to remove the idea of a widget pen entirely.
+
+ use constant WIDGET_PEN_FROM_STYLE => 1;
+
+The widget pen is set to be a mutable clone of the default style pen, to allow
+the legacy behaviour that some code may attempt to mutate the widget pen
+directly. In this case the widget's direct-applied style will not be updated
+to reflect the changes, however. Code using widgets with style-managed pens
+should not attempt to mutate the widget pen, but should use C<set_style>
+instead. A future version may yield warnings or exceptions if the
+style-managed widget pen is mutated.
 
 =cut
 
@@ -273,14 +301,14 @@ sub get_style_pen
    my $class = ref $self;
    my ( $prefix ) = @_;
 
-   my @keys = map { defined $prefix ? "${prefix}_$_" : $_ } @Tickit::Pen::ALL_ATTRS;
+   return $self->{style_pen_cache}{$self->_style_tags}{$prefix//""} ||= do {
+      my @keys = map { defined $prefix ? "${prefix}_$_" : $_ } @Tickit::Pen::ALL_ATTRS;
 
-   my %attrs;
-   @attrs{@Tickit::Pen::ALL_ATTRS} = $self->get_style_values( @keys );
+      my %attrs;
+      @attrs{@Tickit::Pen::ALL_ATTRS} = $self->get_style_values( @keys );
 
-   # TODO: definitely want to cache this one
-   my $pen = Tickit::Pen->new( %attrs );
-   return $pen;
+      Tickit::Pen::Immutable->new( %attrs );
+   };
 }
 
 =head2 $text = $widget->get_style_text
@@ -295,6 +323,97 @@ sub get_style_text
    my $class = ref $self;
 
    return $self->get_style_values( "text" ) // croak "$class style does not define text";
+}
+
+=head2 $widget->set_style( %defs )
+
+Changes the widget's direct-applied style.
+
+C<%defs> should contain style keys optionally suffixed with tags in the same
+form as that given to the C<style> key to the constructor. Defined values will
+add to or replace values already stored by the widget. Keys mapping to
+C<undef> are deleted from the stored style.
+
+Note that changing the direct applied style is moderately costly because it
+must invalidate all of the cached style values and pens that depend on the
+changed keys. For normal runtime changes of style, consider using a tag if
+possible, because style caching takes tags into account, and simply changing
+applied style tags does not invalidate the caches.
+
+=cut
+
+sub set_style
+{
+   my $self = shift;
+   my %defs = @_;
+
+   my $new = Tickit::Style::_Tagset->new;
+   $new->add( $_, $defs{$_} ) for keys %defs;
+
+   my %values;
+   foreach my $keyset ( $new->keysets ) {
+      $values{$_} ||= [] for keys %{ $keyset->style };
+   }
+
+   my @keys = keys %values;
+
+   my @old_values = $self->get_style_values( @keys );
+   $values{$keys[$_]}[0] = $old_values[$_] for 0 .. $#keys;
+
+   $self->{style_direct} ? $self->{style_direct}->merge( $new )
+                         : $self->{style_direct} = $new;
+
+   $self->_style_changed_values( \%values, 1 );
+}
+
+sub _style_changed_values
+{
+   my $self = shift;
+   my ( $values, $invalidate_caches ) = @_;
+
+   my @keys = keys %$values;
+
+   if( $invalidate_caches ) {
+      foreach my $keyset ( values %{ $self->{style_cache} } ) {
+         delete $keyset->{$_} for @keys;
+      }
+   }
+
+   my @new_values = $self->get_style_values( @keys );
+
+   # Remove unchanged keys
+   foreach ( 0 .. $#keys ) {
+      my $key = $keys[$_];
+      my $old = $values->{$key}[0];
+      my $new = $new_values[$_];
+
+      delete $values->{$key}, next if !defined $old and !defined $new;
+      delete $values->{$key}, next if defined $old and defined $new and $old eq $new;
+
+      $values->{$key}[1] = $new;
+   }
+
+   my %changed_pens;
+   foreach my $key ( @keys ) {
+      PEN_ATTR_MAP->{$key} and
+         $changed_pens{""}++;
+
+      $key =~ m/^(.*)_([^_]+)$/ && PEN_ATTR_MAP->{$2} and
+         $changed_pens{$1}++;
+   }
+
+   if( $invalidate_caches ) {
+      foreach my $penset ( values %{ $self->{style_pen_cache} } ) {
+         delete $penset->{$_} for keys %changed_pens;
+      }
+   }
+
+   if( $changed_pens{""} and $self->WIDGET_PEN_FROM_STYLE ) {
+      $self->set_pen( $self->get_style_pen->clone );
+   }
+
+   my $code = $self->can( "on_style_changed_values" );
+   $self->$code( %$values ) if $code;
 }
 
 =head2 $widget->set_window( $window )
@@ -521,11 +640,15 @@ sub set_pen
 {
    my $self = shift;
    my ( $newpen ) = @_;
+
+   croak ref($self)." uses Tickit::Style for its widget pen; ->set_pen cannot be used"
+      if caller ne __PACKAGE__ and $self->WIDGET_PEN_FROM_STYLE;
+
    return if $self->{pen} and $self->{pen} == $newpen;
 
-   $self->{pen}->remove_on_changed( $self ) if $self->{pen};
+   $self->{pen}->remove_on_changed( $self ) if $self->{pen} and $self->{pen}->mutable;
    $self->{pen} = $newpen;
-   $newpen->add_on_changed( $self );
+   $newpen->add_on_changed( $self ) if $newpen->mutable;
 
    if( $self->window ) {
       $self->window->set_pen( $newpen );
