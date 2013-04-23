@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 BEGIN {
-   our $VERSION = '0.29_001';
+   our $VERSION = '0.29_002';
 }
 
 use IO::Handle;

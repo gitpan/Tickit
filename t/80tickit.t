@@ -3,6 +3,12 @@
 use strict;
 use warnings;
 
+BEGIN {
+   # We have some unit tests of terminal control strings. Best to be running
+   # on a known terminal
+   $ENV{TERM} = "xterm";
+}
+
 use Test::More;
 use Test::HexString;
 use Test::Refcount;

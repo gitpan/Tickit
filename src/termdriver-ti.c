@@ -331,8 +331,12 @@ static void stop(TickitTermDriver *ttd)
 {
   struct TIDriver *td = (struct TIDriver *)ttd;
 
+  if(td->mode.mouse)
+    setctl_int(ttd, TICKIT_TERMCTL_MOUSE, 0);
   if(!td->mode.cursorvis)
     setctl_int(ttd, TICKIT_TERMCTL_CURSORVIS, 1);
+  if(td->mode.altscreen)
+    setctl_int(ttd, TICKIT_TERMCTL_ALTSCREEN, 0);
 }
 
 static void gotkey(TickitTermDriver *ttd, TermKey *tk, const TermKeyKey *key)
@@ -408,7 +412,7 @@ static TickitTermDriver *new(TickitTerm *tt, const char *termtype)
   td->str.sgr_fg = unibi_get_str(ut, unibi_set_a_foreground);
   td->str.sgr_bg = unibi_get_str(ut, unibi_set_a_background);
 
-  td->str.sm_csr = unibi_get_str(ut, unibi_cursor_visible);
+  td->str.sm_csr = unibi_get_str(ut, unibi_cursor_normal);
   td->str.rm_csr = unibi_get_str(ut, unibi_cursor_invisible);
 
   tickit_term_set_size(tt, unibi_get_num(ut, unibi_lines), unibi_get_num(ut, unibi_columns));

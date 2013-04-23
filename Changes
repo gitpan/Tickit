@@ -1,5 +1,11 @@
 Revision history for Changes
 
+0.29_002 CHANGES:
+         * Set TERM=xterm for whole-system unit testing so we get reliable
+           terminal initialisation sequence
+         * Bundled libtickit updates:
+            + Bugfix for TI driver cursor visibility mode setting
+
 0.29_001 CHANGES:
          * Allow modification of widget direct-applied style
          * Split Tickit::Pen into mutable and immutable subclasses
