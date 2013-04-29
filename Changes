@@ -1,12 +1,6 @@
 Revision history for Changes
 
-0.29_002 CHANGES:
-         * Set TERM=xterm for whole-system unit testing so we get reliable
-           terminal initialisation sequence
-         * Bundled libtickit updates:
-            + Bugfix for TI driver cursor visibility mode setting
-
-0.29_001 CHANGES:
+0.30    CHANGES:
          * Allow modification of widget direct-applied style
          * Split Tickit::Pen into mutable and immutable subclasses
          * Return immutable pens from Tickit::Widget style
@@ -17,6 +11,8 @@ Revision history for Changes
          * Pass keyboard modifier state through to key/mouse event handlers
          * Avoid floating-point in Tickit::Utils::distribute()
          * Avoid a memory leak bug in Tickit::Pen and Tickit::Term XS code
+         * Set TERM=xterm for whole-system unit testing so we get reliable
+           terminal initialisation sequence
          * Bundled libtickit updates:
             + Split implementation of real xterm and other terminfo-driven
               terminal drivers

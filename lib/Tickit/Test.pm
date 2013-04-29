@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.29_002';
+our $VERSION = '0.30';
 
 use Exporter 'import';
 
@@ -47,6 +47,8 @@ our @EXPORT = qw(
 use Tickit::Test::MockTerm;
 use Tickit::Pen;
 use Tickit;
+
+use Tickit::Utils qw( textwidth substrwidth );
 
 use Test::Builder;
 
@@ -366,7 +368,7 @@ sub is_display
 
             $want_text .= " " x ( $term->cols - $col ) unless defined $want_text and length $want_text;
 
-            my $got_text = $term->get_display_text( $line, $col, length $want_text );
+            my $got_text = $term->get_display_text( $line, $col, textwidth $want_text );
             if( $got_text ne $want_text ) {
                my $ok = $tb->ok( 0, $name );
                $tb->diag( "Display differs on line $line at column $col" );
@@ -377,8 +379,8 @@ sub is_display
 
             my $want_pen = _pen2string( $chunk->[1] );
             my $idx = 0;
-            while( $idx < length $want_text ) {
-               if( substr( $want_text, $idx, 1 ) eq " " ) {
+            while( $idx < textwidth $want_text ) {
+               if( substrwidth( $want_text, $idx, 1 ) eq " " ) {
                   my $want_bg = $chunk->[1]->{bg} // "undef";
                   my $got_bg = $term->get_display_pen( $line, $col )->{bg} // "undef";
                   if( $got_bg ne $want_bg ) {

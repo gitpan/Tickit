@@ -3,7 +3,9 @@ package Tickit::Test::MockTerm;
 use strict;
 use warnings;
 
-our $VERSION = '0.29_002';
+our $VERSION = '0.30';
+
+use Tickit::Utils qw( textwidth substrwidth );
 
 sub new
 {
@@ -203,8 +205,9 @@ sub print
 
    $self->_push_methodlog( print => @_ );
 
-   # TODO: This will only handle ASCII
-   foreach my $char ( split //, $text ) {
+   my $cols = textwidth $text;
+   foreach my $col ( 0 .. $cols-1 ) {
+      my $char = substrwidth $text, $col, 1;
       $self->{cells}[$self->{line}][$self->{col}] = [ $char, %{ $self->{pen} } ];
       $self->{col}++;
    }

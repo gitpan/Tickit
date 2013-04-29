@@ -6,15 +6,24 @@ use ExtUtils::PkgConfig;
 
 my %build_args;
 
-sub eu_pc_modversion
+sub eu_pc_atleast_version
 {
-   my ( $module ) = @_;
+   my ( $module, $ver ) = @_;
+
+   print "Checking pkg-config $module --atleast_version $ver... ";
 
    # Silence its scary errors
-   local *STDERR = *STDERR;
+   open OLDERR, ">&", \*STDERR or die "Cannot dup STDERR: $!";
    open STDERR, ">>", "/dev/null" or die "Cannot reopen STDERR - $!";
 
-   eval { ExtUtils::PkgConfig->modversion( $module ) };
+   my $ret = eval { ExtUtils::PkgConfig->atleast_version( $module, $ver ) };
+
+   open STDERR, ">&", OLDERR;
+   close OLDERR;
+
+   print $ret ? "yes\n" : "no\n";
+
+   return $ret;
 }
 
 sub add_cflags_libs
@@ -29,7 +38,7 @@ sub add_cflags_libs
    push @{ $build_args{extra_linker_flags} }, split( m/ +/, $libs );
 }
 
-if( eu_pc_modversion( "tickit" ) ) {
+if( eu_pc_atleast_version( "tickit", 0 ) ) {
    # libtickit installed; just use it
    print "Using installed libtickit\n";
 
@@ -46,7 +55,7 @@ else {
 
    # bundled source still needs libtermkey and optionally can use
    # unibilium
-   if( eu_pc_modversion( "termkey" ) ) {
+   if( eu_pc_atleast_version( "termkey", "0.16" ) ) {
       print "Using installed libtermkey\n";
 
       add_cflags_libs "termkey";
@@ -64,7 +73,7 @@ else {
       die "OS unsupported - need libtermkey";
    }
 
-   if( eu_pc_modversion( "unibilium" ) ) {
+   if( eu_pc_atleast_version( "unibilium", "1.1.0" ) ) {
       print "Using installed unibilium\n";
 
       push @{ $build_args{extra_compiler_flags} }, qw( -DHAVE_UNIBILIUM );
@@ -80,7 +89,7 @@ else {
       push @{ $build_args{extra_linker_flags} },
          split m/ +/, Alien::unibilium->libs;
    }
-   elsif( eu_pc_modversion( "ncursesw" ) ) {
+   elsif( eu_pc_atleast_version( "ncursesw", 0 ) ) {
       print "Using installed ncursesw\n";
 
       add_cflags_libs "ncursesw";

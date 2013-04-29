@@ -13,7 +13,7 @@ use Tickit::Style;
 
 use Tickit::Utils qw( bound );
 
-our $VERSION = '0.29_002';
+our $VERSION = '0.30';
 
 use constant WIDGET_PEN_FROM_STYLE => 1;
 
