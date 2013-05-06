@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = '0.30';
+our $VERSION = '0.31';
 
 use Carp;
 
@@ -141,6 +141,17 @@ therefore whether it shall be red or blue, it is specified that both of the
 tagged definitions take precedence over the untagged definition, so the colour
 will not be green.
 
+=head1 SUBCLASSING
+
+If a Widget class is subclassed and the subclass does not declare
+C<use Tickit::Style> again, the subclass will be transparent from the point of
+view of style. Any style applied to the base class will apply equally to the
+subclass, and the name of the subclass does not take part in style decisions.
+
+If the subclass does C<use Tickit::Style> again then the new subclass will be
+a distinct widget type for style purposes, and it will require its own new set
+of base style definitions.
+
 =cut
 
 # This class imports functions and sets up initial state
@@ -149,13 +160,15 @@ sub import
    my $class = shift;
    my $pkg = caller;
 
+   ( my $type = $pkg ) =~ s/^Tickit::Widget:://;
+
    # Import the symbols
    {
       no strict 'refs';
       *{"${pkg}::$_"} = \&{"Tickit::Style::$_"} for @EXPORTS;
+      *{"${pkg}::_widget_style_type"} = sub () { $type };
    }
 
-   ( my $type = $pkg ) =~ s/^Tickit::Widget:://;
    $TAGSETS_BY_TYPE_CLASS{$type} ||= {};
 }
 

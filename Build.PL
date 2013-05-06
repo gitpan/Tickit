@@ -80,7 +80,7 @@ else {
 
       add_cflags_libs "unibilium";
    }
-   elsif( eval { require Alien::unibilium } ) {
+   elsif( eval { require Alien::unibilium and Alien::unibilium->VERSION( '0.09' ) } ) {
       print "Using Alien::unibilium\n";
 
       push @{ $build_args{extra_compiler_flags} }, qw( -DHAVE_UNIBILIUM ),
@@ -124,7 +124,7 @@ my $build = Module::Build->new(
    meta_merge => {
       configure_requires => {
          'Alien::libtermkey' => 0,
-         'Alien::unibilium' => 0,
+         'Alien::unibilium' => '0.09',
       },
    },
    build_requires => {

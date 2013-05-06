@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.30';
+our $VERSION = '0.31';
 
 use Carp;
 
@@ -851,7 +851,7 @@ sub get_effective_pen
 {
    my $win = shift;
 
-   my $pen = $win->pen->clone;
+   my $pen = $win->pen->as_mutable;
    for( my $parent = $win->parent; $parent; $parent = $parent->parent ) {
       $pen->default_from( $parent->pen );
    }
@@ -1012,7 +1012,7 @@ sub print
    my $self = shift;
    my $text = shift;
 
-   my $pen = ( @_ == 1 ) ? shift->clone : Tickit::Pen->new( @_ );
+   my $pen = ( @_ == 1 ) ? shift->as_mutable : Tickit::Pen::Mutable->new( @_ );
 
    # First collect up the pen attributes and abort early if any window is
    # invisible
@@ -1101,7 +1101,7 @@ sub erasech
    my $count = shift;
    my $moveend = shift;
 
-   my $pen = ( @_ == 1 ) ? shift->clone : Tickit::Pen->new( @_ );
+   my $pen = ( @_ == 1 ) ? shift->as_mutable : Tickit::Pen::Mutable->new( @_ );
 
    # First collect up the pen attributes and abort early if any window is
    # invisible
@@ -1170,7 +1170,7 @@ sub clearrect
    my $self = shift;
    my $rect = shift;
 
-   my $pen = ( @_ == 1 ) ? shift->clone : Tickit::Pen->new( @_ );
+   my $pen = ( @_ == 1 ) ? shift->as_mutable : Tickit::Pen::Mutable->new( @_ );
 
    if( $rect->top == 0 and $rect->left == 0 and
        $rect->bottom == $self->lines and $rect->right == $self->cols ) {
@@ -1221,7 +1221,7 @@ sub _scrollrect_inner
       return 1;
    }
 
-   my $pen = ( @args == 1 ) ? $args[0]->clone : Tickit::Pen->new( @args );
+   my $pen = ( @args == 1 ) ? $args[0]->as_mutable : Tickit::Pen::Mutable->new( @args );
 
    my $top  = $rect->top;
    my $left = $rect->left;

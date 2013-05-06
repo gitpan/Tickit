@@ -1,5 +1,13 @@
 Revision history for Changes
 
+0.31    CHANGES:
+         * Define the behaviour of Tickit::Style on subclasses, allowing for
+           transparent or independent subclass types
+         * Declare the particular version of Alien::unibilium required
+         * Split pens into mutable and immutable forms; deprecate ->clone
+           method
+         * Added $pen->equiv and ->equiv_attr comparison methods
+
 0.30    CHANGES:
          * Allow modification of widget direct-applied style
          * Split Tickit::Pen into mutable and immutable subclasses

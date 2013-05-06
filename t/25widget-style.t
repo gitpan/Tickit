@@ -45,6 +45,16 @@ sub on_style_changed_values
    %style_changed_values = @_;
 }
 
+package StyledWidget::Subclass;
+use base qw( StyledWidget );
+
+package StyledWidget::StyledSubclass;
+use base qw( StyledWidget );
+use Tickit::Style;
+
+style_definition base =>
+   fg => 7;
+
 package main;
 
 # Code-declared default style
@@ -207,6 +217,21 @@ EOF
    like( exception { $pen_widget->set_pen( Tickit::Pen->new ) },
          qr/^StyledWidget uses Tickit::Style for its widget pen; ->set_pen cannot be used at /,
          'Attempting to ->set_pen on WIDGET_PEN_FROM_STYLE=1 raises exception' );
+}
+
+# subclassing
+{
+   my $widget = StyledWidget::Subclass->new;
+
+   is_deeply( { $widget->get_style_pen->getattrs },
+              { fg => 4, },
+              'style pen for widget subclass' );
+
+   $widget = StyledWidget::StyledSubclass->new;
+
+   is_deeply( { $widget->get_style_pen->getattrs },
+              { fg => 7, },
+              'style pen for widget subclass with independent style' );
 }
 
 done_testing;

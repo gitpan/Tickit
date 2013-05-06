@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.30';
+our $VERSION = '0.31';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -106,7 +106,7 @@ sub new
    }
 
    if( $class->WIDGET_PEN_FROM_STYLE ) {
-      $self->set_pen( $self->get_style_pen->clone );
+      $self->set_pen( $self->get_style_pen->as_mutable );
    }
    else {
       $self->set_pen( Tickit::Pen->new_from_attrs( \%args ) );
@@ -152,8 +152,6 @@ sub set_style_tag
    # Early-return on no change
    return if !$self->{style_tag}{$tag} == !$value;
 
-   ( my $type = ref $self ) =~ s/^Tickit::Widget:://;
-
    # Work out what style keys might depend on this tag
    my %values;
 
@@ -165,6 +163,7 @@ sub set_style_tag
       }
    }
 
+   my $type = $self->_widget_style_type;
    foreach my $class ( $self->style_classes, undef ) {
       my $keys = $KEYS_BY_TYPE_CLASS_TAG{$type}{$class//""}{$tag} ||= do {
          my $tagset = Tickit::Style::_ref_tagset( $type, $class );
@@ -214,7 +213,7 @@ sub get_style_values
    my $self = shift;
    my @keys = @_;
 
-   ( my $type = ref $self ) =~ s/^Tickit::Widget:://;
+   my $type = $self->_widget_style_type;
 
    my @set = ( 0 ) x @keys;
    my @values = ( undef ) x @keys;
@@ -360,8 +359,12 @@ sub set_style
    my @old_values = $self->get_style_values( @keys );
    $values{$keys[$_]}[0] = $old_values[$_] for 0 .. $#keys;
 
-   $self->{style_direct} ? $self->{style_direct}->merge( $new )
-                         : $self->{style_direct} = $new;
+   if( $self->{style_direct} ) {
+      $self->{style_direct}->merge( $new );
+   }
+   else {
+      $self->{style_direct} = $new;
+   }
 
    $self->_style_changed_values( \%values, 1 );
 }
@@ -409,7 +412,7 @@ sub _style_changed_values
    }
 
    if( $changed_pens{""} and $self->WIDGET_PEN_FROM_STYLE ) {
-      $self->set_pen( $self->get_style_pen->clone );
+      $self->set_pen( $self->get_style_pen->as_mutable );
    }
 
    my $code = $self->can( "on_style_changed_values" );

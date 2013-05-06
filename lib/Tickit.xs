@@ -458,6 +458,29 @@ getattrs(self)
     }
     XSRETURN(count);
 
+bool
+equiv_attr(self,other,attr)
+  Tickit::Pen  self
+  Tickit::Pen  other
+  char        *attr
+  INIT:
+    TickitPenAttr a;
+  CODE:
+    if((a = tickit_pen_lookup_attr(attr)) == -1)
+      XSRETURN_UNDEF;
+    RETVAL = tickit_pen_equiv_attr(self->pen, other->pen, a);
+  OUTPUT:
+    RETVAL
+
+bool
+equiv(self,other)
+  Tickit::Pen  self
+  Tickit::Pen  other
+  CODE:
+    RETVAL = tickit_pen_equiv(self->pen, other->pen);
+  OUTPUT:
+    RETVAL
+
 MODULE = Tickit             PACKAGE = Tickit::Pen::Mutable
 
 void

@@ -24,6 +24,14 @@ use Tickit::Pen;
 
    ok( !$pen->hasattr( 'bg' ), '$pen has no bg' );
    is( $pen->getattr( 'bg' ), undef, '$pen bg undef' );
+
+   ok( $pen->equiv( $pen ), '$pen is equiv to itself' );
+   ok( $pen->equiv( Tickit::Pen::Immutable->new( fg => 3 ) ), '$pen is equiv to another one the same' );
+
+   my $pen2 = Tickit::Pen::Immutable->new( fg => 3, b => 1 );
+
+   ok( $pen->equiv_attr( $pen2, 'fg' ), '$pen has equiv_attr fg another' );
+   ok( !$pen->equiv( $pen2 ), '$pen is not equiv to a different one' );
 }
 
 my $changed = 0;
@@ -59,7 +67,7 @@ my $observer = bless {}, "PenObserver";
 
    is( "$pen", "Tickit::Pen::Mutable={fg=3}", '"$pen" after chattr' );
 
-   is_deeply( { $pen->clone->getattrs }, { $pen->getattrs }, '$pen->clone attrs' );
+   is_deeply( { $pen->as_mutable->getattrs }, { $pen->getattrs }, '$pen->as_mutable attrs' );
 
    is( $changed, 1, '$changed after chattr' );
    identical( $changed_pen, $pen, '$changed_pen after chattr' );
@@ -109,7 +117,7 @@ my $bluepen  = Tickit::Pen::Immutable->new( fg => 4 );
 my $otherpen = Tickit::Pen::Immutable->new( fg => 1, bg => 2 );
 
 {
-   my $copy = $bluepen->clone;
+   my $copy = $bluepen->as_mutable;
    $copy->add_on_changed( $observer );
    $changed = 0;
 
@@ -122,7 +130,7 @@ my $otherpen = Tickit::Pen::Immutable->new( fg => 1, bg => 2 );
 }
 
 {
-   my $copy = $bluepen->clone;
+   my $copy = $bluepen->as_mutable;
    $copy->add_on_changed( $observer );
    $changed = 0;
 

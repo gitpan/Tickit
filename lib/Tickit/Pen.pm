@@ -1,14 +1,14 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011-2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::Pen;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.30';
+our $VERSION = '0.31';
 
 use Carp;
 
@@ -144,18 +144,44 @@ sub new_from_attrs
    return $class->_new( $attrs );
 }
 
+=head2 $pen = $orig->as_mutable
+
 =head2 $pen = $orig->clone
 
 Returns a new mutable pen, initialised by copying the attributes of the
 original.
 
+C<clone> is provided as a legacy alias, but may be removed in a future
+version.
+
 =cut
 
-sub clone
+sub as_mutable
 {
    my $orig = shift;
    return Tickit::Pen::Mutable->new_from_attrs( { $orig->getattrs } );
 }
+*clone = \&as_mutable;
+
+=head2 $pen = $orig->as_immutable
+
+Returns an immutable pen, initialised by copying the attributes of the
+original. When called on an immutable pen, this method just returns the same
+pen instance.
+
+=cut
+
+sub as_immutable
+{
+   my $orig = shift;
+   return Tickit::Pen::Immutable->new_from_attrs( { $orig->getattrs } );
+}
+
+=head2 $is_mutable = $pen->mutable
+
+Returns true on mutable pens and false on immutable ones.
+
+=cut
 
 =head1 METHODS ON ALL PENS
 
@@ -185,6 +211,20 @@ Returns the current value of the given attribute
 =head2 %values = $pen->getattrs
 
 Returns a key/value list of all the attributes
+
+=cut
+
+=head2 $equiv = $pen->equiv_attr( $other, $attr )
+
+Returns true if the two pens have the equivalent values for the given
+attribute; that is, either both define it to the same value, or neither
+defines it.
+
+=cut
+
+=head2 $equiv = $pen->equiv( $other )
+
+Returns true if the two pens have equivalent values for all attributes.
 
 =cut
 
@@ -281,6 +321,8 @@ use overload '==' => sub { refaddr($_[0]) == refaddr($_[1]) };
 package Tickit::Pen::Immutable;
 use base qw( Tickit::Pen );
 use constant mutable => 0;
+
+sub as_immutable { return $_[0] }
 
 package Tickit::Pen::Mutable;
 use base qw( Tickit::Pen );
