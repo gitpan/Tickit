@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
 
 package Tickit;
 
@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 BEGIN {
-   our $VERSION = '0.31';
+   our $VERSION = '0.32';
 }
 
 use IO::Handle;
@@ -146,22 +146,22 @@ sub new
 
    weaken( my $weakself = $self );
 
-   $term->set_on_resize( sub {
+   $term->bind_event( resize => sub {
       $weakself or return;
-      my ( $term, $lines, $cols ) = @_;
-      $weakself->rootwin->resize( $lines, $cols );
+      my ( $term, $ev, $args ) = @_;
+      $weakself->rootwin->resize( $args->{lines}, $args->{cols} );
    } );
 
-   $term->set_on_key( sub {
+   $term->bind_event( key => sub {
       $weakself or return;
-      shift; # term
-      $weakself->on_key( @_ );
+      my ( $term, $ev, $args ) = @_;
+      $weakself->on_key( $args );
    } );
 
-   $term->set_on_mouse( sub {
+   $term->bind_event( mouse => sub {
       $weakself or return;
-      shift; # term
-      $weakself->on_mouse( @_ );
+      my ( $term, $ev, $args ) = @_;
+      $weakself->on_mouse( $args );
    } );
 
    $self->set_root_widget( $args{root} ) if defined $args{root};
@@ -267,9 +267,11 @@ sub _SIGWINCH
 sub on_key
 {
    my $self = shift;
-   my ( $type, $str, $mod ) = @_;
+   my ( $args ) = @_;
 
-   $self->rootwin->_handle_key( @_ ) and return;
+   my $str = $args->{str};
+
+   $self->rootwin->_handle_key( $args ) and return;
 
    if( exists $self->{key_binds}{$str} ) {
       $self->{key_binds}{$str}->( $self, $str ) and return;
@@ -309,8 +311,35 @@ sub bind_key
 sub on_mouse
 {
    my $self = shift;
+   my ( $args ) = @_;
 
-   $self->rootwin->_handle_mouse( @_ ) and return;
+   my $type = $args->{type};
+   if( $type eq "press" ) {
+      # Save the mouse press location in case of drag
+      $self->{mouse_last_press} = [ $args->{button}, $args->{line}, $args->{col} ];
+   }
+   elsif( $type eq "drag" and !$self->{mouse_dragging} ) {
+      my $start_args = { %$args,
+         type => "drag_start",
+         line => $self->{mouse_last_press}[1],
+         col  => $self->{mouse_last_press}[2],
+      };
+
+      $self->rootwin->_handle_mouse( $start_args );
+
+      $self->{mouse_dragging} = 1;
+   }
+   elsif( $type eq "release" and $self->{mouse_dragging} ) {
+      my $drop_args = { %$args,
+         type => "drag_drop",
+      };
+
+      $self->rootwin->_handle_mouse( $drop_args );
+
+      $self->{mouse_dragging} = 0;
+   }
+
+   $self->rootwin->_handle_mouse( $args ) and return;
 }
 
 =head2 $tickit->rootwin

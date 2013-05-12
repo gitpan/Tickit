@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Exporter 'import';
 
@@ -220,7 +220,11 @@ sub presskey
 {
    my ( $type, $str, $mod ) = @_;
 
-   $tickit->on_key( $type, $str, $mod||0 );
+   $tickit->on_key( {
+      type => $type,
+      str  => $str,
+      mod  => $mod||0,
+   } );
 }
 
 =head2 pressmouse( $ev, $button, $line, $col, $mod )
@@ -233,7 +237,13 @@ sub pressmouse
 {
    my ( $ev, $button, $line, $col, $mod ) = @_;
 
-   $tickit->on_mouse( $ev, $button, $line, $col, $mod||0 );
+   $tickit->on_mouse( {
+      type   => $ev,
+      button => $button,
+      line   => $line,
+      col    => $col,
+      mod    => $mod||0,
+   } );
 }
 
 =head1 TEST FUNCTIONS

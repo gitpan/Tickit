@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2012-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::Box;
 
@@ -13,7 +13,7 @@ use Tickit::Style;
 
 use Tickit::Utils qw( bound );
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use constant WIDGET_PEN_FROM_STYLE => 1;
 
@@ -225,8 +225,6 @@ foreach my $dir (qw( lines cols )) {
 
 use Tickit::WidgetRole::Alignable name =>  "align", style => "h", reshape => 1;
 use Tickit::WidgetRole::Alignable name => "valign", style => "v", reshape => 1;
-
-sub children_changed { shift->reshape }
 
 sub reshape
 {

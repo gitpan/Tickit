@@ -63,13 +63,13 @@ $loop->add( IO::Async::Timer::Periodic->new(
 my $popup_win;
 
 $rootwin->set_on_mouse( sub {
-   my ( undef, $ev, $button, $line, $col ) = @_;
-   return unless $ev eq "press";
+   my ( $self, $args ) = @_;
+   return unless $args->type eq "press";
 
-   if( $button == 3 ) {
+   if( $args->button == 3 ) {
       $popup_win->hide if $popup_win;
 
-      $popup_win = $rootwin->make_float( $line, $col, 3, 21 );
+      $popup_win = $rootwin->make_float( $args->line, $args->col, 3, 21 );
       $popup_win->pen->chattr( bg => 4 );
 
       $popup_win->set_on_expose( sub {

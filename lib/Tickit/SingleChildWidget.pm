@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Carp;
 

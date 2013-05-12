@@ -13,7 +13,7 @@ use Tickit::Style;
 use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );
@@ -205,12 +205,12 @@ sub render
 sub on_mouse
 {
    my $self = shift;
-   my ( $ev, $button, $line, $col ) = @_;
+   my ( $args ) = @_;
 
-   return unless $ev eq "press" and $button == 1;
+   return unless $args->type eq "press" and $args->button == 1;
    return unless my $on_click = $self->{on_click};
 
-   $on_click->( $self, $line, $col );
+   $on_click->( $self, $args->line, $args->col );
 }
 
 =head1 AUTHOR

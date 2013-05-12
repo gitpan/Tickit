@@ -1,5 +1,12 @@
+#!/usr/bin/perl
+
 package ClickAndDragWidget;
 use base 'Tickit::Widget';
+
+use strict;
+use warnings;
+
+use Tickit;
 
 use Tickit::Widget::Frame;
 
@@ -8,6 +15,7 @@ use List::Util qw( min max );
 sub lines { 1 }
 sub cols  { 1 }
 
+use constant CLEAR_BEFORE_RENDER => 0;
 sub render {}
 
 # In a real Widget these would be stored in an attribute of $self
@@ -17,25 +25,25 @@ my $dragframe;
 sub on_mouse
 {
    my $self = shift;
-   my ( $ev, $button, $line, $col ) = @_;
+   my ( $args ) = @_;
 
-   if( $button eq "release" ) {
+   if( $args->type eq "release" ) {
       $dragframe->set_window( undef );
       undef $dragframe;
       return;
    }
 
-   return unless $button == 1;
+   return unless $args->button == 1;
 
-   if( $ev eq "press" ) {
-      @start = ( $line, $col );
+   if( $args->type eq "press" ) {
+      @start = ( $args->line, $args->col );
       return;
    }
 
-   my $top   = min( $start[0], $line );
-   my $left  = min( $start[1], $col );
-   my $lines = max( $start[0], $line ) - $top + 1;
-   my $cols  = max( $start[1], $col ) - $left + 1;
+   my $top   = min( $start[0], $args->line );
+   my $left  = min( $start[1], $args->col );
+   my $lines = max( $start[0], $args->line ) - $top + 1;
+   my $cols  = max( $start[1], $args->col ) - $left + 1;
 
    return if( $lines == 0 or $cols == 0 );
 
@@ -53,4 +61,4 @@ sub on_mouse
    }
 }
 
-1;
+Tickit->new( root => ClickAndDragWidget->new )->run;

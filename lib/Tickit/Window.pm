@@ -9,11 +9,12 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Carp;
 
-use Scalar::Util qw( weaken );
+use Scalar::Util qw( weaken refaddr );
+use List::Util qw( first );
 
 use Tickit::Pen;
 use Tickit::Rect;
@@ -43,21 +44,17 @@ methods, until it is made visible again with the C<show> method. A hidden
 window will not receive focus or input events. It may still receive geometry
 change events if it is resized.
 
-=head2 Sub Windows and Floating Windows
+=head2 Sub Windows
 
-A division of a window made by calling C<make_sub> obtains a window that
-represents some portion of the drawing area of the parent window. All sibling
-subdivisions are considered equal; if they happen to overlap then it is
-undefined how input events on overlapping regions are handled among them, or
-how drawing may interact. It is recommended that C<make_sub> be used to obtain
-only windows that cover non-overlapping areas of the parent; such as to
-distribute space within a container.
+A division of a window made by calling C<make_sub> or C<make_float> obtains a
+window that represents some portion of the drawing area of the parent window.
+Child windows are stored in order; C<make_sub> adds a new child to the end of
+the list, and C<make_float> adds one at the start.
 
-By comparison, any window created by C<make_float> is considered to sit
-"above" the area of its parent. It will always handle input events before
-other siblings, and any drawing that happens within it overwrites that of its
-non-floating siblings. Any drawing on a non-floating sibling that happens
-within the area of a float is obscured by the contents of the floating window.
+Higher windows (windows more towards the start of the list), will always handle
+input events before lower siblings. The extent of windows also obscures lower
+windows; drawing on lower windows may not be visible because higher windows
+are above it.
 
 =cut
 
@@ -143,8 +140,8 @@ sub _remove
 
 =head2 $sub = $win->make_sub( $top, $left, $lines, $cols )
 
-Constructs a new sub-window starting at the given coordinates of this window.
-It will be sized to the given limits.
+Constructs a new sub-window of the given geometry, and places it at the end of
+the child window list; below any other siblings.
 
 =cut
 
@@ -186,8 +183,8 @@ sub make_hidden_sub
 
 =head2 $float = $win->make_float( $top, $left, $lines, $cols )
 
-Constructs a new floating child window starting at the given coordinates of
-this window. It will be sized to the given limits.
+Constructs a new sub-window of the given geometry, and places it at the start
+of the child window list; above any other siblings.
 
 =cut
 
@@ -238,6 +235,84 @@ sub make_popup
    my $popup = $win->make_float( $top, $left, $lines, $cols );
    $popup->{steal_input} = 1;
    return $popup;
+}
+
+=head2 $win->raise
+
+=cut
+
+sub raise
+{
+   my $self = shift;
+   croak "Cannot ->raise the root window" unless my $parent = $self->parent;
+   $self->parent->_reorder_child( $self, -1 );
+}
+
+=head2 $win->lower
+
+Moves the order of the window in its parent one higher or lower relative to
+its siblings.
+
+=cut
+
+sub lower
+{
+   my $self = shift;
+   croak "Cannot ->lower the root window" unless my $parent = $self->parent;
+   $self->parent->_reorder_child( $self, +1 );
+}
+
+=head2 $win->raise_to_front
+
+Moves the order of the window in its parent to be the front-most among its
+siblings.
+
+=cut
+
+sub raise_to_front
+{
+   my $self = shift;
+   croak "Cannot ->raise_to_front the root window" unless my $parent = $self->parent;
+   $self->parent->_reorder_child( $self, "front" );
+}
+
+=head2 $win->lower_to_back
+
+Moves the order of the window in its parent to be the back-most among its
+siblings.
+
+=cut
+
+sub lower_to_back
+{
+   my $self = shift;
+   croak "Cannot ->lower_to_back the root window" unless my $parent = $self->parent;
+   $self->parent->_reorder_child( $self, "back" );
+}
+
+sub _reorder_child
+{
+   my $self = shift;
+   my ( $child, $where ) = @_;
+
+   my $children = $self->{child_windows} or return;
+   my $idx = first { refaddr($child) == refaddr($children->[$_]) } 0 .. $#$children;
+   defined $idx or croak "$child is not a child of $self";
+
+   # Remove it
+   splice @$children, $idx, 1, ();
+
+   if( $where eq "front" ) {
+      unshift @$children, $child;
+   }
+   elsif( $where eq "back" ) {
+      push @$children, $child;
+   }
+   else {
+      splice @$children, $idx + $where, 0, ( $child );
+   }
+
+   $self->expose( $child->rect );
 }
 
 sub _reap_dead_children
@@ -427,12 +502,26 @@ sub set_on_geom_changed
 Set the callback to invoke whenever a key is pressed while this window, or one
 of its child windows, has the input focus.
 
+In a future release, this callback will be invoked in the following way:
+
+ $handled = $on_key->( $win, $event )
+
+where C<$event> is an object supporting methods called C<type>, C<str> and
+C<mod>. C<type> will be C<"text"> for normal unmodified Unicode, or C<"key">
+for special keys or modified Unicode. C<str> will be the UTF-8 string for
+C<text> events, or the textual description of the key as rendered by
+L<Term::TermKey> for C<key> events. C<mod> will be a bitmask of the modifier
+state.
+
+For backward-compatibility however, the event arguments are also
+expanded positionally, and the object itself responds to stringification
+overloading as the C<type> method, such that it can be considered that it
+is called in the following way instead:
+
  $handled = $on_key->( $win, $type, $str, $mod )
 
-C<$type> will be C<text> for normal unmodified Unicode, or C<key> for special
-keys or modified Unicode. C<$str> will be the UTF-8 string for C<text> events,
-or the textual description of the key as rendered by L<Term::TermKey> for
-C<key> events. C<$mod> will be a bitmask of the modifier state.
+Newly-written code should be written to use the event structure directly, as
+eventually this legacy handling will be removed.
 
 The invoked code should return a true value if it considers the keypress dealt
 with, or false to pass it up to its parent window.
@@ -463,22 +552,28 @@ sub set_on_key
 sub _handle_key
 {
    my $self = shift;
+   my ( $args ) = @_;
 
    return 0 unless $self->is_visible;
 
    $self->_reap_dead_children;
    my $children = $self->{child_windows};
    if( $children and @$children and $children->[0]->{steal_input} ) {
-      $children->[0]->_handle_key( @_ ) and return;
+      $children->[0]->_handle_key( $args ) and return;
    }
 
    my $focus_child = $self->{focus_child};
    if( $focus_child ) {
-      $focus_child->_handle_key( @_ ) and return 1;
+      $focus_child->_handle_key( $args ) and return 1;
    }
 
    if( my $on_key = $self->{on_key} ) {
-      $on_key->( $self, @_ ) and return 1;
+      $on_key->( $self,
+         Tickit::Window::Event->new( %$args ),
+         # legacy arguments
+         $args->{str},
+         $args->{mod},
+      ) and return 1;
    }
 
    if( $children ) {
@@ -486,7 +581,7 @@ sub _handle_key
          next unless $child; # weakrefs; may be undef
          next if $focus_child and $child == $focus_child;
 
-         $child->_handle_key( @_ );
+         $child->_handle_key( $args );
       }
    }
 
@@ -498,17 +593,56 @@ sub _handle_key
 Set the callback to invoke whenever a mouse event is received within the
 window's rectangle.
 
+In a future release, this callback will be invoked in the following way:
+
+ $handled = $on_mouse->( $win, $event )
+
+where C<$event> is an object supporting methods called C<type>, C<button>,
+C<line>, C<col> and C<mod>. C<type> will contain the event name. C<button>
+will contain the button number, though it may not be present for C<release>
+events. C<line> and C<col> are 0-based. C<mod> is a bitmask of modifier
+state. Behaviour of events involving more than one mouse button is not
+well-specified by terminals.
+
+For backward-compatibility however, the event arguments are also
+expanded positionally, and the object itself responds to stringification
+overloading as the C<type> method, such that it can be considered that it
+is called in the following way instead:
+
  $handled = $on_mouse->( $win, $ev, $buttons, $line, $col, $mod )
 
-C<$ev> will be C<press>, C<drag> or C<release>. The button number will be in
-C<$button>, though may not be present for C<release> events. C<$line> and
-C<$col> are 0-based. Behaviour of events involving more than one mouse button
-is not well-specified by terminals. C<$mod> is a bitmask of modifier state.
+Newly-written code should be written to use the event structure directly, as
+eventually this legacy handling will be removed.
+
+The following event names may be observed:
+
+=over 8
+
+=item press
+
+A mouse button has been pressed down on this cell
+
+=item drag_start
+
+The mouse was moved while a button was held, and was initially in the given
+cell
+
+=item drag
+
+The mouse was moved while a button was held, and is now in the given cell
+
+=item drag_drop
+
+A mouse button was released after having been moved, while in the given cell
+
+=item release
+
+A mouse button was released after being pressed
+
+=back
 
 The invoked code should return a true value if it considers the mouse event
-dealt with, or false to pass it up to its parent window. The mouse event is
-passed as defined by L<Tickit::Term>'s C<on_mouse> event, except that the
-line and column counts will be relative to the window, not to the screen.
+dealt with, or false to pass it up to its parent window.
 
 =cut
 
@@ -521,9 +655,12 @@ sub set_on_mouse
 sub _handle_mouse
 {
    my $self = shift;
-   my ( $ev, $button, $line, $col, @more ) = @_;
+   my ( $args ) = @_;
 
    return 0 unless $self->is_visible;
+
+   my $line = $args->{line};
+   my $col  = $args->{col};
 
    if( my $children = $self->{child_windows} ) {
       foreach my $child ( @$children ) {
@@ -537,12 +674,25 @@ sub _handle_mouse
             next if $child_col  < 0 or $child_col  >= $child->cols;
          }
 
-         return 1 if $child->_handle_mouse( $ev, $button, $child_line, $child_col, @more );
+         my $childargs = {
+            %$args,
+            line => $child_line,
+            col  => $child_col,
+         };
+
+         return 1 if $child->_handle_mouse( $childargs );
       }
    }
 
    if( my $on_mouse = $self->{on_mouse} ) {
-      return $on_mouse->( $self, @_ );
+      return $on_mouse->( $self,
+         Tickit::Window::Event->new( %$args ),
+         # legacy arguments
+         $args->{button},
+         $args->{line},
+         $args->{col},
+         $args->{mod},
+      );
    }
 
    return 0;
@@ -975,6 +1125,9 @@ sub goto
    $win->{output_line}   = $line;
    $win->{output_column} = $col;
    $win->{output_needs_goto} = 0;
+
+   my ( $vis ) = $win->_get_span_visibility( $line, $col );
+   return unless $vis;
 
    while( $win ) {
       return if $line < 0 or $line >= $win->lines;
@@ -1541,6 +1694,29 @@ use overload
       my $self = shift;
       return $self;
    },
+   fallback => 1;
+
+package # hide from indexer
+   Tickit::Window::Event;
+
+use Carp;
+
+sub new
+{
+   my $class = shift;
+   bless { @_ }, $class;
+}
+
+foreach my $key (qw( type str mod button line col )) {
+   no strict 'refs';
+   *$key = sub { exists $_[0]{$key} ? $_[0]{$key} : croak "Event has no '$key' field" }
+}
+
+# This horrible overload is just short-term for back-compat so we can pass
+# the event structure itself as the first method argument, to code that still
+# expects to find the event type name there
+use overload
+   '""' => "type",
    fallback => 1;
 
 =head1 AUTHOR

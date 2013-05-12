@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Carp;
 
@@ -18,10 +18,16 @@ use Tickit::Style::Parser;
 
 our @EXPORTS = qw(
    style_definition
+   style_reshape_keys
+   style_reshape_textwidth_keys
 );
 
 # {$type}->{$class} = $tagset
 my %TAGSETS_BY_TYPE_CLASS;
+
+# {$type}->{$key} = 1
+my %RESHAPE_KEYS;
+my %RESHAPE_TEXTWIDTH_KEYS;
 
 =head1 NAME
 
@@ -214,8 +220,55 @@ sub style_definition
 
    die "Expected '\$tags' to be 'base' or a set of :tag names" unless $tags eq "base" or $tags eq "";
 
-   ( my $type = $class ) =~ s/^Tickit::Widget:://;
+   my $type = $class->_widget_style_type;
    _ref_tagset( $type, undef )->merge_with_tags( \%tags, \%definition );
+}
+
+=head2 style_reshape_keys( @keys )
+
+Declares that the given list of keys are somehow responsible for determining
+the shape of the widget. If their values are changed, the C<reshape> method is
+called.
+
+=cut
+
+sub style_reshape_keys
+{
+   my $class = caller;
+
+   my $type = $class->_widget_style_type;
+   $RESHAPE_KEYS{$type}{$_} = 1 for @_;
+}
+
+sub _reshape_keys
+{
+   my ( $type ) = @_;
+   return keys %{ $RESHAPE_KEYS{$type} };
+}
+
+=head2 style_reshape_textwidth_keys( @keys )
+
+Declares that the given list of keys contain text, the C<textwidth()> of which
+is used to determine the shape of the widget. If their values are changed such
+that the C<textwidth()> differs, the C<reshape> method is called.
+
+Between them these two methods may help avoid C<Tickit::Widget> classes from
+needing to override the C<on_style_changed_values> method.
+
+=cut
+
+sub style_reshape_textwidth_keys
+{
+   my $class = caller;
+
+   my $type = $class->_widget_style_type;
+   $RESHAPE_TEXTWIDTH_KEYS{$type}{$_} = 1 for @_;
+}
+
+sub _reshape_textwidth_keys
+{
+   my ( $type ) = @_;
+   return keys %{ $RESHAPE_TEXTWIDTH_KEYS{$type} };
 }
 
 my @ON_STYLE_LOAD;

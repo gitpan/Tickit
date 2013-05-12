@@ -1,5 +1,18 @@
 Revision history for Changes
 
+0.32    CHANGES:
+         * Allow widgets to declare style keys to cause ->reshape calls
+         * Allow Windows to be re-ordered within their parent, better document
+           the behaviour of Window ordering
+         * Handle mouse drag/drop events at the rootwin level
+         * Pass key/mouse event arguments as a structure as well as positional
+           arguments
+         * Implement HBox/VBox spacing as style keys
+         * Wrap tickit_term_getctl_int()
+         * Bundled libtickit updates:
+            + Down-convert colours to 8 or 16 colour palettes when on non-
+              256color-aware terminals
+
 0.31    CHANGES:
          * Define the behaviour of Tickit::Style on subclasses, allowing for
            transparent or independent subclass types

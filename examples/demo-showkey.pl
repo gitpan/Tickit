@@ -1,5 +1,12 @@
+#!/usr/bin/perl
+
 package ShowKeyWidget;
 use base 'Tickit::Widget';
+
+use strict;
+use warnings;
+
+use Tickit;
 
 my $text;
 
@@ -21,12 +28,12 @@ sub render
 sub on_key
 {
    my $self = shift;
-   my ( $type, $str ) = @_;
+   my ( $args ) = @_;
 
-   $text = "$type: $str";
+   $text = join ": ", $args->type, $args->str;
    $self->redraw;
 
    return 0;
 }
 
-1;
+Tickit->new( root => ShowKeyWidget->new )->run;

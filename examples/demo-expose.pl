@@ -30,15 +30,15 @@ my $rootwin = $tickit->rootwin;
 my @start;
 $rootwin->set_on_mouse(
    sub {
-      my ( $rootwin, $ev, $buttons, $line, $col ) = @_;
-      @start = ( $line, $col ) and return if $ev eq "press";
-      return unless $ev eq "release";
+      my ( $self, $args ) = @_;
+      @start = ( $args->line, $args->col ) and return if $args->type eq "press";
+      return unless $args->type eq "release";
 
-      my $top  = min( $start[0], $line );
-      my $left = min( $start[1], $col );
+      my $top  = min( $start[0], $args->line );
+      my $left = min( $start[1], $args->col );
 
-      my $bottom = max( $start[0], $line ) + 1;
-      my $right  = max( $start[1], $col )  + 1;
+      my $bottom = max( $start[0], $args->line ) + 1;
+      my $right  = max( $start[1], $args->col )  + 1;
 
       $rootwin->_do_expose( Tickit::Rect->new(
          top   => $top,

@@ -310,4 +310,58 @@ flush_tickit;
    $win->close;
 }
 
+# Window ordering
+{
+   my $win_A = $rootwin->make_sub( 0, 0, 4, 80 );
+   my $win_B = $rootwin->make_sub( 0, 0, 4, 80 );
+   my $win_C = $rootwin->make_sub( 0, 0, 4, 80 );
+
+   $win_A->set_on_expose( sub {
+      my ( $win ) = @_;
+      $win->goto( 0, 0 ); $win->print( "Window A" );
+   });
+
+   $win_B->set_on_expose( sub {
+      my ( $win ) = @_;
+      $win->goto( 0, 0 ); $win->print( "Window B" );
+   });
+
+   $win_C->set_on_expose( sub {
+      my ( $win ) = @_;
+      $win->goto( 0, 0 ); $win->print( "Window C" );
+   });
+
+   $rootwin->expose;
+   flush_tickit;
+
+   is_termlog( [ GOTO(0,0),
+                 SETPEN,
+                 PRINT("Window A") ],
+                 'Termlog for overlapping initially' );
+
+   $win_B->raise;
+   flush_tickit;
+
+   is_termlog( [ GOTO(0,0),
+                 SETPEN,
+                 PRINT("Window B") ],
+                 'Termlog for overlapping after $win_B->raise' );
+
+   $win_B->lower;
+   flush_tickit;
+
+   is_termlog( [ GOTO(0,0),
+                 SETPEN,
+                 PRINT("Window A") ],
+                 'Termlog for overlapping after $win_B->lower' );
+
+   $win_C->raise_to_front;
+   flush_tickit;
+
+   is_termlog( [ GOTO(0,0),
+                 SETPEN,
+                 PRINT("Window C") ],
+                 'Termlog for overlapping after $win_C->raise_to_front' );
+}
+
 done_testing;

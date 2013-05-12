@@ -54,8 +54,7 @@ is( $pos->columns, 80, '$pos->columns is 80 for print under floating window' );
    $win->goto( 0, 0 );
    $pos = $win->print( "Y" x 50 );
 
-   is_termlog( [ GOTO(10,20),
-                 GOTO(10,40),
+   is_termlog( [ GOTO(10,40),
                  SETPEN,
                  PRINT("Y"x30) ],
                'Termlog for print sibling under floating window' );

@@ -30,7 +30,7 @@ is_deeply( \@key_events, [ [ text => "A" ] ], 'on_key A' );
 
 pressmouse( press => 1, 4, 3 );
 
-is_deeply( \@mouse_events, [ [ press => 1, 4, 3, 0 ] ], 'on_mouse abs@3,4' );
+is_deeply( \@mouse_events, [ [ press => 1, 4, 3 ] ], 'on_mouse abs@3,4' );
 
 is_oneref( $widget, '$widget has refcount 1 at EOF' );
 
@@ -53,11 +53,13 @@ sub cols   { 1 }
 sub on_key
 {
    my $self = shift;
-   push @key_events, [ $_[0] => $_[1] ];
+   my ( $args ) = @_;
+   push @key_events, [ $args->type => $args->str ];
 }
 
 sub on_mouse
 {
    my $self = shift;
-   push @mouse_events, [ @_ ];
+   my ( $args ) = @_;
+   push @mouse_events, [ $args->type => $args->button, $args->line, $args->col ];
 }

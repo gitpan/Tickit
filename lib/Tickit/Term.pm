@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 # Load the XS code
 require Tickit;
@@ -97,33 +97,6 @@ function rather than performing IO operations on this filehandle.
 
 Optional. If supplied, will be used as the terminal filehandle for reading
 keypress and other events.
-
-=item on_resize => CODE
-
-Optional. Event handler function for when the terminal window is resized. Will
-be passed the C<Tickit::Term> instance, and the new size.
-
- $on_resize->( $term, $lines, $cols )
-
-=item on_key => CODE
-
-Optional. Event handler function for when a key is pressed. Will be passed the
-C<Tickit::Term> instance, a type string (either C<text> for unmodified Unicode
-or C<key> for special keys or modified Unicode), a string containing a
-representation of the text or key, and a modifier bitmask.
-
- $on_key->( $term, $type, $str, $mod )
-
-=item on_mouse => CODE
-
-Optional. Event handler function for when a mouse button is pressed or
-released, or the cursor dragged with a button pressed. Will be passed the
-C<Tickit::Term> instance, a string indicating C<press>, C<drag>, C<release> or
-C<wheel>, the button number or wheel direction, the 0-based line and column
-index, and a modifier bitmask. For C<wheel> events, the direction will be one
-of C<up> or C<down>.
-
- $on_mouse->( $term, $ev, $button_dir, $line, $col, $mod )
 
 =back
 
@@ -222,10 +195,6 @@ Removes an event handler that returned the given C<$id> value.
 
 =cut
 
-=head2 $term->set_on_resize( $on_resize )
-
-=cut
-
 sub set_on_resize
 {
    my $self = shift;
@@ -238,10 +207,6 @@ sub set_on_resize
    } );
 }
 
-=head2 $term->set_on_key( $on_key )
-
-=cut
-
 sub set_on_key
 {
    my $self = shift;
@@ -253,12 +218,6 @@ sub set_on_key
       $code->( $self, $args->{type}, $args->{str} );
    } );
 }
-
-=head2 $term->set_on_mouse( $on_mouse )
-
-Set a new CODE references to handle events.
-
-=cut
 
 sub set_on_mouse
 {
@@ -375,12 +334,16 @@ implemented by printing spaces. This removes the need for two cursor jumps.
 
 =cut
 
+=head2 $value = $term->getctl_int( $ctl )
+
 =head2 $success = $term->setctl_int( $ctl, $value )
 
-Sets the value of an integer terminal control option. C<$ctl> should be one of
-the following options. They can be specified either as integers, using the
-following named constants, or as strings giving the part following C<TERMCTL_>
-in lower-case.
+Gets or sets the value of an integer terminal control option. C<$ctl> should
+be one of the following options. They can be specified either as integers,
+using the following named constants, or as strings giving the part following
+C<TERMCTL_> in lower-case.
+
+On failure, each method returns C<undef>.
 
 =over 8
 

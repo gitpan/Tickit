@@ -89,13 +89,13 @@ static void print(TickitTermDriver *ttd, const char *str)
   tickit_termdrv_write_str(ttd, str, strlen(str));
 }
 
-static void run_ti(TickitTermDriver *ttd, const char *str, int n_params, ...)
+static void run_ti(TickitTermDriver *ttd, const char *str, const char *name, int n_params, ...)
 {
   unibi_var_t params[9];
   va_list args;
 
   if(!str) {
-    fprintf(stderr, "Abort on attempt to use NULL TI string\n");
+    fprintf(stderr, "Abort on attempt to use NULL TI string %s\n", name);
     abort();
   }
 
@@ -120,18 +120,18 @@ static int goto_abs(TickitTermDriver *ttd, int line, int col)
   struct TIDriver *td = (struct TIDriver*)ttd;
 
   if(line != -1 && col != -1)
-    run_ti(ttd, td->str.cup, 2, line, col);
+    run_ti(ttd, td->str.cup, "cup", 2, line, col);
   else if(line != -1) {
     if(!td->str.vpa)
       return 0;
 
-    run_ti(ttd, td->str.vpa, 1, line);
+    run_ti(ttd, td->str.vpa, "vpa", 1, line);
   }
   else if(col != -1) {
     if(!td->str.hpa)
       return 0;
 
-    run_ti(ttd, td->str.hpa, 1, col);
+    run_ti(ttd, td->str.hpa, "hpa", 1, col);
   }
 
   return 1;
@@ -142,22 +142,22 @@ static void move_rel(TickitTermDriver *ttd, int downward, int rightward)
   struct TIDriver *td = (struct TIDriver*)ttd;
 
   if(downward == 1 && td->str.cud1)
-    run_ti(ttd, td->str.cud1, 0);
+    run_ti(ttd, td->str.cud1, "cud1", 0);
   else if(downward == -1 && td->str.cuu1)
-    run_ti(ttd, td->str.cuu1, 0);
+    run_ti(ttd, td->str.cuu1, "cuu1", 0);
   else if(downward > 0)
-    run_ti(ttd, td->str.cud, 1, downward);
+    run_ti(ttd, td->str.cud, "cud", 1, downward);
   else if(downward < 0)
-    run_ti(ttd, td->str.cuu, 1, -downward);
+    run_ti(ttd, td->str.cuu, "cuu", 1, -downward);
 
   if(rightward == 1 && td->str.cuf1)
-    run_ti(ttd, td->str.cuf1, 0);
+    run_ti(ttd, td->str.cuf1, "cuf1", 0);
   else if(rightward == -1 && td->str.cub1)
-    run_ti(ttd, td->str.cub1, 0);
+    run_ti(ttd, td->str.cub1, "cub1", 0);
   else if(rightward > 0)
-    run_ti(ttd, td->str.cuf, 1, rightward);
+    run_ti(ttd, td->str.cuf, "cuf", 1, rightward);
   else if(rightward < 0)
-    run_ti(ttd, td->str.cub, 1, -rightward);
+    run_ti(ttd, td->str.cub, "cub", 1, -rightward);
 }
 
 static int scrollrect(TickitTermDriver *ttd, int top, int left, int lines, int cols, int downward, int rightward)
@@ -175,33 +175,33 @@ static int scrollrect(TickitTermDriver *ttd, int top, int left, int lines, int c
       goto_abs(ttd, line, left);
 
       if(rightward == 1 && td->str.ich1)
-        run_ti(ttd, td->str.ich1, 0);
+        run_ti(ttd, td->str.ich1, "ich1", 0);
       else if(rightward == -1 && td->str.dch1)
-        run_ti(ttd, td->str.dch1, 0);
+        run_ti(ttd, td->str.dch1, "dch1", 0);
       else if(rightward > 0)
-        run_ti(ttd, td->str.ich, 1, rightward);
+        run_ti(ttd, td->str.ich, "ich", 1, rightward);
       else if(rightward < 0)
-        run_ti(ttd, td->str.dch, 1, -rightward);
+        run_ti(ttd, td->str.dch, "dch", 1, -rightward);
     }
 
     return 1;
   }
 
   if(left == 0 && cols == term_cols && rightward == 0) {
-    run_ti(ttd, td->str.stbm, 2, top, top + lines - 1);
+    run_ti(ttd, td->str.stbm, "stbm", 2, top, top + lines - 1);
 
     goto_abs(ttd, top, 0);
 
     if(downward == 1 && td->str.dl1)
-      run_ti(ttd, td->str.dl1, 0);
+      run_ti(ttd, td->str.dl1, "dl1", 0);
     else if(downward == -1 && td->str.il1)
-      run_ti(ttd, td->str.il1, 0);
+      run_ti(ttd, td->str.il1, "il1", 0);
     else if(downward > 0)
-      run_ti(ttd, td->str.dl, 1, downward);
+      run_ti(ttd, td->str.dl, "dl", 1, downward);
     else if(downward < 0)
-      run_ti(ttd, td->str.il, 1, -downward);
+      run_ti(ttd, td->str.il, "il", 1, -downward);
 
-    run_ti(ttd, td->str.stbm, 2, 0, term_lines - 1);
+    run_ti(ttd, td->str.stbm, "stbm", 2, 0, term_lines - 1);
     return 1;
   }
 
@@ -219,7 +219,7 @@ static void erasech(TickitTermDriver *ttd, int count, int moveend)
    * reverse-video mode. Most terminals don't do rv+ECH properly
    */
   if(td->cap.bce && !tickit_pen_get_bool_attr(tickit_termdrv_current_pen(ttd), TICKIT_PEN_REVERSE)) {
-    run_ti(ttd, td->str.ech, 1, count);
+    run_ti(ttd, td->str.ech, "ech", 1, count);
 
     if(moveend == 1)
       move_rel(ttd, 0, count);
@@ -244,7 +244,7 @@ static void clear(TickitTermDriver *ttd)
 {
   struct TIDriver *td = (struct TIDriver *)ttd;
 
-  run_ti(ttd, td->str.ed2, 0);
+  run_ti(ttd, td->str.ed2, "ed2", 0);
 }
 
 static void chpen(TickitTermDriver *ttd, const TickitPen *delta, const TickitPen *final)
@@ -256,7 +256,7 @@ static void chpen(TickitTermDriver *ttd, const TickitPen *delta, const TickitPen
    * the individual enter/exit modes from the delta pen
    */
 
-  run_ti(ttd, td->str.sgr, 9,
+  run_ti(ttd, td->str.sgr, "sgr", 9,
       0, // standout
       tickit_pen_get_bool_attr(final, TICKIT_PEN_UNDER),
       tickit_pen_get_bool_attr(final, TICKIT_PEN_REVERSE),
@@ -270,11 +270,37 @@ static void chpen(TickitTermDriver *ttd, const TickitPen *delta, const TickitPen
   int c;
   if((c = tickit_pen_get_colour_attr(final, TICKIT_PEN_FG)) > -1 &&
       c < td->cap.colours)
-    run_ti(ttd, td->str.sgr_fg, 1, c);
+    run_ti(ttd, td->str.sgr_fg, "sgr_fg", 1, c);
 
   if((c = tickit_pen_get_colour_attr(final, TICKIT_PEN_BG)) > -1 &&
       c < td->cap.colours)
-    run_ti(ttd, td->str.sgr_bg, 1, c);
+    run_ti(ttd, td->str.sgr_bg, "sgr_bg", 1, c);
+}
+
+static int getctl_int(TickitTermDriver *ttd, TickitTermCtl ctl, int *value)
+{
+  struct TIDriver *td = (struct TIDriver *)ttd;
+
+  switch(ctl) {
+    case TICKIT_TERMCTL_ALTSCREEN:
+      *value = td->mode.altscreen;
+      return 1;
+
+    case TICKIT_TERMCTL_CURSORVIS:
+      *value = td->mode.cursorvis;
+      return 1;
+
+    case TICKIT_TERMCTL_MOUSE:
+      *value = td->mode.mouse;
+      return 1;
+
+    case TICKIT_TERMCTL_COLORS:
+      *value = td->cap.colours;
+      return 1;
+
+    default:
+      return 0;
+  }
 }
 
 static int setctl_int(TickitTermDriver *ttd, TickitTermCtl ctl, int value)
@@ -297,7 +323,7 @@ static int setctl_int(TickitTermDriver *ttd, TickitTermCtl ctl, int value)
       if(!td->mode.cursorvis == !value)
         return 1;
 
-      run_ti(ttd, value ? td->str.sm_csr : td->str.rm_csr, 0);
+      run_ti(ttd, value ? td->str.sm_csr : td->str.rm_csr, "Xm_csr", 0);
       td->mode.cursorvis = !!value;
       return 1;
 
@@ -364,6 +390,7 @@ static TickitTermDriverVTable ti_vtable = {
   .erasech    = erasech,
   .clear      = clear,
   .chpen      = chpen,
+  .getctl_int = getctl_int,
   .setctl_int = setctl_int,
   .setctl_str = setctl_str,
   .gotkey     = gotkey,

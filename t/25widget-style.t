@@ -20,10 +20,14 @@ use Tickit::Style;
 
 style_definition base =>
    fg => 2,
-   text => "Hello, world!";
+   text => "Hello, world!",
+   spacing => 1;
 
 style_definition ':active' =>
    u => 1;
+
+style_reshape_keys qw( spacing );
+style_reshape_textwidth_keys qw( text );
 
 # Normally this would be a package constant, but we'll make it a method so we
 # can easily adjust it for testing
@@ -37,6 +41,9 @@ use constant CLEAR_BEFORE_RENDER => 0;
 sub render
 {
 }
+
+my $RESHAPED;
+sub reshape { $RESHAPED++ }
 
 my %style_changed_values;
 sub on_style_changed_values
@@ -217,6 +224,30 @@ EOF
    like( exception { $pen_widget->set_pen( Tickit::Pen->new ) },
          qr/^StyledWidget uses Tickit::Style for its widget pen; ->set_pen cannot be used at /,
          'Attempting to ->set_pen on WIDGET_PEN_FROM_STYLE=1 raises exception' );
+}
+
+# style_reshape_keys
+{
+   $RESHAPED = 0;
+   my $widget = StyledWidget->new;
+
+   is( $RESHAPED, 0, '$RESHAPED before ->set_style( text )' );
+
+   $widget->set_style( spacing => 2 );
+
+   is_deeply( \%style_changed_values,
+              { spacing => [ 1, 2 ] },
+              'on_style_changed_values after reshape key change' );
+
+   is( $RESHAPED, 1, '$RESHAPED 1 after ->set_style( text )' );
+
+   $widget->set_style( text => "Goodbye" );
+
+   is_deeply( \%style_changed_values,
+              { text => [ "Hello, world!", "Goodbye" ] },
+              'on_style_changed_values after reshape key change' );
+
+   is( $RESHAPED, 2, '$RESHAPED 2 after ->set_style( text )' );
 }
 
 # subclassing

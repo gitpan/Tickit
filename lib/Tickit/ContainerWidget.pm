@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Carp;
 
@@ -68,7 +68,7 @@ sub add
 
    $self->{child_opts}{refaddr $child} = \%opts;
 
-   $self->children_changed if $self->can( "children_changed" );
+   $self->children_changed;
 }
 
 =head2 $widget->remove( $child_or_index )
@@ -89,7 +89,7 @@ sub remove
 
    delete $self->{child_opts}{refaddr $child};
 
-   $self->children_changed if $self->can( "children_changed" );
+   $self->children_changed;
 }
 
 =head2 %opts = $widget->child_opts( $child )
@@ -131,12 +131,23 @@ sub set_child_opts
       defined $newopts{$_} ? ( $opts->{$_} = $newopts{$_} ) : ( delete $opts->{$_} );
    }
 
-   $self->children_changed if $self->can( "children_changed" );
+   $self->children_changed;
 }
 
-# Provide default empty implementations of optional methods which other
-# classes might call
-sub child_resized {}
+sub child_resized
+{
+   my $self = shift;
+   $self->reshape if $self->window;
+   $self->resized;
+}
+
+sub children_changed
+{
+   my $self = shift;
+
+   $self->reshape if $self->window;
+   $self->resized;
+}
 
 sub window_lost
 {
@@ -168,11 +179,15 @@ Optional. If implemented, this method will be called after any change of the
 contained child widgets or their options. Typically this will be used to set
 windows on them by sub-dividing the window of the parent.
 
+If not overridden, the base implementation will call C<reshape>.
+
 =head2 $widget->child_resized( $child )
 
 Optional. If implemented, this method will be called after a child widget
 changes or may have changed its size requirements. Typically this will be used
 to adjusts the windows allocated to children.
+
+If not overridden, the base implementation will call C<reshape>.
 
 =head1 AUTHOR
 

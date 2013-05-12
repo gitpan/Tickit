@@ -219,6 +219,7 @@ typedef enum {
   TICKIT_TERMCTL_TITLE_TEXT,
   TICKIT_TERMCTL_ICONTITLE_TEXT,
   TICKIT_TERMCTL_KEYPAD_APP,
+  TICKIT_TERMCTL_COLORS, // read-only
 } TickitTermCtl;
 
 typedef enum {
@@ -227,6 +228,7 @@ typedef enum {
   TICKIT_TERM_CURSORSHAPE_LEFT_BAR,
 } TickitTermCursorShape;
 
+int tickit_term_getctl_int(TickitTerm *tt, TickitTermCtl ctl, int *value);
 int tickit_term_setctl_int(TickitTerm *tt, TickitTermCtl ctl, int value);
 int tickit_term_setctl_str(TickitTerm *tt, TickitTermCtl ctl, const char *value);
 

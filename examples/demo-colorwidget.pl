@@ -1,11 +1,19 @@
+#!/usr/bin/perl
+
 package ColourWidget;
 use base 'Tickit::Widget';
+
+use strict;
+use warnings;
+
+use Tickit;
 
 my $text = "Press 0 to 7 to change the colour of this text";
 
 sub lines { 1 }
 sub cols  { length $text }
 
+use constant CLEAR_BEFORE_RENDER => 0;
 sub render
 {
    my $self = shift;
@@ -21,10 +29,10 @@ sub render
 sub on_key
 {
    my $self = shift;
-   my ( $type, $str ) = @_;
+   my ( $args ) = @_;
 
-   if( $type eq "text" and $str =~ m/[0-7]/ ) {
-      $self->pen->chattr( fg => $str );
+   if( $args->type eq "text" and $args->str =~ m/[0-7]/ ) {
+      $self->pen->chattr( fg => $args->str );
       $self->redraw;
       return 1;
    }
@@ -32,4 +40,4 @@ sub on_key
    return 0;
 }
 
-1;
+Tickit->new( root => ColourWidget->new )->run;

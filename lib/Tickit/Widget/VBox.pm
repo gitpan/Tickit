@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::VBox;
 
@@ -10,11 +10,9 @@ use warnings;
 use base qw( Tickit::Widget::LinearBox );
 use Tickit::Style;
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use List::Util qw( sum max );
-
-use constant WIDGET_PEN_FROM_STYLE => 1;
 
 =head1 NAME
 
@@ -56,13 +54,31 @@ Note that while the widget pen is mutable and changes to it will result in
 immediate redrawing, any changes made will be lost if the widget style is
 changed.
 
+The following style keys are used:
+
+=over 4
+
+=item spacing => INT
+
+The number of lines of spacing between children
+
+=back
+
 =cut
+
+style_definition base =>
+   spacing => 0;
+
+style_reshape_keys qw( spacing );
+
+use constant WIDGET_PEN_FROM_STYLE => 1;
 
 sub lines
 {
    my $self = shift;
+   my $spacing = $self->get_style_values( "spacing" );
    return ( sum( map { $_->lines } $self->children ) || 1 ) +
-          $self->{spacing} * ( $self->children - 1 );
+          $spacing * ( $self->children - 1 );
 }
 
 sub cols

@@ -229,7 +229,8 @@ static TickitTermCtl term_name2ctl(const char *name)
       return streq(name+1, "ltscreen") ? TICKIT_TERMCTL_ALTSCREEN
                                        : -1;
     case 'c':
-      return streq(name+1, "ursorblink") ? TICKIT_TERMCTL_CURSORBLINK
+      return streq(name+1, "olors")      ? TICKIT_TERMCTL_COLORS
+           : streq(name+1, "ursorblink") ? TICKIT_TERMCTL_CURSORBLINK
            : streq(name+1, "ursorshape") ? TICKIT_TERMCTL_CURSORSHAPE
            : streq(name+1, "ursorvis")   ? TICKIT_TERMCTL_CURSORVIS
                                          : -1;
@@ -362,6 +363,7 @@ static void setup_constants(void)
   DO_CONSTANT(TICKIT_TERMCTL_KEYPAD_APP)
   DO_CONSTANT(TICKIT_TERMCTL_MOUSE)
   DO_CONSTANT(TICKIT_TERMCTL_TITLE_TEXT)
+  DO_CONSTANT(TICKIT_TERMCTL_COLORS)
 
   DO_CONSTANT(TICKIT_TERM_CURSORSHAPE_BLOCK)
   DO_CONSTANT(TICKIT_TERM_CURSORSHAPE_UNDER)
@@ -1245,10 +1247,9 @@ erasech(self,count,moveend)
     tickit_term_erasech(self->tt, count, SvOK(moveend) ? SvIV(moveend) : -1);
 
 int
-setctl_int(self,ctl,value)
+getctl_int(self,ctl)
   Tickit::Term self
   SV          *ctl
-  int          value
   INIT:
     TickitTermCtl ctl_e;
   CODE:
@@ -1262,9 +1263,33 @@ setctl_int(self,ctl,value)
     else
       croak("Expected 'ctl' to be an integer or string");
 
-    RETVAL = tickit_term_setctl_int(self->tt, ctl_e, value);
+    if(!tickit_term_getctl_int(self->tt, ctl_e, &RETVAL))
+      XSRETURN_UNDEF;
   OUTPUT:
     RETVAL
+
+void
+setctl_int(self,ctl,value)
+  Tickit::Term self
+  SV          *ctl
+  int          value
+  INIT:
+    TickitTermCtl ctl_e;
+  PPCODE:
+    if(SvPOK(ctl)) {
+      ctl_e = term_name2ctl(SvPV_nolen(ctl));
+      if(ctl_e == -1)
+        croak("Unrecognised 'ctl' name '%s'", SvPV_nolen(ctl));
+    }
+    else if(SvIOK(ctl))
+      ctl_e = SvIV(ctl);
+    else
+      croak("Expected 'ctl' to be an integer or string");
+
+    if(tickit_term_setctl_int(self->tt, ctl_e, value))
+      XSRETURN_YES;
+    else
+      XSRETURN_NO;
 
 int
 setctl_str(self,ctl,value)

@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -16,6 +16,7 @@ use List::MoreUtils qw( all );
 
 use Tickit::Pen;
 use Tickit::Style;
+use Tickit::Utils qw( textwidth );
 
 use constant PEN_ATTR_MAP => { map { $_ => 1 } @Tickit::Pen::ALL_ATTRS };
 
@@ -415,8 +416,34 @@ sub _style_changed_values
       $self->set_pen( $self->get_style_pen->as_mutable );
    }
 
+   my $reshape = 0;
+
+   my $type = $self->_widget_style_type;
+   foreach ( Tickit::Style::_reshape_keys( $type ) ) {
+      next unless $values->{$_};
+
+      $reshape = 1;
+      last;
+   }
+
+   foreach ( Tickit::Style::_reshape_textwidth_keys( $type ) ) {
+      next unless $values->{$_};
+      next if textwidth( $values->{$_}[0] ) == textwidth( $values->{$_}[1] );
+
+      $reshape = 1;
+      last;
+   }
+
    my $code = $self->can( "on_style_changed_values" );
    $self->$code( %$values ) if $code;
+
+   if( $reshape ) {
+      $self->reshape;
+      $self->redraw;
+   }
+   elsif( keys %changed_pens ) {
+      $self->redraw;
+   }
 }
 
 =head2 $widget->set_window( $window )
@@ -733,17 +760,19 @@ Optional. Called by C<set_window> when a window has been set for this widget.
 Optional. Called by C<set_window> when C<undef> has been set as the window for
 this widget. The old window object is passed in.
 
-=head2 $handled = $widget->on_key( $type, $str, $key )
+=head2 $handled = $widget->on_key( ... )
 
 Optional. If provided, this method will be set as the C<on_key> callback for
 any window set on the widget. By providing this method a subclass can
-implement widgets that respond to user input.
+implement widgets that respond to user input. It receives the same arguments
+as the underlying window C<on_key> event.
 
-=head2 $handled = $widget->on_mouse( $ev, $button, $line, $col )
+=head2 $handled = $widget->on_mouse( ... )
 
 Optional. If provided, this method will be set as the C<on_mouse> callback for
 any window set on the widget. By providing this method a subclass can
-implement widgets that respond to user input.
+implement widgets that respond to user input. If receives the same arguments
+as the underlying window C<on_mouse> event.
 
 =head2 $widget->on_style_changed_values( %values )
 
@@ -755,6 +784,10 @@ containing the old and new values.
 The C<%values> hash may contain false positives in some cases, if the old and
 the new value are actually the same, but it still appears from the style
 definitions that certain keys are changed.
+
+Most of the time this method may not be necessary as the C<style_reshape_keys>
+and C<style_reshape_textwidth_keys> declarations should suffice for most
+purposes.
 
 =cut
 
@@ -858,10 +891,10 @@ change the pen foreground colour.
  sub on_key
  {
     my $self = shift;
-    my ( $type, $str ) = @_;
+    my ( $args ) = @_;
 
-    if( $type eq "text" and $str =~ m/[0-7]/ ) {
-       $self->pen->chattr( fg => $str );
+    if( $args->type eq "text" and $args->str =~ m/[0-7]/ ) {
+       $self->pen->chattr( fg => $args->str );
        $self->redraw;
        return 1;
     }
@@ -908,11 +941,11 @@ list of the last 10 mouse clicks and renders them with an C<X>.
  sub on_mouse
  {
     my $self = shift;
-    my ( $ev, $button, $line, $col ) = @_;
+    my ( $args ) = @_;
 
-    return unless $ev eq "press" and $button == 1;
+    return unless $args->type eq "press" and $args->button == 1;
 
-    push @points, [ $line, $col ];
+    push @points, [ $args->line, $args->col ];
     shift @points while @points > 10;
     $self->redraw;
  }

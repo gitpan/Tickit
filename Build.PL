@@ -126,6 +126,10 @@ my $build = Module::Build->new(
          'Alien::libtermkey' => 0,
          'Alien::unibilium' => '0.09',
       },
+      requires => {
+         'Alien::libtermkey' => 0,
+         'Alien::unibilium' => '0.09',
+      },
    },
    build_requires => {
       'Test::Builder::Tester' => 0,

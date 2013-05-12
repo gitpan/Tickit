@@ -15,7 +15,8 @@ $win->focus( 0, 0 );
 
 my @key_events;
 $win->set_on_key( sub {
-   push @key_events, [ $_[1] => $_[2] ];
+   my ( $self, $ev ) = @_;
+   push @key_events, [ $ev->type => $ev->str ];
    return 1;
 } );
 
@@ -25,7 +26,8 @@ is_deeply( \@key_events, [ [ text => "A" ] ], 'on_key A' );
 
 my @mouse_events;
 $win->set_on_mouse( sub {
-   push @mouse_events, [ @_[1..4] ];
+   my ( $self, $ev ) = @_;
+   push @mouse_events, [ $ev->type => $ev->button, $ev->line, $ev->col ];
    return 1;
 } );
 
@@ -47,11 +49,13 @@ my @subkey_events;
 my @submouse_events;
 my $subret = 1;
 $subwin->set_on_key( sub {
-   push @subkey_events, [ $_[1] => $_[2] ];
+   my ( $self, $ev ) = @_;
+   push @subkey_events, [ $ev->type => $ev->str ];
    return $subret;
 } );
 $subwin->set_on_mouse( sub {
-   push @submouse_events, [ @_[1..4] ];
+   my ( $self, $ev ) = @_;
+   push @submouse_events, [ $ev->type => $ev->button, $ev->line, $ev->col ];
    return $subret;
 } );
 

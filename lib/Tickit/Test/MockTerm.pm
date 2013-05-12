@@ -2,8 +2,9 @@ package Tickit::Test::MockTerm;
 
 use strict;
 use warnings;
+use feature qw( switch );
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Tickit::Utils qw( textwidth substrwidth );
 
@@ -18,8 +19,6 @@ sub new
       pen   => { map { $_ => undef } @Tickit::Pen::ALL_ATTRS },
    }, $class;
 
-   $self->set_on_resize( $args{on_resize} ) if $args{on_resize};
-
    $self->clear;
 
    # Clear the method log
@@ -32,22 +31,23 @@ sub new
 sub set_output_buffer { }
 sub flush { }
 
-sub set_on_resize
+sub bind_event
 {
    my $self = shift;
-   ( $self->{on_resize} ) = @_;
-}
+   my ( $ev, $code ) = @_;
 
-sub set_on_key
-{
-   my $self = shift;
-   ( $self->{on_key} ) = @_;
-}
-
-sub set_on_mouse
-{
-   my $self = shift;
-   ( $self->{on_mouse} ) = @_;
+   given( $ev ) {
+      when( "resize" ) {
+         $self->{on_resize} = $code;
+      }
+      when( "key" ) {
+         $self->{on_key} = $code;
+      }
+      when( "mouse" ) {
+         $self->{on_mouse} = $code;
+      }
+      default { die "TODO: implement bind_event $ev" }
+   }
 }
 
 sub is_changed
@@ -135,7 +135,10 @@ sub resize
       $self->{lines} = $newlines;
       $self->{cols}  = $newcols;
 
-      $self->{on_resize}->( $self, $newlines, $newcols ) if $self->{on_resize};
+      $self->{on_resize}->( $self, resize => {
+         lines => $newlines,
+         cols  => $newcols,
+      } ) if $self->{on_resize};
    }
 }
 

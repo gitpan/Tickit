@@ -24,17 +24,23 @@ my $tickit = Tickit->new();
 
 $tickit->set_root_widget( $vbox );
 
+sub _modstr
+{
+   my ( $mod ) = @_;
+   return join "-", ( $mod & 2 ? "A" : () ), ( $mod & 4 ? "C" : () ), ( $mod & 1 ? "S" : () );
+}
+
 # Mass hackery
 $tickit->term->bind_event( key => sub {
    my ( undef, $ev, $args ) = @_;
-   my ( $type, $str ) = @{$args}{qw( type str )};
-   $keydisplay->set_text( "$type $str" );
+   my ( $type, $str, $mod ) = @{$args}{qw( type str mod )};
+   $keydisplay->set_text( "$type $str (mod=" . _modstr($mod) . ")" );
 } );
 
 $tickit->term->bind_event( mouse => sub {
    my ( undef, $ev, $args ) = @_;
-   my ( $type, $button, $line, $col ) = @{$args}{qw( type button line col )};
-   $mousedisplay->set_text( "$type button $button at ($line,$col)" );
+   my ( $type, $button, $line, $col, $mod ) = @{$args}{qw( type button line col mod )};
+   $mousedisplay->set_text( "$type button $button at ($line,$col) (mod=" . _modstr($mod) . ")" );
 } );
 
 $tickit->run;

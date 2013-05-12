@@ -38,12 +38,14 @@ my $rootwin = $tickit->rootwin;
 
 my @key_events;
 $rootwin->set_on_key( sub {
-   push @key_events, [ $_[1] => $_[2] ];
+   my ( $self, $ev ) = @_;
+   push @key_events, [ $ev->type => $ev->str ];
 } );
 
 my @mouse_events;
 $rootwin->set_on_mouse( sub {
-   push @mouse_events, [ @_[1..4] ];
+   my ( $self, $ev ) = @_;
+   push @mouse_events, [ $ev->type => $ev->button, $ev->line, $ev->col ];
 } );
 
 syswrite( $my_wr, "A" );

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Carp;
 
@@ -57,10 +57,11 @@ sub new
    my $class = shift;
    my %args = @_;
 
+   exists $args{$_} and $args{style}{$_} = delete $args{$_} for qw( spacing );
+
    my $self = $class->SUPER::new( %args );
 
    $self->{children} = [];
-   $self->{spacing} = $args{spacing} || 0;
 
    return $self;
 }
@@ -175,12 +176,6 @@ sub render
    }
 }
 
-sub reshape
-{
-   my $self = shift;
-   $self->redistribute_child_windows;
-}
-
 =head2 $widget->add( $child, %opts )
 
 Adds the widget as a new child of this one, with the given options
@@ -216,25 +211,7 @@ sub remove
    $self->SUPER::remove( $child ) if $child;
 }
 
-sub children_changed
-{
-   my $self = shift;
-
-   $self->redistribute_child_windows if $self->window;
-   $self->resized; # Tell my parent
-
-   $self->redraw;
-}
-
-sub child_resized
-{
-   my $self = shift;
-   $self->redistribute_child_windows if $self->window;
-
-   $self->redraw;
-}
-
-sub redistribute_child_windows
+sub reshape
 {
    my $self = shift;
    $self->{suppress_redistribute} and return;
@@ -243,12 +220,14 @@ sub redistribute_child_windows
 
    return unless $self->children;
 
+   my $spacing = $self->get_style_values( "spacing" );
+
    my @buckets;
    foreach my $child ( $self->children ) {
       my %opts = $self->child_opts( $child );
 
       push @buckets, {
-         fixed => $self->{spacing},
+         fixed => $spacing,
       } if @buckets; # gap
 
       my $base = defined $opts{force_size} ? $opts{force_size}
@@ -270,6 +249,8 @@ sub redistribute_child_windows
 
       $self->set_child_window( $child, $b->{start}, $b->{value}, $window );
    }
+
+   $self->redraw;
 }
 
 =head1 AUTHOR
