@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 use Carp;
 
@@ -304,7 +304,9 @@ Remove an observer previously added by C<add_on_changed>.
 
 =cut
 
-use overload '""' => "STRING";
+use overload
+   '""' => "STRING",
+   bool => sub { 1 };
 
 sub STRING
 {

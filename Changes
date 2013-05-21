@@ -1,5 +1,12 @@
 Revision history for Changes
 
+0.33    CHANGES:
+         * Added Tickit::RenderBuffer; a renamed copy of Tickit::RenderContext
+           from CPAN. Re-implemented more in XS/C code
+         * Removed Tickit::WidgetRole::Borderable
+         * Added 'bool' override for pens, rects and windows, because they are
+           all always true
+
 0.32    CHANGES:
          * Allow widgets to declare style keys to cause ->reshape calls
          * Allow Windows to be re-ordered within their parent, better document

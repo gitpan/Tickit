@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 use Carp;
 
@@ -1694,6 +1694,7 @@ use overload
       my $self = shift;
       return $self;
    },
+   bool => sub { 1 },
    fallback => 1;
 
 package # hide from indexer

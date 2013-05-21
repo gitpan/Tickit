@@ -8,8 +8,9 @@ package Tickit::Widget::LinearBox;
 use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
+use Tickit::RenderBuffer;
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 use Carp;
 
@@ -167,13 +168,15 @@ sub render
    my $self = shift;
    my %args = @_;
 
-   my $window = $self->window or return;
+   my $win = $self->window or return;
    my $rect = $args{rect};
+   my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
+   $rb->clip( $rect );
+   $rb->setpen( $self->pen );
 
-   foreach my $line ( $rect->linerange ) {
-      $window->goto( $line, $rect->left );
-      $window->erasech( $rect->cols );
-   }
+   $rb->erase_at( $_, $rect->left, $rect->cols ) for $rect->linerange;
+
+   $rb->flush_to_window( $win );
 }
 
 =head2 $widget->add( $child, %opts )

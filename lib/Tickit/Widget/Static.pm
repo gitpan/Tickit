@@ -9,11 +9,12 @@ use strict;
 use warnings;
 use base qw( Tickit::Widget );
 use Tickit::Style;
+use Tickit::RenderBuffer;
 
 use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );
@@ -178,28 +179,27 @@ sub render
    my $self = shift;
    my %args = @_;
 
-   my $win = $self->window;
+   my $win = $self->window or return;
    $win->is_visible or return;
    my $rect = $args{rect};
+   my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
+   $rb->clip( $rect );
+   $rb->setpen( $self->pen );
+
+   $rb->erase_at( $_, $rect->left, $rect->cols ) for $rect->linerange;
 
    my $cols = $win->cols;
-
    my ( $above, $lines ) = $self->_valign_allocation( $self->lines, $win->lines );
-
-   $win->goto( $_, 0 ), $win->erasech( $cols ) for $rect->top .. $above - 1;
 
    foreach my $line ( 0 .. $lines - 1 ) {
       my $text = $self->{lines}[$line];
 
-      my ( $left, $textwidth, $right ) = $self->_align_allocation( textwidth( $text ), $cols );
+      my ( $left, $textwidth ) = $self->_align_allocation( textwidth( $text ), $cols );
 
-      $win->goto( $above + $line, 0 );
-      $win->erasech( $left, 1 ) if $left;
-      $win->print( substrwidth $text, 0, $textwidth );
-      $win->erasech( $right ) if $right;
+      $rb->text_at( $above + $line, $left, substrwidth( $text, 0, $textwidth ) );
    }
 
-   $win->goto( $_, 0 ), $win->erasech( $cols ) for $above + $lines .. $rect->bottom - 1;
+   $rb->flush_to_window( $win );
 }
 
 sub on_mouse

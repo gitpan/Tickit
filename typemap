@@ -1,8 +1,9 @@
-Tickit::Pen       T_PTROBJ
-Tickit::Rect      T_PTROBJ
-Tickit::RectSet   T_PTROBJ
-Tickit::StringPos T_PTROBJ_OR_NULL
-Tickit::Term      T_PTROBJ
+Tickit::Pen          T_PTROBJ_OR_NULL
+Tickit::Rect         T_PTROBJ
+Tickit::RectSet      T_PTROBJ
+Tickit::RenderBuffer T_PTROBJ
+Tickit::StringPos    T_PTROBJ_OR_NULL
+Tickit::Term         T_PTROBJ
 
 INPUT
 T_PTROBJ_OR_NULL

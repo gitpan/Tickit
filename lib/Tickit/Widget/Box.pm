@@ -10,10 +10,11 @@ use warnings;
 use 5.010; # //
 use base qw( Tickit::SingleChildWidget );
 use Tickit::Style;
+use Tickit::RenderBuffer;
 
 use Tickit::Utils qw( bound );
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 use constant WIDGET_PEN_FROM_STYLE => 1;
 
@@ -132,13 +133,15 @@ sub render
    my $self = shift;
    my %args = @_;
 
-   my $window = $self->window or return;
+   my $win = $self->window or return;
    my $rect = $args{rect};
+   my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
+   $rb->clip( $rect );
+   $rb->setpen( $self->pen );
 
-   foreach my $line ( $rect->linerange ) {
-      $window->goto( $line, $rect->left );
-      $window->erasech( $rect->cols );
-   }
+   $rb->erase_at( $_, $rect->left, $rect->cols ) for $rect->linerange;
+
+   $rb->flush_to_window( $win );
 }
 
 =head1 METHODS

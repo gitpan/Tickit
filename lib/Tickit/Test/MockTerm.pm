@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use feature qw( switch );
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 use Tickit::Utils qw( textwidth substrwidth );
 
