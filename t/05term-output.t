@@ -104,20 +104,20 @@ $term->erasech( 23, undef );
 stream_is( "\e[23X", '$term->erasech( 23 )' );
 
 $stream = "";
-$term->mode_altscreen( 1 );
-stream_is( "\e[?1049h", '$term->mode_altscreen( 1 )' );
+$term->setctl_int( altscreen => 1 );
+stream_is( "\e[?1049h", '$term->setctl_int( altscreen => 1 )' );
 
 $stream = "";
-$term->mode_altscreen( 0 );
-stream_is( "\e[?1049l", '$term->mode_altscreen( 0 )' );
+$term->setctl_int( altscreen => 0 );
+stream_is( "\e[?1049l", '$term->setctl_int( altscreen => 0 )' );
 
 $stream = "";
-$term->mode_mouse( 1 );
-stream_is( "\e[?1002h\e[?1006h", '$term->mode_mouse( 1 )' );
+$term->setctl_int( mouse => 1 );
+stream_is( "\e[?1002h\e[?1006h", '$term->setctl_int( mouse => 1 )' );
 
 $stream = "";
-$term->mode_mouse( 0 );
-stream_is( "\e[?1002l\e[?1006l", '$term->mode_mouse( 0 )' );
+$term->setctl_int( mouse => 0 );
+stream_is( "\e[?1002l\e[?1006l", '$term->setctl_int( mouse => 0 )' );
 
 # Reset the pen
 $term->setpen;

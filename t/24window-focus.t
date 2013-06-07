@@ -29,10 +29,15 @@ $win->set_on_focus( sub {
 ok( !$win->is_focused, '$win->is_focused initially false' );
 is( $focused, undef, '$focused not yet defined' );
 
-$win->focus( 0, 0 );
+$win->cursor_at( 0, 0 );
+flush_tickit;
 
-ok( $win->is_focused, '$win->is_focused true after ->focus' );
-is( $focused, "in", '$focused is "in" after ->focus' );
+ok( !$win->is_focused, '$win->is_focused still false after ->cursor_at' );
+
+$win->take_focus;
+
+ok( $win->is_focused, '$win->is_focused true after ->take_focus' );
+is( $focused, "in", '$focused is "in" after ->take_focus' );
 
 flush_tickit;
 
@@ -42,11 +47,23 @@ is_termlog( [ GOTO(3,10), ],
 ok( $term->{cursorvis}, 'Cursor is visible after window focus' );
 
 $win->reposition( 5, 15 );
-
 flush_tickit;
 
 is_termlog( [ GOTO(5,15), ],
             'Termlog after window reposition' );
+
+$win->cursor_at( 2, 2 );
+flush_tickit;
+
+is_termlog( [ GOTO(7,17), ],
+            'Termlog after ->cursor_at moves cursor' );
+
+$win->cursor_shape( "under" );
+flush_tickit;
+
+is_termlog( [ GOTO(7,17), ],
+            'Termlog after ->cursor_shape' );
+is( $term->{cursorshape}, "under", 'Cursor shape after ->cursor_shape' );
 
 $win->hide;
 flush_tickit;
@@ -61,16 +78,73 @@ flush_tickit;
 
 ok( $term->{cursorvis}, 'Cursor is visible after focus window show' );
 
-is_termlog( [ GOTO(5,15), ],
+is_termlog( [ GOTO(7,17), ],
             'Termlog after focus window show' );
 
 is_oneref( $win, '$win has refcount 1 at EOF' );
 is_refcount( $rootwin, 3, '$rootwin has refcount 3 at EOF' );
 
-my $otherwin = $rootwin->make_sub( 10, 5, 2, 2 );
-$otherwin->focus( 0, 0 );
+{
+   my $winA = $rootwin->make_sub( 5, 0, 1, 80 );
+   my $winB = $rootwin->make_sub( 6, 0, 1, 80 );
+   $winA->cursor_at( 0, 0 );
+   $winB->cursor_at( 0, 0 );
 
-ok( !$win->is_focused, '$win->is_focused false after ->focus on other window' );
-is( $focused, "out", '$focused is "out" after ->focus on other window' );
+   my $focusA; $winA->set_on_focus( sub { $focusA = $_[1]; $_[0]->restore } );
+   my $focusB; $winB->set_on_focus( sub { $focusB = $_[1]; $_[0]->restore } );
+
+   $winA->take_focus;
+   flush_tickit;
+
+   ok(  $focusA, '$focusA after $winA->take_focus' );
+   ok( !$focusB, '$focusB after $winA->take_focus' );
+   is_termlog( [ GOTO(5,0),
+                 GOTO(5,0) ],
+               'Termlog after $winA->take_focus' );
+
+   $winB->take_focus;
+   flush_tickit;
+
+   ok( !$focusA, '$focusA after $winB->take_focus' );
+   ok(  $focusB, '$focusB after $winB->take_focus' );
+   is_termlog( [ GOTO(6,0),
+                 GOTO(6,0) ],
+               'Termlog after $winB->take_focus' );
+
+   $winB->hide;
+   $winA->take_focus;
+   flush_tickit;
+
+   is_termlog( [ GOTO(5,0),
+                 GOTO(5,0) ],
+               'Termlog after $winB hidden' );
+
+   $winA->hide;
+   $winB->show;
+   flush_tickit;
+
+   is_termlog( [ GOTO(6,0) ],
+               'Termlog after $winA hidden/$winB shown' );
+
+   $winA->take_focus;
+   flush_tickit;
+
+   is_termlog( [ GOTO(6,0) ],
+               'Termlog after ->take_focus on hidden window' );
+   ok( $winB->is_focused, '$winB still has focus after ->take_focus on hidden window' );
+
+   $winA->close;
+   $winB->close;
+}
+
+{
+   my $otherwin = $rootwin->make_sub( 10, 5, 2, 2 );
+   $otherwin->focus( 0, 0 );
+
+   ok( !$win->is_focused, '$win->is_focused false after ->focus on other window' );
+   is( $focused, "out", '$focused is "out" after ->focus on other window' );
+
+   $otherwin->close;
+}
 
 done_testing;

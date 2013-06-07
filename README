@@ -68,6 +68,17 @@ METHODS
     not be invoked yet, but will be invoked at some point before the next
     round of input events are processed.
 
+  $tickit->timer( $mode, $amount, $code )
+    Runs the given CODE reference at some fixed point in time in the future.
+    `$mode' must be either the string `at', or `after'; and specifies that
+    `$amount' gives either the absolute epoch time, or the delay relative to
+    now, respectively. Fractions are supported to a resolution of
+    microseconds.
+
+     $tickit->timer( at => $epoch, $code )
+
+     $tickit->timer( after => $delay, $code )
+
   $term = $tickit->term
     Returns the underlying Tickit::Term object.
 

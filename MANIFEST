@@ -12,6 +12,7 @@ examples/demo-input.pl
 examples/demo-lines.pl
 examples/demo-pen.pl
 examples/demo-showkey.pl
+examples/demo-timer.pl
 examples/demo-vbox.pl
 examples/demo-xterm256.pl
 examples/hello-world.pl
@@ -91,9 +92,10 @@ t/29window-dragndrop.t
 t/30widget.t
 t/31widget-window.t
 t/32widget-container.t
-t/33widget-input.t
-t/34widget-clear.t
-t/35widget-style.t
+t/33widget-clear.t
+t/34widget-style.t
+t/35widget-focus.t
+t/36widget-input.t
 t/50widget-static.t
 t/51widget-box.t
 t/52widget-hbox.t

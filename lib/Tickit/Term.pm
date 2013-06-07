@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 # Load the XS code
 require Tickit;
@@ -450,10 +450,12 @@ bytes of input. May result in C<on_key> or C<on_mouse> events.
 
 =cut
 
-=head2 $term->input_wait
+=head2 $term->input_wait( $timeout )
 
 Block until some input is available, and process it. Returns after one round
-of input has been processed. May result in C<on_key> or C<on_mouse> events.
+of input has been processed. May result in C<on_key> or C<on_mouse> events. If
+C<$timeout> is defined, it will wait a period of time no longer than this time
+before returning, even if no input events were received.
 
 =cut
 

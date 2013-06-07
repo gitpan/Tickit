@@ -9,12 +9,15 @@ use strict;
 use warnings;
 
 BEGIN {
-   our $VERSION = '0.33';
+   our $VERSION = '0.34';
 }
+
+use Carp;
 
 use IO::Handle;
 
 use Scalar::Util qw( weaken );
+use Time::HiRes qw( time );
 
 BEGIN {
    require XSLoader;
@@ -23,6 +26,9 @@ BEGIN {
 
 use Tickit::Term;
 use Tickit::Window;
+
+use Struct::Dumb;
+struct TimeQueue => [qw( time code )];
 
 =head1 NAME
 
@@ -120,6 +126,7 @@ sub new
 
    my $self = bless {
       todo_queue => [],
+      timer_queue => [],
       redraw_queue => [],
    }, $class;
 
@@ -207,6 +214,39 @@ sub later
    push @{ $self->{todo_queue} }, $code;
 }
 
+=head2 $tickit->timer( $mode, $amount, $code )
+
+Runs the given CODE reference at some fixed point in time in the future.
+C<$mode> must be either the string C<at>, or C<after>; and specifies that
+C<$amount> gives either the absolute epoch time, or the delay relative to now,
+respectively. Fractions are supported to a resolution of microseconds.
+
+ $tickit->timer( at => $epoch, $code )
+
+ $tickit->timer( after => $delay, $code )
+
+=cut
+
+sub timer
+{
+   my $self = shift;
+   my ( $mode, $amount, $code ) = @_;
+
+   my $at;
+   if( $mode eq "at" ) {
+      $at = $amount;
+   }
+   elsif( $mode eq "after" ) {
+      $at = time + $amount;
+   }
+   else {
+      croak "Mode should be 'at' or 'after'";
+   }
+
+   # TODO: bin-search insert position then splice
+   @{ $self->{timer_queue} } = sort { $a->time <=> $b->time } @{ $self->{timer_queue} }, TimeQueue( $at => $code );
+}
+
 sub enqueue_redraw
 {
    my $self = shift;
@@ -221,7 +261,7 @@ sub enqueue_redraw
 
    $self->{redraw_queued} = 1;
    $self->later( sub {
-      $weakself->term->mode_cursorvis( 0 );
+      $weakself->term->setctl_int( cursorvis => 0 );
 
       my @queue = @$queue;
       @$queue = ();
@@ -378,9 +418,9 @@ sub setup_term
    my $self = shift;
 
    my $term = $self->term;
-   $term->mode_altscreen( 1 );
-   $term->mode_cursorvis( 0 );
-   $term->mode_mouse( 1 );
+   $term->setctl_int( altscreen => 1 );
+   $term->setctl_int( cursorvis => 0 );
+   $term->setctl_int( mouse     => 1 );
    $term->clear;
 
    if( my $widget = $self->{root_widget} ) {
@@ -405,9 +445,9 @@ sub teardown_term
    }
 
    my $term = $self->term;
-   $term->mode_altscreen( 0 );
-   $term->mode_cursorvis( 1 );
-   $term->mode_mouse( 0 );
+   $term->setctl_int( altscreen => 0 );
+   $term->setctl_int( cursorvis => 1 );
+   $term->setctl_int( mouse     => 0 );
 
    $term->flush;
 }
@@ -423,7 +463,19 @@ sub _tick
 {
    my $self = shift;
 
-   $self->{term}->input_wait;
+   my $timer_queue = $self->{timer_queue};
+
+   my $timeout;
+   if( @$timer_queue ) {
+      $timeout = $self->{timer_queue}[0]->time - time;
+   }
+
+   $self->{term}->input_wait( $timeout );
+
+   my $now = time;
+   while( @$timer_queue and $timer_queue->[0]->time <= $now ) {
+      shift( @$timer_queue )->code->();
+   }
 
    $self->_flush_later if @{ $self->{todo_queue} };
 }
@@ -459,7 +511,14 @@ sub run
 
    $self->setup_term;
 
-   $SIG{INT} = $SIG{TERM} = sub { $self->stop };
+   $SIG{INT} = $SIG{TERM} = sub {
+      my $signal = shift;
+
+      # Disable the handler so a second signal will be fatal
+      undef $SIG{$signal};
+
+      $self->stop;
+   };
 
    $SIG{WINCH} = sub {
       $self->later( sub { $self->_SIGWINCH } )

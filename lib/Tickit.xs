@@ -2008,10 +2008,19 @@ input_readable(self)
     tickit_term_input_readable(self->tt);
 
 void
-input_wait(self)
+input_wait(self,timeout=&PL_sv_undef)
   Tickit::Term  self
+  SV           *timeout
   CODE:
-    tickit_term_input_wait(self->tt);
+    if(SvNOK(timeout)) {
+      struct timeval tv;
+      tv.tv_sec = (long)SvNV(timeout);
+      tv.tv_usec = 1E6 * (SvNV(timeout) - tv.tv_sec);
+      tickit_term_input_wait(self->tt, &tv);
+    }
+    else
+      tickit_term_input_wait(self->tt, NULL);
+
 
 SV *
 check_timeout(self)

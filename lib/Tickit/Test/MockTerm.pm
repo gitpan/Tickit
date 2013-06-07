@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use feature qw( switch );
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 use Tickit::Utils qw( textwidth substrwidth );
 
@@ -321,20 +321,23 @@ sub setpen
    $self->chpen( map { $_ => $attrs{$_} } @Tickit::Pen::ALL_ATTRS );
 }
 
-sub mode_altscreen
-{
-   # ignore
-}
-
-sub mode_cursorvis
+sub setctl_int
 {
    my $self = shift;
-   ( $self->{cursorvis} ) = @_;
-}
+   my ( $ctl, $value ) = @_;
 
-sub mode_mouse
-{
-   # ignore
+   if( $ctl eq "cursorvis" ) {
+      $self->{cursorvis} = $value;
+   }
+   elsif( $ctl eq "cursorshape" ) {
+      $self->{cursorshape} = $value;
+   }
+   elsif( grep { $_ eq $ctl } qw( altscreen mouse ) ) {
+      # ignore
+   }
+   else {
+      warn "Tickit::Test::MockTerm ignoring setctl_int $ctl";
+   }
 }
 
 0x55AA;

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 use Carp;
 
@@ -338,6 +338,19 @@ sub parent
    return $self->{parent};
 }
 
+=head2 @windows = $win->subwindows
+
+Returns a list of the subwindows of this one. They are returned in order,
+highest first.
+
+=cut
+
+sub subwindows
+{
+   my $self = shift;
+   return @{ $self->{child_windows} };
+}
+
 =head2 $rootwin = $win->root
 
 Returns the root window
@@ -391,6 +404,13 @@ sub show
    my $self = shift;
    $self->{visible} = 1;
 
+   if( my $parent = $self->parent ) {
+      if( !$parent->{focused_child} and $self->{focused_child} || $self->is_focused ) {
+         $parent->{focused_child} = $self;
+         weaken $parent->{focused_child} if WEAKEN_CHILDREN;
+      }
+   }
+
    $self->expose;
 }
 
@@ -407,8 +427,12 @@ sub hide
    $self->{visible} = 0;
 
    if( my $parent = $self->parent ) {
+      if( $parent->{focused_child} and $parent->{focused_child} == $self ) {
+         undef $parent->{focused_child};
+      }
       $parent->_do_expose( $self->rect );
    }
+
    $self->restore;
 }
 
@@ -451,7 +475,7 @@ sub reposition
 
    $self->change_geometry( $top, $left, $self->lines, $self->cols );
 
-   $self->_requeue_focus if defined $self->{focus_col};
+   $self->restore if $self->is_focused;
 }
 
 =head2 $win->change_geometry( $top, $left, $lines, $cols )
@@ -562,9 +586,10 @@ sub _handle_key
       $children->[0]->_handle_key( $args ) and return;
    }
 
-   my $focus_child = $self->{focus_child};
-   if( $focus_child ) {
-      $focus_child->_handle_key( $args ) and return 1;
+   my $focused_child = $self->{focused_child};
+
+   if( $focused_child ) {
+      $focused_child->_handle_key( $args ) and return 1;
    }
 
    if( my $on_key = $self->{on_key} ) {
@@ -579,7 +604,7 @@ sub _handle_key
    if( $children ) {
       foreach my $child ( @$children ) {
          next unless $child; # weakrefs; may be undef
-         next if $focus_child and $child == $focus_child;
+         next if $focused_child and $child == $focused_child;
 
          $child->_handle_key( $args );
       }
@@ -1523,66 +1548,104 @@ sub scroll
    );
 }
 
+=head2 $win->cursor_at( $line, $col )
+
+Sets the position in the window at which the terminal cursor will be placed if
+this window has focus. This method does I<not> force the window to take the
+focus though; for that see C<take_focus>.
+
+=cut
+
+sub cursor_at
+{
+   my $self = shift;
+   ( $self->{cursor_line}, $self->{cursor_col} ) = @_;
+   $self->tickit->enqueue_redraw if $self->is_focused;
+}
+
+=head2 $win->cursor_shape( $shape )
+
+Sets the shape that the terminal cursor will have if this window has focus.
+This method does I<not> force the window to take the focus though; for that
+see C<take_focus>. Valid values for C<$shape> are the various
+C<TERMCTL_CURSORSHAPE_*> constants from L<Tickit::Term>.
+
+=cut
+
+sub cursor_shape
+{
+   my $self = shift;
+   ( $self->{cursor_shape} ) = @_;
+   $self->tickit->enqueue_redraw if $self->is_focused;
+}
+
+=head2 $win->take_focus
+
+Causes this window to take the input focus, and updates the cursor position to
+the stored active position given by C<cursor_at>.
+
+=cut
+
+sub take_focus
+{
+   my $self = shift;
+   my ( $focuswin ) = @_;
+
+   $self->_focus_gained
+}
+
 =head2 $win->focus( $line, $col )
 
-Put the cursor at the given position in this window. Ensures the cursor
-remains at this position after drawing.
+A convenient shortcut combining C<cursor_at> with C<take_focus>; setting the
+focus cursor position and taking the input focus.
 
 =cut
 
 sub focus
 {
    my $self = shift;
-   my ( $line, $col ) = @_;
-
-   $self->{focus_line} = $line;
-   $self->{focus_col}  = $col;
-
-   $self->{on_focus}->( $self, 1 ) if $self->{on_focus};
-
-   $self->_requeue_focus
+   $self->cursor_at( @_ );
+   $self->take_focus;
 }
 
-sub _requeue_focus
+sub _focus_gained
 {
    my $self = shift;
-   my ( $focuswin ) = @_;
+   my ( $child ) = @_;
 
-   if( $self->{focus_child} and defined $focuswin and $self->{focus_child} != $focuswin ) {
-      $self->{focus_child}->_lose_focus;
+   if( $self->{focused_child} and defined $child and $self->{focused_child} != $child ) {
+      $self->{focused_child}->_focus_lost;
    }
 
-   $self->{focus_child} = $focuswin;
-   weaken $self->{focus_child} if WEAKEN_CHILDREN;
-
    if( my $parent = $self->parent ) {
-      $parent->_requeue_focus( $self );
+      # Still update without ourself but don't inform parent if we're invisible
+      $parent->_focus_gained( $self ) if $self->is_visible;
    }
    else {
       $self->tickit->enqueue_redraw;
    }
+
+   if( !$child ) {
+      $self->{focused} = 1;
+      $self->{on_focus}->( $self, 1 ) if $self->{on_focus};
+   }
+
+   $self->{focused_child} = $child;
+   weaken $self->{focused_child} if WEAKEN_CHILDREN;
 }
 
-sub _gain_focus
+sub _focus_lost
 {
    my $self = shift;
 
-   if( my $focus_child = $self->{focus_child} ) {
-      $focus_child->_gain_focus;
+   if( my $focused_child = $self->{focused_child} ) {
+      $focused_child->_focus_lost;
    }
-   elsif( $self->is_visible ) {
-      $self->goto( $self->{focus_line}, $self->{focus_col} );
+
+   if( $self->{focused} ) {
+      undef $self->{focused};
+      $self->{on_focus}->( $self, 0 ) if $self->{on_focus};
    }
-}
-
-sub _lose_focus
-{
-   my $self = shift;
-
-   undef $self->{focus_line};
-   undef $self->{focus_col};
-
-   $self->{on_focus}->( $self, 0 ) if $self->{on_focus};
 }
 
 =head2 $focused = $win->is_focused
@@ -1594,7 +1657,7 @@ Returns true if this window currently has the input focus
 sub is_focused
 {
    my $self = shift;
-   return defined $self->{focus_line};
+   return defined $self->{focused};
 }
 
 =head2 $win->restore
@@ -1611,21 +1674,21 @@ sub restore
 
    my $term = $root->term;
 
-   if( my $focus_child = $root->{focus_child} ) {
-      if( $focus_child->is_visible ) {
-         $term->mode_cursorvis( 1 );
-         $focus_child->_gain_focus;
-      }
-      else {
-         $term->mode_cursorvis( 0 );
-      }
-   }
-   elsif( defined $root->{focus_line} ) {
-      $term->mode_cursorvis( 1 );
-      $root->_gain_focus;
+   my $win = $root;
+   while( $win ) {
+      last unless $win->is_visible;
+      last unless $win->{focused_child};
+      $win = $win->{focused_child};
    }
 
-   $root->_needs_flush;
+   if( $win and $win->is_visible and $win->is_focused ) {
+      $term->setctl_int( cursorvis => 1 );
+      $win->goto( $win->{cursor_line}, $win->{cursor_col} );
+      $win->term->setctl_int( cursorshape => $win->{cursor_shape} // Tickit::Term::TERM_CURSORSHAPE_BLOCK );
+   }
+   else {
+      $term->setctl_int( cursorvis => 0 );
+   }
 }
 
 =head2 $win->clearline( $line )

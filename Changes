@@ -1,5 +1,14 @@
 Revision history for Changes
 
+0.34    CHANGES:
+         * Added timeout to Term->input_wait
+         * Added Tickit->timer
+         * Many internal updates to Window focus code
+         * Added Window->cursor_at, ->cursor_shape and ->take_focus
+         * Added Widget focus integration, including automatic ':focus' style
+           tag
+         * Added Window->subwindows
+
 0.33    CHANGES:
          * Added Tickit::RenderBuffer; a renamed copy of Tickit::RenderContext
            from CPAN. Re-implemented more in XS/C code

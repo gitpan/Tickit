@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::ContainerWidget );
 use Tickit::RenderBuffer;
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 use Carp;
 

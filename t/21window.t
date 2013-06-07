@@ -49,6 +49,9 @@ is( $rect->right,  30, '$win->rect->right' );
 identical( $win->parent, $rootwin, '$win->parent' );
 identical( $win->root,   $rootwin, '$win->root' );
 
+is_deeply( [ $rootwin->subwindows ],
+           [ $win ], '$rootwin->subwindows' );
+
 identical( $win->term, $term, '$win->term' );
 
 is_deeply( [ $win->_get_span_visibility( 0, 0 ) ],

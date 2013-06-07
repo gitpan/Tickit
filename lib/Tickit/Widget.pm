@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -21,6 +21,8 @@ use Tickit::Utils qw( textwidth );
 use constant PEN_ATTR_MAP => { map { $_ => 1 } @Tickit::Pen::ALL_ATTRS };
 
 use constant WIDGET_PEN_FROM_STYLE => 0;
+
+use constant CAN_FOCUS => 0;
 
 =head1 NAME
 
@@ -482,6 +484,8 @@ sub set_window
 
       $self->window_gained( $self->{window} );
 
+      $window->take_focus if delete $self->{focus_pending};
+
       $self->reshape;
 
       $window->expose;
@@ -515,18 +519,24 @@ sub window_gained
       );
    } );
 
+   $window->set_on_focus( sub {
+      my ( $win, $focus ) = @_;
+      $self->set_style_tag( focus => $focus );
+   } ) if $self->can( "_widget_style_type" );
+
    if( $self->can( "on_key" ) ) {
       $window->set_on_key( sub {
          shift;
          $self->on_key( @_ );
       } );
    }
-   if( $self->can( "on_mouse" ) ) {
-      $window->set_on_mouse( sub {
-         shift;
-         $self->on_mouse( @_ );
-      } );
-   }
+
+   $window->set_on_mouse( sub {
+      shift;
+      my ( $event ) = @_;
+      $self->take_focus if $self->CAN_FOCUS and $event->button == 1 and $event->type eq "press";
+      $self->on_mouse( @_ ) if $self->can( "on_mouse" );
+   } );
 }
 
 sub window_lost
@@ -537,6 +547,7 @@ sub window_lost
 
    $window->set_on_geom_changed( undef );
    $window->set_on_expose( undef );
+   $window->set_on_focus( undef );
    $window->set_on_key( undef );
    $window->set_on_mouse( undef );
 }
@@ -699,6 +710,30 @@ sub on_pen_changed
 # Default empty implementation
 sub reshape { }
 
+=head2 $widget->take_focus
+
+Calls C<take_focus> on the Widget's underlying Window, if present, or stores
+that the window should take focus when one is eventually set by C<set_window>.
+
+May only be called on Widget subclasses that override C<CAN_FOCUS> to return a
+true value.
+
+=cut
+
+sub take_focus
+{
+   my $self = shift;
+
+   croak ref($self) . " cannot ->take_focus" unless $self->CAN_FOCUS;
+
+   if( my $win = $self->window ) {
+      $win->take_focus if $win->is_visible;
+   }
+   else {
+      $self->{focus_pending} = 1;
+   }
+}
+
 =head1 SUBCLASS METHODS
 
 Because this is an abstract class, the constructor must be called on a
@@ -789,7 +824,25 @@ Most of the time this method may not be necessary as the C<style_reshape_keys>
 and C<style_reshape_textwidth_keys> declarations should suffice for most
 purposes.
 
+=head2 $widget->CAN_FOCUS
+
+Optional, normally false. If this constant method returns a true value, the
+widget is allowed to take focus using the C<take_focus> method. It will also
+take focus automatically if it receives a mouse button 1 press event.
+
 =cut
+
+=head1 STYLE
+
+The following style tags are used on all widget classes that use Style:
+
+=over 4
+
+=item :focus
+
+Set when this widget has the input focus
+
+=back
 
 =head1 EXAMPLES
 
