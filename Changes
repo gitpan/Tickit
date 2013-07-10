@@ -1,5 +1,17 @@
 Revision history for Changes
 
+0.35    CHANGES:
+         * Give the terminal up to 100msec to initialise before running
+         * Added ContainerWidget->find_child and ->focus_next
+         * Implement Tab/Shift-Tab as focus movement keys
+         * Added style_redraw_keys
+         * Keybindings from Style
+         * Added ->render_to_rb alternative to ->render method
+
+        BUGFIXES:
+         * Clean up focus chain when removing a child window that has focus
+         * Make sure that RenderBuffer stores UTF-8 text bytes
+
 0.34    CHANGES:
          * Added timeout to Term->input_wait
          * Added Tickit->timer

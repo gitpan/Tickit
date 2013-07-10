@@ -2,6 +2,9 @@
 #define __TICKIT_H__
 
 #include <stdlib.h>
+#include <stdarg.h>
+
+#include <sys/time.h>
 
 /*
  * Tickit events
@@ -175,6 +178,7 @@ int  tickit_term_get_output_fd(const TickitTerm *tt);
 void tickit_term_set_output_func(TickitTerm *tt, TickitTermOutputFunc *fn, void *user);
 void tickit_term_set_output_buffer(TickitTerm *tt, size_t len);
 
+void tickit_term_await_started(TickitTerm *tt, const struct timeval *timeout);
 void tickit_term_flush(TickitTerm *tt);
 
 /* fd is allowed to be unset (-1); works abstractly */
@@ -187,7 +191,7 @@ void tickit_term_set_utf8(TickitTerm *tt, int utf8);
 void tickit_term_input_push_bytes(TickitTerm *tt, const char *bytes, size_t len);
 void tickit_term_input_readable(TickitTerm *tt);
 int  tickit_term_input_check_timeout(TickitTerm *tt);
-void tickit_term_input_wait(TickitTerm *tt);
+void tickit_term_input_wait(TickitTerm *tt, const struct timeval *timeout);
 
 void tickit_term_get_size(const TickitTerm *tt, int *lines, int *cols);
 void tickit_term_set_size(TickitTerm *tt, int lines, int cols);
@@ -199,6 +203,8 @@ int  tickit_term_bind_event(TickitTerm *tt, TickitEventType ev, TickitTermEventF
 void tickit_term_unbind_event_id(TickitTerm *tt, int id);
 
 void tickit_term_print(TickitTerm *tt, const char *str);
+void tickit_term_printf(TickitTerm *tt, const char *fmt, ...);
+void tickit_term_vprintf(TickitTerm *tt, const char *fmt, va_list args);
 int  tickit_term_goto(TickitTerm *tt, int line, int col);
 void tickit_term_move(TickitTerm *tt, int downward, int rightward);
 int  tickit_term_scrollrect(TickitTerm *tt, int top, int left, int lines, int cols, int downward, int rightward);

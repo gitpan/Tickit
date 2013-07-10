@@ -57,7 +57,7 @@ struct TickitTerm {
   int lines;
   int cols;
 
-  int started;
+  enum { UNSTARTED, STARTING, STARTED } state;
 
   int colors;
   TickitPen *pen;
@@ -142,7 +142,7 @@ TickitTerm *tickit_term_new_for_termtype(const char *termtype)
   tickit_term_getctl_int(tt, TICKIT_TERMCTL_COLORS, &tt->colors);
 
   // Can't 'start' yet until we have an output method
-  tt->started = 0;
+  tt->state = UNSTARTED;
 
   return tt;
 
@@ -240,10 +240,10 @@ void tickit_term_set_output_fd(TickitTerm *tt, int fd)
 
   tickit_term_refresh_size(tt);
 
-  if(!tt->started) {
+  if(tt->state == UNSTARTED) {
     if(tt->driver->vtable->start)
       (*tt->driver->vtable->start)(tt->driver);
-    tt->started = 1;
+    tt->state = STARTING;
   }
 }
 
@@ -257,10 +257,10 @@ void tickit_term_set_output_func(TickitTerm *tt, TickitTermOutputFunc *fn, void 
   tt->outfunc      = fn;
   tt->outfunc_user = user;
 
-  if(!tt->started) {
+  if(tt->state == UNSTARTED) {
     if(tt->driver->vtable->start)
       (*tt->driver->vtable->start)(tt->driver);
-    tt->started = 1;
+    tt->state = STARTING;
   }
 }
 
@@ -311,9 +311,58 @@ void tickit_term_set_utf8(TickitTerm *tt, int utf8)
     termkey_set_flags(tt->termkey, tt->termkey_flags);
 }
 
+void tickit_term_await_started(TickitTerm *tt, const struct timeval *timeout)
+{
+  if(tt->state == STARTED)
+    return;
+
+  struct timeval until;
+  gettimeofday(&until, NULL);
+
+  // until += timeout
+  if(until.tv_usec + timeout->tv_usec >= 1E6) {
+    until.tv_sec  += timeout->tv_sec + 1;
+    until.tv_usec += timeout->tv_usec - 1E6;
+  }
+  else {
+    until.tv_sec  += timeout->tv_sec;
+    until.tv_usec += timeout->tv_usec;
+  }
+
+  while(tt->state != STARTED) {
+    if(!tt->driver->vtable->started ||
+       (*tt->driver->vtable->started)(tt->driver))
+      break;
+
+    struct timeval timeout;
+    gettimeofday(&timeout, NULL);
+
+    // timeout = until - timeout
+    if(until.tv_usec < timeout.tv_usec) {
+      timeout.tv_sec  = until.tv_sec  - timeout.tv_sec - 1;
+      timeout.tv_usec = until.tv_usec - timeout.tv_usec + 1E6;
+    }
+    else {
+      timeout.tv_sec  = until.tv_sec  - timeout.tv_sec;
+      timeout.tv_usec = until.tv_usec - timeout.tv_usec;
+    }
+
+    if(timeout.tv_sec < 0)
+      break;
+
+    tickit_term_input_wait(tt, &timeout);
+  }
+
+  tt->state = STARTED;
+}
+
 static void got_key(TickitTerm *tt, TermKey *tk, TermKeyKey *key)
 {
   TickitEvent args;
+
+  if(tt->driver->vtable->gotkey &&
+     (*tt->driver->vtable->gotkey)(tt->driver, tk, key))
+    return;
 
   if(key->type == TERMKEY_TYPE_MOUSE) {
     TermKeyMouseEvent ev;
@@ -356,10 +405,6 @@ static void got_key(TickitTerm *tt, TermKey *tk, TermKeyKey *key)
     args.mod  = key->modifiers;
 
     run_events(tt, TICKIT_EV_KEY, &args);
-  }
-  else {
-    if(tt->driver->vtable->gotkey)
-      (*tt->driver->vtable->gotkey)(tt->driver, tk, key);
   }
 }
 
@@ -439,13 +484,21 @@ int tickit_term_input_check_timeout(TickitTerm *tt)
   return -1;
 }
 
-void tickit_term_input_wait(TickitTerm *tt)
+void tickit_term_input_wait(TickitTerm *tt, const struct timeval *timeout)
 {
   TermKey *tk = get_termkey(tt);
   TermKeyKey key;
 
-  termkey_waitkey(tk, &key);
-  got_key(tt, tk, &key);
+  struct timeval to_copy;
+  if(timeout)
+    to_copy = *timeout;
+
+  fd_set readfds;
+  int fd = termkey_get_fd(tk);
+  FD_SET(fd, &readfds);
+  if(select(fd + 1, &readfds, NULL, NULL, timeout ? &to_copy : NULL) == 1) {
+    termkey_advisereadable(tk);
+  }
 
   /* Might as well get any more that are ready */
   while(termkey_getkey(tk, &key) == TERMKEY_RES_KEY) {
@@ -526,6 +579,27 @@ void tickit_termdrv_write_strf(TickitTermDriver *ttd, const char *fmt, ...)
 void tickit_term_print(TickitTerm *tt, const char *str)
 {
   (*tt->driver->vtable->print)(tt->driver, str);
+}
+
+void tickit_term_printf(TickitTerm *tt, const char *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  tickit_term_vprintf(tt, fmt, args);
+  va_end(args);
+}
+
+void tickit_term_vprintf(TickitTerm *tt, const char *fmt, va_list args)
+{
+  va_list args2;
+  va_copy(args2, args);
+
+  size_t len = vsnprintf(NULL, 0, fmt, args) + 1;
+  char *buf = get_tmpbuffer(tt, len);
+  vsnprintf(buf, len, fmt, args2);
+  (*tt->driver->vtable->print)(tt->driver, buf);
+
+  va_end(args2);
 }
 
 int tickit_term_goto(TickitTerm *tt, int line, int col)

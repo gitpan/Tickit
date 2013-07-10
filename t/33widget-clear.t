@@ -20,7 +20,7 @@ my $win = mk_window;
    };
 
    like( $warnings,
-         qr/^Constructing a WidgetWithClear with CLEAR_BEFORE_RENDER at /,
+         qr/^Constructing a ->render WidgetWithClear with CLEAR_BEFORE_RENDER at /,
          'Constructing a Widget with CLEAR_BEFORE_RENDER yields a warning');
 
    $widget->set_window( $win );

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use Carp;
 
@@ -135,6 +135,10 @@ sub _remove
    for( my $i = 0; $i < @$children; ) {
       $i++, next if defined $children->[$i] and $children->[$i] != $child;
       splice @$children, $i, 1, ();
+   }
+
+   if( $self->{focused_child} and $self->{focused_child} == $child ) {
+      undef $self->{focused_child};
    }
 }
 

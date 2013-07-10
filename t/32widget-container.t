@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Test::More;
+use Test::Identity;
 use Test::Refcount;
 
 my $widget = TestWidget->new;
@@ -49,6 +50,27 @@ is_deeply( [ $container->children ], [], '$container->children empty' );
 is( $widget->parent, undef, '$widget->parent is undef' );
 
 is( $changed, 3, '$changed is 3' );
+
+# child search
+{
+   my @widgets = map { TestWidget->new } 1 .. 4;
+
+   $container->add( $_ ) for @widgets;
+
+   identical( $container->find_child( first  => undef       ), $widgets[0], '->find_child first' );
+
+   identical( $container->find_child( before => $widgets[2] ), $widgets[1], '->find_child before' );
+   identical( $container->find_child( before => $widgets[0] ), undef,       '->find_child before first' );
+
+   identical( $container->find_child( after  => $widgets[1] ), $widgets[2], '->find_child after' );
+   identical( $container->find_child( after  => $widgets[3] ), undef,       '->find_child after last' );
+
+   identical( $container->find_child( last   => undef       ), $widgets[3], '->find_child last' );
+
+   identical( $container->find_child( after => $widgets[1], where => sub { $_ != $widgets[2] } ),
+              $widgets[3],
+              '->find_child where filter' );
+}
 
 done_testing;
 

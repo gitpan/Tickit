@@ -7,9 +7,10 @@ package Tickit::ContainerWidget;
 
 use strict;
 use warnings;
+use feature qw( switch );
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use Carp;
 
@@ -158,13 +159,197 @@ sub window_lost
    $self->SUPER::window_lost( @_ );
 }
 
+=head2 $child = $widget->find_child( $how, $other, %args )
+
+Returns a child widget. The C<$how> argument determines how this is done,
+relative to the child widget given by C<$other>:
+
+=over 4
+
+=item first
+
+The first child returned by C<children> (C<$other> is ignored)
+
+=item last
+
+The last child returned by C<children> (C<$other> is ignored)
+
+=item before
+
+The child widget just before C<$other> in the order given by C<children>
+
+=item after
+
+The child widget just after C<$other> in the order given by C<children>
+
+=back
+
+Takes the following named arguments:
+
+=over 8
+
+=item where => CODE
+
+Optional. If defined, gives a filter function to filter the list of children
+before searching for the required one. Will be invoked once per child, with
+the child widget set as C<$_>; it should return a boolean value to indicate if
+that child should be included in the search.
+
+=back
+
+=cut
+
+sub find_child
+{
+   my $self = shift;
+   my ( $how, $other, %args ) = @_;
+
+   my @children = $self->children;
+   if( my $where = $args{where} ) {
+      @children = grep { defined $other and $_ == $other or $where->() } @children;
+   }
+
+   for( $how ) {
+      when( "first" ) {
+         return $children[0];
+      }
+      when( "last" ) {
+         return $children[-1];
+      }
+      when( "before" ) {
+         $children[$_] == $other and return $children[$_-1] for 1 .. $#children;
+         return undef;
+      }
+      when( "after" ) {
+         $children[$_] == $other and return $children[$_+1] for 0 .. $#children-1;
+         return undef;
+      }
+      default {
+         croak "Unrecognised ->find_child mode '$how'";
+      }
+   }
+}
+
+use constant CONTAINER_OR_FOCUSABLE => sub {
+   $_->isa( "Tickit::ContainerWidget" ) or $_->CAN_FOCUS
+};
+
+=head2 $widget->focus_next( $how, $other )
+
+Moves the input focus to the next widget in the widget tree, by searching in
+the direction given by C<$how> relative to the widget given by C<$other>
+(which must be an immediate child of C<$widget>).
+
+The direction C<$how> must be one of the following four values:
+
+=over 4
+
+=item first
+
+=item last
+
+Moves focus to the first or last child widget that can take focus. Recurses
+into child widgets that are themselves containers. C<$other> is ignored.
+
+=item after
+
+=item before
+
+Moves focus to the next or previous child widget in tree order from the one
+given by C<$other>. Recurses into child widgets that are themselves
+containers, and out into parent containers.
+
+These searches will wrap around the widget tree; moving C<after> the last node
+in the widget tree will move to the first, and vice versa.
+
+=back
+
+This differs from C<find_child> in that it performs a full tree search through
+the widget tree, considering parents and children. If a C<before> or C<after>
+search falls off the end of one node, it will recurse up to its parent and
+search within the next child, and so on.
+
+Usually this would be used via the widget itself:
+
+ $self->parent->focus_next( $how => $self );
+
+=cut
+
+sub focus_next
+{
+   my $self = shift;
+   my ( $how, $other ) = @_;
+
+   # This tree search has the potential to loop infinitely, if there are no
+   # focusable widgets at all. It would only do this if it cycles via the root
+   # widget twice in a row. Technically we could detect it earlier, but that
+   # is more difficult to arrange for
+   my $done_root;
+
+   my $next;
+
+   while(1) {
+      $next = $self->find_child( $how, $other, where => CONTAINER_OR_FOCUSABLE );
+      last if $next and $next->CAN_FOCUS;
+
+      # Either we found a container (recurse into it),
+      if( $next ) {
+         my $childhow = $how;
+         if(    $how eq "after"  ) { $childhow = "first" }
+         elsif( $how eq "before" ) { $childhow = "last" }
+
+         # See if child has it
+         return if $next->focus_next( $childhow => undef );
+
+         $other = $next;
+         redo;
+      }
+      # or we'll have to recurse up to my parent
+      elsif( my $parent = $self->parent ) {
+         if( $how eq "after" or $how eq "before" ) {
+            $other = $self;
+            $self = $parent;
+            redo;
+         }
+         else {
+            return undef;
+         }
+      }
+      # or we'll have to cycle around the root
+      else {
+         die "Cycled through the entire widget tree and did not find a focusable widget" if $done_root;
+         $done_root++;
+
+         if(    $how eq "after"  ) { $how = "first" }
+         elsif( $how eq "before" ) { $how = "last"  }
+         else { die "Cannot cycle how=$how around root widget"; }
+
+         $other = undef;
+         redo;
+      }
+   }
+
+   # if( !$next and my $parent = $self->parent ) {
+   #    return undef if $how eq "first" || $how eq "last";
+
+   #    return $parent->focus_next( $how, $self );
+   # }
+
+   $next->take_focus;
+   return 1;
+}
+
 =head1 SUBCLASS METHODS
 
 =head2 @children = $widget->children
 
 Required. Should return a list of all the contained child widgets. The order
-is not specified. This method is used by C<window_lost> to remove the windows
-from all the child widgets automatically.
+is not specified, but should be in some stable order that makes sense given
+the layout of the widget's children.
+
+This method is used by C<window_lost> to remove the windows from all the child
+widgets automatically, and by C<find_child> to obtain a child relative to
+another given one.
 
 =head2 $widget->render( %args )
 

@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use feature qw( switch );
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use Tickit::Utils qw( textwidth substrwidth );
 
@@ -30,6 +30,9 @@ sub new
 # Ignore output buffering
 sub set_output_buffer { }
 sub flush { }
+
+# We're already ready
+sub await_started { }
 
 sub bind_event
 {

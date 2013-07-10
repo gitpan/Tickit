@@ -21,13 +21,16 @@ use Tickit::Style;
 style_definition base =>
    fg => 2,
    text => "Hello, world!",
-   spacing => 1;
+   spacing => 1,
+   marker => "[]",
+   '<Enter>' => "activate";
 
 style_definition ':active' =>
    u => 1;
 
 style_reshape_keys qw( spacing );
 style_reshape_textwidth_keys qw( text );
+style_redraw_keys qw( marker );
 
 # Normally this would be a package constant, but we'll make it a method so we
 # can easily adjust it for testing
@@ -38,9 +41,8 @@ sub cols  { 1 }
 sub lines { 1 }
 
 use constant CLEAR_BEFORE_RENDER => 0;
-sub render
-{
-}
+my $RENDERED;
+sub render { $RENDERED++ }
 
 my $RESHAPED;
 sub reshape { $RESHAPED++ }
@@ -70,12 +72,15 @@ package main;
 
    is_deeply( { $widget->get_style_pen->getattrs }, { fg => 2 }, 'style pen for default' );
    is( $widget->get_style_text, "Hello, world!", 'render text for default' );
+
+   is( $widget->get_style_values( "<Enter>" ), "activate", 'Style for keypress' );
 }
 
 Tickit::Style->load_style( <<'EOF' );
 StyledWidget {
    fg: 4;
    something-b: true; something-u: true; something-i: true;
+   <Space>: activate;
 }
 
 StyledWidget.BOLD {
@@ -102,6 +107,8 @@ EOF
    is_deeply( { $widget->get_style_pen("something")->getattrs },
               { b => 1, u => 1, i => 1 },
               'pen can have boolean attributes' );
+
+   is( $widget->get_style_values( "<Space>" ), "activate", 'Style for keypress from stylesheet' );
 }
 
 # Stylesheet-applied style on a class
@@ -228,10 +235,11 @@ EOF
 
 # style_reshape_keys
 {
-   $RESHAPED = 0;
    my $widget = StyledWidget->new;
+   # Needs a window for ->render
+   $widget->set_window( $win );
 
-   is( $RESHAPED, 0, '$RESHAPED before ->set_style( text )' );
+   $RESHAPED = 0;
 
    $widget->set_style( spacing => 2 );
 
@@ -248,6 +256,21 @@ EOF
               'on_style_changed_values after reshape key change' );
 
    is( $RESHAPED, 2, '$RESHAPED 2 after ->set_style( text )' );
+
+   $RESHAPED = 0;
+   $RENDERED = 0;
+   $widget->set_style( marker => "<>" );
+
+   is_deeply( \%style_changed_values,
+              { marker => [ "[]", "<>" ] },
+              'on_style_changed_values after redraw key change' );
+
+   flush_tickit;
+
+   is( $RESHAPED, 0, '$RESHAPED still 0 after ->set_style( marker )' );
+   is( $RENDERED, 1, '$RENDERED 1 after ->set_style( marker )' );
+
+   $widget->set_window( undef );
 }
 
 # subclassing

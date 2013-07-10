@@ -7,6 +7,7 @@ examples/demo-colorwidget.pl
 examples/demo-dragndrop.pl
 examples/demo-expose.pl
 examples/demo-float.pl
+examples/demo-focus.pl
 examples/demo-hbox.pl
 examples/demo-input.pl
 examples/demo-lines.pl
@@ -96,6 +97,7 @@ t/33widget-clear.t
 t/34widget-style.t
 t/35widget-focus.t
 t/36widget-input.t
+t/37widget-container-focus.t
 t/50widget-static.t
 t/51widget-box.t
 t/52widget-hbox.t

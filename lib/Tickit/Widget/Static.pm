@@ -14,7 +14,7 @@ use Tickit::RenderBuffer;
 use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );
@@ -172,19 +172,12 @@ sub set_on_click
    $self->{on_click} = $on_click;
 }
 
-use constant CLEAR_BEFORE_RENDER => 0;
-
-sub render
+sub render_to_rb
 {
    my $self = shift;
-   my %args = @_;
+   my ( $rb, $rect ) = @_;
 
-   my $win = $self->window or return;
-   $win->is_visible or return;
-   my $rect = $args{rect};
-   my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
-   $rb->clip( $rect );
-   $rb->setpen( $self->pen );
+   my $win = $self->window;
 
    $rb->erase_at( $_, $rect->left, $rect->cols ) for $rect->linerange;
 
@@ -198,8 +191,6 @@ sub render
 
       $rb->text_at( $above + $line, $left, substrwidth( $text, 0, $textwidth ) );
    }
-
-   $rb->flush_to_window( $win );
 }
 
 sub on_mouse

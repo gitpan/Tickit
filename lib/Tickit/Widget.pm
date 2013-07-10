@@ -8,19 +8,22 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use Carp;
 use Scalar::Util qw( weaken );
 use List::MoreUtils qw( all );
 
 use Tickit::Pen;
+use Tickit::RenderBuffer;
 use Tickit::Style;
 use Tickit::Utils qw( textwidth );
 
 use constant PEN_ATTR_MAP => { map { $_ => 1 } @Tickit::Pen::ALL_ATTRS };
 
 use constant WIDGET_PEN_FROM_STYLE => 0;
+
+use constant KEYPRESSES_FROM_STYLE => 0;
 
 use constant CAN_FOCUS => 0;
 
@@ -38,6 +41,21 @@ this class which provides a suitable implementation of the C<render> and other
 provided methods is derived. Instances in that class are then constructed.
 
 See the C<EXAMPLES> section below.
+
+=head1 STYLE
+
+The following style actions are used:
+
+=over 4
+
+=item focus_next_before (<Tab>)
+
+=item focus_next_after (<S-Tab>)
+
+Requests the focus move to the next or previous focusable widget in display
+order.
+
+=back
 
 =cut
 
@@ -90,8 +108,15 @@ sub new
          croak "$class cannot ->$method - do you subclass and implement it?";
    }
 
-   $class->CLEAR_BEFORE_RENDER and
-      carp "Constructing a $class with CLEAR_BEFORE_RENDER";
+   # Require override ->render or a ->render_to_rb
+   if( $class->can( "render" ) == \&render ) {
+      $class->can( "render_to_rb" ) or
+         croak "$class must override ->render or provide a ->render_to_rb";
+   }
+   else {
+      $class->CLEAR_BEFORE_RENDER and
+         carp "Constructing a ->render $class with CLEAR_BEFORE_RENDER";
+   }
 
    my $self = bless {
       classes => delete $args{classes} // [ delete $args{class} ],
@@ -137,9 +162,12 @@ sub style_classes
 =head2 $widget->set_style_tag( $tag, $value )
 
 Sets the (boolean) state of the named style tag. After calling this method,
-the C<get_style_*> methods may return different results, but no resizing or
-redrawing is automatically performed; the widget should do this itself. It may
-find the C<on_style_changed_values> method useful for this.
+the C<get_style_*> methods may return different results. No resizing or
+redrawing is necessarily performed; but the widget can use
+C<style_reshape_keys>, C<style_reshape_textwidth_keys> or C<style_redraw_keys>
+to declare which style keys should cause automatic reshaping or redrawing. In
+addition it can override the C<on_style_changed_values> method to inspect the
+changes and decide for itself.
 
 =cut
 
@@ -419,6 +447,7 @@ sub _style_changed_values
    }
 
    my $reshape = 0;
+   my $redraw  = 0;
 
    my $type = $self->_widget_style_type;
    foreach ( Tickit::Style::_reshape_keys( $type ) ) {
@@ -436,6 +465,13 @@ sub _style_changed_values
       last;
    }
 
+   foreach ( Tickit::Style::_redraw_keys( $type ) ) {
+      next unless $values->{$_};
+
+      $redraw = 1;
+      last;
+   }
+
    my $code = $self->can( "on_style_changed_values" );
    $self->$code( %$values ) if $code;
 
@@ -443,7 +479,7 @@ sub _style_changed_values
       $self->reshape;
       $self->redraw;
    }
-   elsif( keys %changed_pens ) {
+   elsif( keys %changed_pens or $redraw ) {
       $self->redraw;
    }
 }
@@ -524,10 +560,26 @@ sub window_gained
       $self->set_style_tag( focus => $focus );
    } ) if $self->can( "_widget_style_type" );
 
-   if( $self->can( "on_key" ) ) {
+   if( my $code = $self->can( "on_key" ) or $self->KEYPRESSES_FROM_STYLE ) {
       $window->set_on_key( sub {
          shift;
-         $self->on_key( @_ );
+         my ( $key ) = @_;
+
+         {
+            # Space comes as " " but we'd prefer to use "Space" in styles
+            my $keystr = $key->str eq " " ? "Space" : $key->str;
+
+            my $action;
+            $action = $self->get_style_values( "<$keystr>" ) if $self->KEYPRESSES_FROM_STYLE;
+            $action //= "focus_next_after"  if $keystr eq "Tab";
+            $action //= "focus_next_before" if $keystr eq "S-Tab";
+
+            last unless $action;
+
+            my $code = $self->can( "key_$action" );
+            return 1 if $code and $code->( $self, @_ );
+         }
+         return 1 if $code and $code->( $self, @_ );
       } );
    }
 
@@ -537,6 +589,20 @@ sub window_gained
       $self->take_focus if $self->CAN_FOCUS and $event->button == 1 and $event->type eq "press";
       $self->on_mouse( @_ ) if $self->can( "on_mouse" );
    } );
+}
+
+sub key_focus_next_after
+{
+   my $self = shift;
+   $self->parent and $self->parent->focus_next( after => $self );
+   return 1;
+}
+
+sub key_focus_next_before
+{
+   my $self = shift;
+   $self->parent and $self->parent->focus_next( before => $self );
+   return 1;
 }
 
 sub window_lost
@@ -655,6 +721,24 @@ sub _do_clear
    return 1;
 }
 
+sub render
+{
+   my $self = shift;
+   my %args = @_;
+
+   my $win = $self->window or return;
+   $win->is_visible or return;
+
+   my $rect = $args{rect};
+   my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
+   $rb->clip( $rect );
+   $rb->setpen( $self->pen );
+
+   $self->render_to_rb( $rb, $rect );
+
+   $rb->flush_to_window( $win );
+}
+
 =head2 $pen = $widget->pen
 
 Returns the widget's L<Tickit::Pen>. Modifying an attribute of the returned
@@ -739,10 +823,18 @@ sub take_focus
 Because this is an abstract class, the constructor must be called on a
 subclass which implements the following methods.
 
+=head2 $widget->render_to_rb( $renderbuffer, $rect )
+
+Called to redraw the widget's content to the given L<Tickit::RenderBuffer>.
+
+Will be passed the clipping rectangle region to be rendered; the method does
+not have to render any content outside of this region.
+
 =head2 $widget->render( %args )
 
-Called to redraw the widget's content to its window. Methods can be called on
-the contained L<Tickit::Window> object obtained from C<< $widget->window >>.
+An alternative to C<render_to_rb>. Called to redraw the widget's content
+directly to its window. Methods can be called on the contained
+L<Tickit::Window> object obtained from C<< $widget->window >>.
 
 Will be passed hints on the region of the window that requires rendering; the
 method implementation may choose to use this information to restrict drawing,
@@ -821,14 +913,29 @@ the new value are actually the same, but it still appears from the style
 definitions that certain keys are changed.
 
 Most of the time this method may not be necessary as the C<style_reshape_keys>
-and C<style_reshape_textwidth_keys> declarations should suffice for most
-purposes.
+C<style_reshape_textwidth_keys>, and C<style_redraw_keys> declarations should
+suffice for most purposes.
 
 =head2 $widget->CAN_FOCUS
 
 Optional, normally false. If this constant method returns a true value, the
 widget is allowed to take focus using the C<take_focus> method. It will also
 take focus automatically if it receives a mouse button 1 press event.
+
+=head2 $widget->KEYPRESSES_FROM_STYLE
+
+Optional, normally false. If this constant method returns a true value, the
+widget will use style information to invoke named methods on keypresses. When
+the window's C<on_key> event is invoked, the widget will first attempt to look
+up a style key with the name of the pressed key, including its modifier key
+prefixes, surrounded by C<< <angle brackets> >>. If this gives the name of a,
+method prefixed by C<key_> then that method is invoked as a special-purpose
+C<on_key> handler. If this does not exist, or does not return true, then the
+widget's regular C<on_key> handler is invoked, if present.
+
+As a special case, space is given the key name C<< <Space> >> instead of being
+notated by a literal space character in brackets, for neatness of the style
+information.
 
 =cut
 

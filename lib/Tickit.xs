@@ -1421,7 +1421,7 @@ _xs_get_text_substr(self,textidx,start,len)
     endpos = startpos;
     tickit_string_countmore(text, &endpos, &limit);
 
-    RETVAL = newSVpvn(text + startpos.bytes, endpos.bytes - startpos.bytes);
+    RETVAL = newSVpvn_utf8(text + startpos.bytes, endpos.bytes - startpos.bytes, 1);
   OUTPUT:
     RETVAL
 
@@ -1457,7 +1457,7 @@ text_at(self,line,col,text,pen=NULL)
   Tickit::RenderBuffer self
   int line
   int col
-  char *text
+  SV *text
   Tickit::Pen pen
   INIT:
     TickitRenderBuffer *rb;
@@ -1465,10 +1465,13 @@ text_at(self,line,col,text,pen=NULL)
     TickitStringPos endpos;
     int len, origlen;
     int startcol;
+    char *textbytes;
   CODE:
     rb = self;
 
-    tickit_string_count(text, &endpos, NULL);
+    textbytes = SvPVutf8_nolen(text);
+
+    tickit_string_count(textbytes, &endpos, NULL);
     origlen = len = endpos.columns;
 
     if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, &startcol))
@@ -1488,7 +1491,7 @@ text_at(self,line,col,text,pen=NULL)
       Renew(rb->texts, rb->size_texts, char *);
     }
 
-    rb->texts[rb->n_texts] = savepv(text);
+    rb->texts[rb->n_texts] = savepv(textbytes);
 
     cell = _tickit_rb_make_span(rb, line, col, len);
     cell->state     = TEXT;
@@ -1905,6 +1908,17 @@ set_output_func(self,func)
 
     self->output_func = (CV*)SvREFCNT_inc(func);
     tickit_term_set_output_func(self->tt, term_output_fn, self);
+
+void
+await_started(self,timeout)
+  Tickit::Term  self
+  double        timeout
+  INIT:
+    struct timeval tv;
+  CODE:
+    tv.tv_sec = (long)timeout;
+    tv.tv_usec = (timeout - tv.tv_sec) * 1E6;
+    tickit_term_await_started(self->tt, &tv);
 
 void
 flush(self)

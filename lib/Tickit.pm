@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 BEGIN {
-   our $VERSION = '0.34';
+   our $VERSION = '0.35';
 }
 
 use Carp;
@@ -418,6 +418,9 @@ sub setup_term
    my $self = shift;
 
    my $term = $self->term;
+
+   $term->await_started( 0.100 ); # 100 msec
+
    $term->setctl_int( altscreen => 1 );
    $term->setctl_int( cursorvis => 0 );
    $term->setctl_int( mouse     => 1 );

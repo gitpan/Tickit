@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::Widget::LinearBox );
 use Tickit::Style;
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use List::Util qw( sum max );
 

@@ -14,7 +14,7 @@ use Tickit::RenderBuffer;
 
 use Tickit::Utils qw( bound );
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use constant WIDGET_PEN_FROM_STYLE => 1;
 

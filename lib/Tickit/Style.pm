@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use Carp;
 
@@ -20,6 +20,7 @@ our @EXPORTS = qw(
    style_definition
    style_reshape_keys
    style_reshape_textwidth_keys
+   style_redraw_keys
 );
 
 # {$type}->{$class} = $tagset
@@ -28,6 +29,7 @@ my %TAGSETS_BY_TYPE_CLASS;
 # {$type}->{$key} = 1
 my %RESHAPE_KEYS;
 my %RESHAPE_TEXTWIDTH_KEYS;
+my %REDRAW_KEYS;
 
 =head1 NAME
 
@@ -61,7 +63,7 @@ C<Tickit::Style> - declare customisable style information on widgets
 This module adds the ability to a L<Tickit::Widget> class to declare a set of
 named keys that take values, and provides convenient accessors for the widget
 to determine what the values are at any given moment in time. The values
-currently in effect are determined by the widget class code, and any 
+currently in effect are determined by the widget class code, and any
 stylesheet files loaded by the application.
 
 The widget itself can store a set of tags; named entities that may be present
@@ -105,6 +107,15 @@ C<false>.
 While it is more traditional for keys in stylesheet files to contain hypens
 (C<->), it is more convenient in Perl code to use underscores (C<_>) instead.
 The parser will convert hypens in key names into underscores.
+
+As well as giving visual styling information, stylesheets can also associate
+behavioural actions with keypresses. These are given by a keypress key name in
+angle brackets (C<< <NAME> >>) and an action name, which is a bareword
+identifier.
+
+ WidgetClass {
+   <Enter>: activate;
+ }
 
 =head2 How Style is Determined
 
@@ -252,9 +263,6 @@ Declares that the given list of keys contain text, the C<textwidth()> of which
 is used to determine the shape of the widget. If their values are changed such
 that the C<textwidth()> differs, the C<reshape> method is called.
 
-Between them these two methods may help avoid C<Tickit::Widget> classes from
-needing to override the C<on_style_changed_values> method.
-
 =cut
 
 sub style_reshape_textwidth_keys
@@ -269,6 +277,31 @@ sub _reshape_textwidth_keys
 {
    my ( $type ) = @_;
    return keys %{ $RESHAPE_TEXTWIDTH_KEYS{$type} };
+}
+
+=head2 style_redraw_keys( @keys )
+
+Declares that the given list of keys are somehow responsible for determining
+the look of the widget, but in a way that does not determine the size. If
+their values are changed, the C<redraw> method is called.
+
+Between them these three methods may help avoid C<Tickit::Widget> classes from
+needing to override the C<on_style_changed_values> method.
+
+=cut
+
+sub style_redraw_keys
+{
+   my $class = caller;
+
+   my $type = $class->_widget_style_type;
+   $REDRAW_KEYS{$type}{$_} = 1 for @_;
+}
+
+sub _redraw_keys
+{
+   my ( $type ) = @_;
+   return keys %{ $REDRAW_KEYS{$type} };
 }
 
 my @ON_STYLE_LOAD;

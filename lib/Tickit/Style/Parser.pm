@@ -44,25 +44,38 @@ sub parse_def
    $self->scope_of(
       '{',
       sub { $self->sequence_of( sub {
-         my $delete = $self->maybe_expect( '!' );
-         my $key = $self->token_ident;
-         $self->commit;
+         $self->any_of(
+            sub {
+               my $delete = $self->maybe_expect( '!' );
+               my $key = $self->token_ident;
+               $self->commit;
 
-         $key =~ s/-/_/g;
+               $key =~ s/-/_/g;
 
-         if( $delete ) {
-            $style{$key} = undef;
-         }
-         else {
-            $self->expect( ':' );
-            my $value = $self->any_of(
-               $self->can( "token_int" ),
-               $self->can( "token_string" ),
-               \&token_boolean,
-            );
-            $style{$key} = $value;
-         }
+               if( $delete ) {
+                  $style{$key} = undef;
+               }
+               else {
+                  $self->expect( ':' );
+                  my $value = $self->any_of(
+                     $self->can( "token_int" ),
+                     $self->can( "token_string" ),
+                     \&token_boolean,
+                  );
+                  $style{$key} = $value;
+               }
 
+            },
+            sub {
+               $self->expect( '<' ); $self->commit;
+               my $key = $self->maybe_expect( '>' ) || $self->substring_before( '>' );
+               $self->expect( '>' );
+
+               $self->expect( ':' );
+
+               $style{"<$key>"} = $self->token_ident;
+            }
+         );
          $self->expect( ';' );
       } ) },
       '}'

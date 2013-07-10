@@ -14,6 +14,7 @@ my ( $term, $win ) = mk_term_and_window;
 
 my @key_events;
 my @mouse_events;
+my $do_something_counter = 0;
 my $widget = TestWidget->new;
 
 is_oneref( $widget, '$widget has refcount 1 initially' );
@@ -32,6 +33,10 @@ pressmouse( press => 1, 4, 3 );
 
 is_deeply( \@mouse_events, [ [ press => 1, 4, 3 ] ], 'on_mouse abs@3,4' );
 
+presskey( key => "Enter" );
+
+is( $do_something_counter, 1, '$do_something_counter after <Enter>' );
+
 is_oneref( $widget, '$widget has refcount 1 at EOF' );
 
 done_testing;
@@ -39,6 +44,7 @@ done_testing;
 package TestWidget;
 
 use base qw( Tickit::Widget );
+use Tickit::Style;
 
 use constant CLEAR_BEFORE_RENDER => 0;
 sub render
@@ -49,6 +55,15 @@ sub render
 
 sub lines  { 1 }
 sub cols   { 1 }
+
+use constant KEYPRESSES_FROM_STYLE => 1;
+
+BEGIN {
+   style_definition base =>
+      '<Enter>' => 'do_thing';
+}
+
+sub key_do_thing { $do_something_counter++ }
 
 sub on_key
 {

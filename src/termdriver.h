@@ -7,6 +7,7 @@ typedef struct TickitTermDriver TickitTermDriver;
 typedef struct {
   void (*destroy)(TickitTermDriver *ttd);
   void (*start)(TickitTermDriver *ttd);
+  int  (*started)(TickitTermDriver *ttd);
   void (*stop)(TickitTermDriver *ttd);
   void (*print)(TickitTermDriver *ttd, const char *str);
   int  (*goto_abs)(TickitTermDriver *ttd, int line, int col);
@@ -18,7 +19,7 @@ typedef struct {
   int  (*getctl_int)(TickitTermDriver *ttd, TickitTermCtl ctl, int *value);
   int  (*setctl_int)(TickitTermDriver *ttd, TickitTermCtl ctl, int value);
   int  (*setctl_str)(TickitTermDriver *ttd, TickitTermCtl ctl, const char *value);
-  void (*gotkey)(TickitTermDriver *ttd, TermKey *tk, const TermKeyKey *key);
+  int  (*gotkey)(TickitTermDriver *ttd, TermKey *tk, const TermKeyKey *key);
 } TickitTermDriverVTable;
 
 struct TickitTermDriver {
