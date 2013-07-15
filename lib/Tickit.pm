@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 BEGIN {
-   our $VERSION = '0.35';
+   our $VERSION = '0.36';
 }
 
 use Carp;
@@ -519,6 +519,9 @@ sub run
 
       # Disable the handler so a second signal will be fatal
       undef $SIG{$signal};
+      $SIG{$signal} = sub {
+         die "Aborting Tickit on double SIGINT\n";
+      };
 
       $self->stop;
    };

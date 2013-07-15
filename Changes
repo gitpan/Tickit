@@ -1,5 +1,14 @@
 Revision history for Changes
 
+0.36    CHANGES:
+         * Added bounds arguments to $rect->linerange
+         * Added $rb->eraserect
+         * Updated *Box container widgets to use ->render_to_rb
+
+        BUGFIXES:
+         * Avoid calling $win->clear when using ->render_to_rb
+         * Handle $rb->text entirely outside of clipping region
+
 0.35    CHANGES:
          * Give the terminal up to 100msec to initialise before running
          * Added ContainerWidget->find_child and ->focus_next

@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::ContainerWidget );
 use Tickit::RenderBuffer;
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 use Carp;
 
@@ -163,20 +163,12 @@ sub set_child_opts
    return $self->SUPER::set_child_opts( $child, @_ );
 }
 
-sub render
+sub render_to_rb
 {
    my $self = shift;
-   my %args = @_;
+   my ( $rb, $rect ) = @_;
 
-   my $win = $self->window or return;
-   my $rect = $args{rect};
-   my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
-   $rb->clip( $rect );
-   $rb->setpen( $self->pen );
-
-   $rb->erase_at( $_, $rect->left, $rect->cols ) for $rect->linerange;
-
-   $rb->flush_to_window( $win );
+   $rb->eraserect( $rect );
 }
 
 =head2 $widget->add( $child, %opts )

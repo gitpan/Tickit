@@ -1463,7 +1463,7 @@ text_at(self,line,col,text,pen=NULL)
     TickitRenderBuffer *rb;
     TickitRenderBufferCell *cell;
     TickitStringPos endpos;
-    int len, origlen;
+    int len;
     int startcol;
     char *textbytes;
   CODE:
@@ -1472,10 +1472,10 @@ text_at(self,line,col,text,pen=NULL)
     textbytes = SvPVutf8_nolen(text);
 
     tickit_string_count(textbytes, &endpos, NULL);
-    origlen = len = endpos.columns;
+    RETVAL = len = endpos.columns;
 
     if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, &startcol))
-      XSRETURN_UNDEF;
+      goto done;
 
     if(line < 0 || line >= rb->lines)
       croak("$line out of range");
@@ -1500,8 +1500,7 @@ text_at(self,line,col,text,pen=NULL)
     cell->text.offs = startcol;
 
     rb->n_texts++;
-
-    RETVAL = origlen;
+done:
   OUTPUT:
     RETVAL
 

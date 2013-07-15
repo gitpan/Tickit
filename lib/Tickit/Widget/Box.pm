@@ -14,7 +14,7 @@ use Tickit::RenderBuffer;
 
 use Tickit::Utils qw( bound );
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 use constant WIDGET_PEN_FROM_STYLE => 1;
 
@@ -128,20 +128,12 @@ sub cols
    return bound( $self->child_cols_min, $self->child->cols, $self->child_cols_max );
 }
 
-sub render
+sub render_to_rb
 {
    my $self = shift;
-   my %args = @_;
+   my ( $rb, $rect ) = @_;
 
-   my $win = $self->window or return;
-   my $rect = $args{rect};
-   my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
-   $rb->clip( $rect );
-   $rb->setpen( $self->pen );
-
-   $rb->erase_at( $_, $rect->left, $rect->cols ) for $rect->linerange;
-
-   $rb->flush_to_window( $win );
+   $rb->eraserect( $rect );
 }
 
 =head1 METHODS

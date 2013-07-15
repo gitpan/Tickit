@@ -51,6 +51,19 @@ my $rb = Tickit::RenderBuffer->new(
               ],
               'RC text rendering with clipping' );
    undef @methods;
+
+   $rb->goto( 2, 18 );
+   $rb->text( $_, $pen ) for qw( A B C D E );
+
+   $rb->flush_to_window( $win );
+   is_deeply( \@methods,
+              [
+                 [ goto => 2, 18 ],
+                 [ print => "A", {} ],
+                 [ print => "B", {} ],
+              ],
+              'RC text at VC with clipping' );
+   undef @methods;
 }
 
 # Clipping to rect

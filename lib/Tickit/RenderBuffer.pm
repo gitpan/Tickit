@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use feature qw( switch );
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 use Carp;
 use Scalar::Util qw( refaddr );
@@ -437,6 +437,22 @@ sub erase_to
 
    # $self->{col} = $col;
    $self->goto( $self->line, $col );
+}
+
+=head2 $rb->eraserect( $rect, $pen )
+
+Sets the range of cells given by the rectangle to erase with the given pen.
+
+=cut
+
+sub eraserect
+{
+   my $self = shift;
+   my ( $rect, $pen ) = @_;
+
+   foreach my $line ( $rect->linerange ) {
+      $self->erase_at( $line, $rect->left, $rect->cols, $pen );
+   }
 }
 
 =head1 LINE DRAWING

@@ -10,7 +10,7 @@ use warnings;
 
 use Carp;
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 # Load the XS code
 require Tickit;
@@ -107,9 +107,11 @@ Return the size of the rectangle.
 
 =cut
 
-=head2 @lines = $rect->linerange
+=head2 @lines = $rect->linerange( $min, $max )
 
-A convenient shortcut to generate the list of lines covered; being
+A convenient shortcut to generate the list of lines covered that are within
+the given bounds (either bound may be given as C<undef>). Without bounds,
+equivalent to:
 
  $rect->top .. $rect->bottom - 1
 
@@ -118,7 +120,15 @@ A convenient shortcut to generate the list of lines covered; being
 sub linerange
 {
    my $self = shift;
-   return $self->top .. $self->bottom - 1;
+   my ( $min, $max ) = @_;
+
+   my $start = $self->top;
+   $start = $min if defined $min and $min > $start;
+
+   my $stop = $self->bottom - 1;
+   $stop = $max if defined $max and $max < $stop;
+
+   return $start .. $stop;
 }
 
 =head1 METHODS

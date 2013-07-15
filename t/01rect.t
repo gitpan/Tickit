@@ -24,6 +24,9 @@ is( $rect->bottom, 12, '$rect->bottom' );
 is( $rect->right,  30, '$rect->right' );
 
 is_deeply( [ $rect->linerange ], [ 5 .. 11 ], '$rect->linerange' );
+is_deeply( [ $rect->linerange( 8, undef ) ], [ 8 .. 11 ], '$rect->linerange with min bound' );
+is_deeply( [ $rect->linerange( undef, 9 ) ], [ 5 .. 9 ], '$rect->linerange with max bound' );
+is_deeply( [ $rect->linerange( 2, 20 ) ], [ 5 .. 11 ], '$rect->linerange with bounds outside' );
 
 my $subrect;
 

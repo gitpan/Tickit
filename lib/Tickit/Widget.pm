@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -103,20 +103,17 @@ sub new
    my $class = shift;
    my %args = @_;
 
-   foreach my $method (qw( render lines cols )) {
+   foreach my $method (qw( lines cols )) {
       $class->can( $method ) or
          croak "$class cannot ->$method - do you subclass and implement it?";
    }
 
    # Require override ->render or a ->render_to_rb
-   if( $class->can( "render" ) == \&render ) {
-      $class->can( "render_to_rb" ) or
-         croak "$class must override ->render or provide a ->render_to_rb";
-   }
-   else {
-      $class->CLEAR_BEFORE_RENDER and
-         carp "Constructing a ->render $class with CLEAR_BEFORE_RENDER";
-   }
+   $class->can( "render_to_rb" ) or $class->can( "render" ) or
+      croak "$class cannot ->render_to_rb or ->render - do you subclass and implement it?";
+
+   $class->can( "render" ) and $class->CLEAR_BEFORE_RENDER and
+      carp "Constructing a ->render $class with CLEAR_BEFORE_RENDER";
 
    my $self = bless {
       classes => delete $args{classes} // [ delete $args{class} ],
@@ -543,17 +540,34 @@ sub window_gained
       $self->redraw if !$self->parent;
    } );
 
-   $window->set_on_expose( sub {
-      my ( $win, $rect ) = @_;
-      $self->_do_clear( $rect ) if $self->CLEAR_BEFORE_RENDER;
-      $self->render(
-         rect => $rect,
-         top   => $rect->top,
-         left  => $rect->left,
-         lines => $rect->lines,
-         cols  => $rect->cols,
-      );
-   } );
+   if( $self->can( "render_to_rb" ) ) {
+      $window->set_on_expose( sub {
+         my ( $win, $rect ) = @_;
+         $win->is_visible or return;
+
+         my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
+         $rb->clip( $rect );
+         $rb->setpen( $self->pen );
+
+         $self->render_to_rb( $rb, $rect );
+
+         $rb->flush_to_window( $win );
+      });
+   }
+   else {
+      # Legacy rendering to Window
+      $window->set_on_expose( sub {
+         my ( $win, $rect ) = @_;
+         $self->_do_clear( $rect ) if $self->CLEAR_BEFORE_RENDER;
+         $self->render(
+            rect => $rect,
+            top   => $rect->top,
+            left  => $rect->left,
+            lines => $rect->lines,
+            cols  => $rect->cols,
+         );
+      } );
+   }
 
    $window->set_on_focus( sub {
       my ( $win, $focus ) = @_;
@@ -719,24 +733,6 @@ sub _do_clear
 
    $window->clearrect( $rect );
    return 1;
-}
-
-sub render
-{
-   my $self = shift;
-   my %args = @_;
-
-   my $win = $self->window or return;
-   $win->is_visible or return;
-
-   my $rect = $args{rect};
-   my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
-   $rb->clip( $rect );
-   $rb->setpen( $self->pen );
-
-   $self->render_to_rb( $rb, $rect );
-
-   $rb->flush_to_window( $win );
 }
 
 =head2 $pen = $widget->pen

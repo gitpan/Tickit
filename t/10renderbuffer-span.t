@@ -88,6 +88,8 @@ is( $rb->cols,  20, '$rb->cols' );
    $rb->text_at( 3, 2, "dddddd", $pen );
    $rb->text_at( 3, 0, "DDDDD", $pen2 );
 
+   $rb->text_at( 4, 4, "", $pen ); # empty text should do nothing
+
    $rb->flush_to_window( $win );
    is_deeply( \@methods,
               [
@@ -224,6 +226,21 @@ is( $rb->cols,  20, '$rb->cols' );
                  [ print => "at 1,0", {} ],
               ],
               'RC renders text with translation' );
+   undef @methods;
+}
+
+# ->eraserect
+{
+   $rb->eraserect( Tickit::Rect->new( top => 2, left => 3, lines => 5, cols => 8 ) );
+
+   $rb->flush_to_window( $win );
+   is_deeply( \@methods,
+              [
+                ( map {
+                   [ goto => $_, 3 ],
+                   [ erasech => 8, undef, {} ] } 2 .. 6 )
+              ],
+              'RC renders eraserect' );
    undef @methods;
 }
 
