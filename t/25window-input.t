@@ -12,6 +12,7 @@ my $rootwin = mk_window;
 my $win = $rootwin->make_sub( 3, 10, 4, 20 );
 
 $win->focus( 0, 0 );
+flush_tickit;
 
 my @key_events;
 $win->set_on_key( sub {
@@ -44,6 +45,7 @@ is_deeply( \@mouse_events, [], 'no event for mouse abs@2,1' );
 my $subwin = $win->make_sub( 2, 2, 1, 10 );
 
 $subwin->focus( 0, 0 );
+flush_tickit;
 
 my @subkey_events;
 my @submouse_events;
@@ -92,6 +94,7 @@ is_deeply( \@submouse_events, [ [ press => 1, 0, 3 ] ], 'on_mouse abs@15,5 on su
 is_deeply( \@mouse_events,    [ [ press => 1, 2, 5 ] ], 'on_mouse abs@15,5 on win' );
 
 my $otherwin = $rootwin->make_sub( 10, 10, 4, 20 );
+flush_tickit;
 
 my @handlers;
 $win->set_on_key     ( sub { push @handlers, "win";      return 0 } );

@@ -15,6 +15,7 @@ my $win = $rootwin->make_sub( 3, 10, 4, 30 );
 
 $win->goto( 2, 3 );
 $win->print( "Hello" );
+flush_tickit;
 
 is_termlog( [ GOTO(5,13),
               SETPEN,
@@ -149,6 +150,7 @@ drain_termlog;
 
 {
    my $subwin = $win->make_sub( 2, 2, 1, 10 );
+   flush_tickit;
 
    is_deeply( [ $subwin->_get_span_visibility( 0, 0 ) ],
               [ 1, 10 ], '$subwin 0,0 visible for 10 columns' );
@@ -186,6 +188,7 @@ drain_termlog;
                'Display with correct pen' );
 
    $subwin->close;
+   flush_tickit;
 }
 
 # Hidden windows
@@ -196,6 +199,7 @@ drain_termlog;
    my $win1 = $win;
    my $win2 = $rootwin->make_sub( 3, 10, 4, 30 );
    $win2->hide;
+   flush_tickit;
 
    ok(  $win1->is_visible, '$win1 is visible' );
    ok( !$win2->is_visible, '$win2 is hidden' );
@@ -242,6 +246,7 @@ drain_termlog;
 
    $win1->close;
    $win2->close;
+   flush_tickit;
 }
 
 $win->close; undef $win;
@@ -308,6 +313,7 @@ flush_tickit;
    undef @exposed_rects;
 
    $win->close;
+   flush_tickit;
 }
 
 # Window ordering
@@ -315,6 +321,7 @@ flush_tickit;
    my $win_A = $rootwin->make_sub( 0, 0, 4, 80 );
    my $win_B = $rootwin->make_sub( 0, 0, 4, 80 );
    my $win_C = $rootwin->make_sub( 0, 0, 4, 80 );
+   flush_tickit;
 
    $win_A->set_on_expose( sub {
       my ( $win ) = @_;

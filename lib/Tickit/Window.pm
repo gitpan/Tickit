@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 use Carp;
 
@@ -22,6 +22,7 @@ use Tickit::RectSet;
 use Tickit::Utils qw( string_countmore );
 
 use constant WEAKEN_CHILDREN => 1;
+use constant CHILD_WINDOWS_LATER => $ENV{TICKIT_CHILD_WINDOWS_LATER};
 
 =head1 NAME
 
@@ -106,13 +107,7 @@ future version.
 
 =cut
 
-sub DESTROY
-{
-   my $self = shift;
-   $self->close;
-}
-
-sub close
+sub _close
 {
    my $self = shift;
 
@@ -122,23 +117,70 @@ sub close
    $self->set_on_expose( undef );
    $self->set_on_focus( undef );
 
-   $self->{parent}->_remove( $self ) if $self->{parent};
-   defined and $_->close for @{ $self->{child_windows} };
+   defined and $_->_close for @{ $self->{child_windows} };
+   undef $self->{child_windows};
+   @{ $self->{pending_geom_changes} } = ();
 }
 
-sub _remove
+sub DESTROY
 {
    my $self = shift;
-   my ( $child ) = @_;
+   $self->_close;
+   $self->{parent}->_do_change_children( remove => $self ) if $self->{parent};
+}
 
-   my $children = $self->{child_windows};
-   for( my $i = 0; $i < @$children; ) {
-      $i++, next if defined $children->[$i] and $children->[$i] != $child;
-      splice @$children, $i, 1, ();
+sub close
+{
+   my $self = shift;
+   $self->_close;
+   $self->{parent}->_change_children( remove => $self ) if $self->{parent};
+}
+
+sub _do_change_children
+{
+   my $self = shift;
+   my $how = shift;
+
+   my $children = $self->{child_windows} ||= [];
+   $self->_reap_dead_children;
+
+   if( $how eq "insert" ) {
+      my ( $sub, $index ) = @_;
+
+      $index = @$children if $index == -1;
+      splice @$children, $index, 0, ( $sub );
+      weaken $children->[$index] if WEAKEN_CHILDREN;
    }
+   elsif( $how eq "remove" ) {
+      my ( $child ) = @_;
+      for( my $i = 0; $i < @$children; ) {
+         $i++, next if defined $children->[$i] and $children->[$i] != $child;
+         splice @$children, $i, 1, ();
+      }
 
-   if( $self->{focused_child} and $self->{focused_child} == $child ) {
-      undef $self->{focused_child};
+      if( $self->{focused_child} and $self->{focused_child} == $child ) {
+         undef $self->{focused_child};
+      }
+   }
+}
+
+sub _change_children
+{
+   my $self = shift;
+
+   if( CHILD_WINDOWS_LATER ) {
+      my $queue = $self->{pending_geom_changes} ||= do {
+         my @queue;
+         $self->tickit->later( sub {
+            $self->_do_change_children( @$_ ) for @queue;
+            undef $self->{pending_geom_changes};
+         });
+         \@queue;
+      };
+      push @$queue, [ @_ ];
+   }
+   else {
+      $self->_do_change_children( @_ );
    }
 }
 
@@ -159,11 +201,10 @@ sub make_sub
    }, ref $self;
    $sub->_init;
 
-   $sub->change_geometry( $top, $left, $lines, $cols );
-
    $self->_reap_dead_children;
-   push @{ $self->{child_windows} }, $sub;
-   weaken $self->{child_windows}[-1] if WEAKEN_CHILDREN;
+
+   $sub->change_geometry( $top, $left, $lines, $cols );
+   $self->_change_children( insert => $sub, -1 );
 
    return $sub;
 }
@@ -202,12 +243,10 @@ sub make_float
    }, ref $self;
    $sub->_init;
 
-   $sub->change_geometry( $top, $left, $lines, $cols );
-
    $self->_reap_dead_children;
-   # floats go first
-   unshift @{ $self->{child_windows} }, $sub;
-   weaken $self->{child_windows}[0] if WEAKEN_CHILDREN;
+
+   $sub->change_geometry( $top, $left, $lines, $cols );
+   $self->_change_children( insert => $sub, 0 );
 
    return $sub;
 }

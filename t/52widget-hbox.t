@@ -31,7 +31,12 @@ is( $widget->cols, 3*8 + 2*2, '$widget->cols is 3*8 + 2*2' );
 
 $widget->set_window( $win );
 
-ok( defined $statics[0]->window, '$static has window after ->set_window $win' );
+ok( defined $statics[0]->window, '$statics[0] has window after ->set_window $win' );
+ok( defined $statics[1]->window, '$statics[1] has window after ->set_window $win' );
+ok( defined $statics[2]->window, '$statics[2] has window after ->set_window $win' );
+is( "".$statics[0]->window, 'Tickit::Window[8x25 abs@0,0]', '$statics[0] has correct window' );
+is( "".$statics[1]->window, 'Tickit::Window[8x25 abs@10,0]', '$statics[1] has correct window' );
+is( "".$statics[2]->window, 'Tickit::Window[8x25 abs@20,0]', '$statics[2] has correct window' );
 
 flush_tickit;
 

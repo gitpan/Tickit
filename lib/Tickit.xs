@@ -13,6 +13,9 @@
 
 #define streq(a,b) (strcmp(a,b)==0)
 
+// UVs also have the IOK flag set
+#define SvIsNumeric(sv) (SvFLAGS(sv) & (SVp_IOK|SVp_NOK))
+
 static TickitEventType tickit_name2ev(const char *name)
 {
   switch(name[0]) {
@@ -145,7 +148,7 @@ static void pen_set_attr(TickitPen *pen, TickitPenAttr attr, SV *val)
     tickit_pen_set_bool_attr(pen, attr, SvOK(val) ? SvIV(val) : 0);
     break;
   case TICKIT_PENTYPE_COLOUR:
-    if(!SvPOK(val) && (SvIOK(val) || SvUOK(val) || SvNOK(val)))
+    if(!SvPOK(val) && SvIsNumeric(val))
       tickit_pen_set_colour_attr(pen, attr, SvIV(val));
     else if(SvPOK(val))
       tickit_pen_set_colour_attr_desc(pen, attr, SvPV_nolen(val));
@@ -1225,7 +1228,7 @@ goto(self,line,col)
   CODE:
     rb = self;
 
-    if(SvIOK(line) && SvIOK(col)) {
+    if(SvIsNumeric(line) && SvIsNumeric(col)) {
       rb->vc_pos_set = 1;
       rb->vc_line = SvIV(line);
       rb->vc_col  = SvIV(col);
@@ -1253,6 +1256,7 @@ setpen(self,pen)
   INIT:
     TickitRenderBuffer *rb;
     TickitPen *prevpen = NULL;
+    TickitPenAttr a;
   CODE:
     rb = self;
 
@@ -1267,9 +1271,13 @@ setpen(self,pen)
     else {
       if(!rb->pen)
         rb->pen = tickit_pen_new();
+      else
+        // TODO: tickit_pen_clear()
+        for(a = 0; a < TICKIT_N_PEN_ATTRS; a++)
+          tickit_pen_clear_attr(rb->pen, a);
 
       if(pen)
-        tickit_pen_copy(rb->pen, pen->pen, 0);
+        tickit_pen_copy(rb->pen, pen->pen, 1);
       if(prevpen)
         tickit_pen_copy(rb->pen, prevpen, 0);
     }
@@ -2025,7 +2033,7 @@ input_wait(self,timeout=&PL_sv_undef)
   Tickit::Term  self
   SV           *timeout
   CODE:
-    if(SvNOK(timeout)) {
+    if(SvIsNumeric(timeout)) {
       struct timeval tv;
       tv.tv_sec = (long)SvNV(timeout);
       tv.tv_usec = 1E6 * (SvNV(timeout) - tv.tv_sec);

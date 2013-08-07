@@ -12,8 +12,10 @@ use Tickit::Test;
 my $root = mk_window;
 
 my $win = $root->make_sub( 10, 20, 1, 50 );
+flush_tickit;
 
 my $popupwin = $win->make_popup( 2, 2, 10, 10 );
+flush_tickit;
 
 is_oneref( $popupwin, '$popupwin has refcount 1 initially' );
 

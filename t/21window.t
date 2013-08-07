@@ -16,6 +16,7 @@ my ( $term, $rootwin ) = mk_term_and_window;
 is_refcount( $rootwin, 2, '$rootwin has refcount 2 initially' );
 
 my $win = $rootwin->make_sub( 3, 10, 4, 20 );
+flush_tickit;
 
 is_oneref( $win, '$win has refcount 1 initially' );
 is_refcount( $rootwin, 3, '$rootwin has refcount 3 after ->make_sub' );
@@ -79,6 +80,7 @@ is( $win->cols, 15, '$win->cols is 15 after resize' );
 is( $geom_changed, 1, '$reshaped is 1 after resize' );
 
 my $subwin = $win->make_sub( 2, 2, 1, 10 );
+flush_tickit;
 
 is( $subwin->top,  2, '$subwin->top' );
 is( $subwin->left, 2, '$subwin->left' );
@@ -109,6 +111,7 @@ is_refcount( $rootwin, 3, '$rootwin has refcount 3 before $win drop' );
 
 $subwin->close; undef $subwin;
 $win->close; undef $win;
+flush_tickit;
 
 is_refcount( $rootwin, 2, '$rootwin has refcount 3 at EOF' );
 

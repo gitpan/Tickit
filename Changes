@@ -1,5 +1,16 @@
 Revision history for Changes
 
+0.37    CHANGES:
+         * Allow Style files to use :: in widget type names
+         * Added an experiment to test making child window list changes
+           asynchronously "later"
+
+        BUGFIXES:
+         * API fixes in demos
+         * Recognise (and truncate) non-integer cursor positions to
+           RenderBuffer
+         * Ensure that RenderBuffer->setpen can alter already-set attributes
+
 0.36    CHANGES:
          * Added bounds arguments to $rect->linerange
          * Added $rb->eraserect

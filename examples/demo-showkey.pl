@@ -13,16 +13,18 @@ my $text;
 sub lines {  1 }
 sub cols  { 10 }
 
-sub render
+sub render_to_rb
 {
    my $self = shift;
+   my ( $rb, $rect ) = @_;
+
    my $win = $self->window;
 
-   $win->clear;
-   $win->goto( ( $win->lines - $self->lines ) / 2, ( $win->cols - $self->cols ) / 2 );
-   $win->print( $text );
+   $rb->goto( ( $win->lines - $self->lines ) / 2, ( $win->cols - $self->cols ) / 2 );
+   $rb->text( $text ) if defined $text;
+   $rb->erase_to( $win->cols );
 
-   $win->focus( 0, 0 );
+   $win->cursor_at( 0, 0 );
 }
 
 sub on_key

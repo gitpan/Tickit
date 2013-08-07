@@ -21,13 +21,19 @@ sub parse
    $self->sequence_of( \&parse_def );
 }
 
+sub token_typename
+{
+   my $self = shift;
+   $self->generic_token( typename => qr/(?:${\pattern_ident}::)*${\pattern_ident}/ );
+}
+
 struct Definition => [qw( type class tags style )];
 
 sub parse_def
 {
    my $self = shift;
 
-   my $type = $self->token_ident;
+   my $type = $self->token_typename;
    $self->commit;
 
    my $class;

@@ -100,5 +100,5 @@ sub render
    corner_at( $rb, 17, 50, LINE_THICK,  LINE_DOUBLE, $pen );
    corner_at( $rb, 17, 56, LINE_THICK,  LINE_THICK,  $pen );
 
-   $rb->render_to_window( $win );
+   $rb->flush_to_window( $win );
 }

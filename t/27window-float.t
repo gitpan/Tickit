@@ -13,6 +13,7 @@ my $root = mk_window;
 my $pos;
 
 my $rootfloat = $root->make_float( 10, 10, 5, 30 );
+flush_tickit;
 
 is_oneref( $rootfloat, '$rootfloat has refcount 1 initially' );
 is_refcount( $root, 3, '$root has refcount 3 after ->make_float' );

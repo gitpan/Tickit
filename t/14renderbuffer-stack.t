@@ -94,6 +94,43 @@ my $pen = Tickit::Pen->new;
          $rb->setpen( Tickit::Pen->new( fg => 4 ) );
          $rb->text( "456" );
 
+         $rb->setpen( Tickit::Pen->new( bg => -1 ) );
+
+         $rb->text( "789" );
+
+         $rb->restore;
+      }
+
+      $rb->text( "ABC" );
+   }
+   $rb->restore;
+
+   $rb->flush_to_window( $win );
+
+   is_deeply( \@methods,
+              [
+                 [ goto => 3, 0 ],
+                 [ print => "123", { bg => 1 } ],
+                 [ print => "456", { bg => 1, fg => 4 } ],
+                 [ print => "789", { bg => -1 } ],
+                 [ print => "ABC", { bg => 1 } ],
+              ],
+              'Stack saves/restores render pen' );
+   undef @methods;
+
+   $rb->save;
+   {
+      $rb->goto( 4, 0 );
+
+      $rb->setpen( Tickit::Pen->new( rv => 1 ) );
+      $rb->text( "123" );
+
+      {
+         $rb->savepen;
+
+         $rb->setpen( Tickit::Pen->new( rv => 0 ) );
+         $rb->text( "456" );
+
          $rb->restore;
       }
 
@@ -105,12 +142,12 @@ my $pen = Tickit::Pen->new;
 
    is_deeply( \@methods,
               [
-                 [ goto => 3, 0 ],
-                 [ print => "123", { bg => 1 } ],
-                 [ print => "456", { bg => 1, fg => 4 } ],
-                 [ print => "789", { bg => 1 } ],
+                 [ goto => 4, 0 ],
+                 [ print => "123", { rv => 1  } ],
+                 [ print => "456", { rv => '' } ],
+                 [ print => "789", { rv => 1  } ],
               ],
-              'Stack saves/restores render pen' );
+              'Stack saves/restores allows zeroing pen attributes' );
    undef @methods;
 }
 

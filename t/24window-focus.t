@@ -17,6 +17,7 @@ is_refcount( $rootwin, 2, '$rootwin has refcount 2 initially' );
 ok( !$term->{cursorvis}, 'Cursor not yet visible initially' );
 
 my $win = $rootwin->make_sub( 3, 10, 4, 20 );
+flush_tickit;
 
 is_oneref( $win, '$win has refcount 1 initially' );
 is_refcount( $rootwin, 3, '$rootwin has refcount 3 after ->make_sub' );
@@ -135,16 +136,19 @@ is_refcount( $rootwin, 3, '$rootwin has refcount 3 at EOF' );
 
    $winA->close;
    $winB->close;
+   flush_tickit;
 }
 
 {
    my $otherwin = $rootwin->make_sub( 10, 5, 2, 2 );
    $otherwin->focus( 0, 0 );
+   flush_tickit;
 
    ok( !$win->is_focused, '$win->is_focused false after ->focus on other window' );
    is( $focused, "out", '$focused is "out" after ->focus on other window' );
 
    $otherwin->close;
+   flush_tickit;
 }
 
 done_testing;

@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 # Load the XS code
 require Tickit;

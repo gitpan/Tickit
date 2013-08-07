@@ -10,7 +10,7 @@ use warnings;
 use feature qw( switch );
 use base qw( Tickit::Widget );
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 use Carp;
 
