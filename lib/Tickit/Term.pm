@@ -8,7 +8,9 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.37';
+our $VERSION = '0.38';
+
+use Carp;
 
 # Load the XS code
 require Tickit;
@@ -107,7 +109,7 @@ sub new
    my $class = shift;
    my %params = @_;
 
-   my $self = $class->_new( $ENV{TERM} );
+   my $self = $class->_new( $ENV{TERM} ) or croak "Cannot construct Tickit::Term - $!";
 
    $self->set_input_handle ( $params{input_handle}  ) if $params{input_handle};
    $self->set_output_handle( $params{output_handle} ) if $params{output_handle};
@@ -378,7 +380,9 @@ Enables keypad application mode
 
 =item TERMCTL_MOUSE
 
-Enables mouse tracking mode
+Enables mouse tracking mode. C<$vaule> should be one of
+C<TERM_MOUSEMODE_CLICK>, C<TERM_MOUSEMODE_DRAG>, C<TERM_MOUSEMODE_MOVE> or
+C<TERM_MOUSEMODE_OFF>.
 
 =back
 

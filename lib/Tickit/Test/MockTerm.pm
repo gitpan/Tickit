@@ -3,8 +3,9 @@ package Tickit::Test::MockTerm;
 use strict;
 use warnings;
 use feature qw( switch );
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.37';
+our $VERSION = '0.38';
 
 use Tickit::Utils qw( textwidth substrwidth );
 
@@ -236,8 +237,8 @@ sub scrollrect
    if( $left + $cols == $self->cols and $downward == 0 ) {
       foreach my $line ( $top .. $top + $lines - 1 ) {
          $self->goto( $line, $left );
-         $rightward > 0 ? $self->_insertch(  $rightward )
-                        : $self->_deletech( -$rightward );
+         $rightward > 0 ? $self->_deletech(  $rightward )
+                        : $self->_insertch( -$rightward );
       }
       return 1;
    }

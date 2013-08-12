@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.37';
+our $VERSION = '0.38';
 
 use Carp;
 
@@ -699,9 +699,20 @@ cell
 
 The mouse was moved while a button was held, and is now in the given cell
 
+=item drag_outside
+
+The mouse was moved outside of the window that handled the C<drag_start>
+event, and is still being dragged.
+
 =item drag_drop
 
 A mouse button was released after having been moved, while in the given cell
+
+=item drag_stop
+
+The drag operation has finished. This event is always given directly to the
+window that handled the C<drag_start> event, rather than the window on which
+the mouse release event happened.
 
 =item release
 
@@ -711,6 +722,12 @@ A mouse button was released after being pressed
 
 The invoked code should return a true value if it considers the mouse event
 dealt with, or false to pass it up to its parent window.
+
+Once a dragging operation has begun via C<drag_start>, the window that handled
+the event will always receive C<drag>, C<drag_outside>, and an eventual
+C<drag_stop> event even if the mouse moves outside that window. No other
+window will receive a C<drag_outside> or C<drag_stop> event than the one that
+started the operation.
 
 =cut
 
@@ -725,7 +742,7 @@ sub _handle_mouse
    my $self = shift;
    my ( $args ) = @_;
 
-   return 0 unless $self->is_visible;
+   return unless $self->is_visible;
 
    my $line = $args->{line};
    my $col  = $args->{col};
@@ -748,12 +765,13 @@ sub _handle_mouse
             col  => $child_col,
          };
 
-         return 1 if $child->_handle_mouse( $childargs );
+         my $ret = $child->_handle_mouse( $childargs );
+         return $ret if $ret;
       }
    }
 
    if( my $on_mouse = $self->{on_mouse} ) {
-      return $on_mouse->( $self,
+      return $self if $on_mouse->( $self,
          Tickit::Window::Event->new( %$args ),
          # legacy arguments
          $args->{button},

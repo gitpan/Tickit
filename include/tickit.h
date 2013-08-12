@@ -96,6 +96,7 @@ void tickit_pen_set_colour_attr(TickitPen *pen, TickitPenAttr attr, int value);
 int  tickit_pen_set_colour_attr_desc(TickitPen *pen, TickitPenAttr attr, const char *value);
 
 void tickit_pen_clear_attr(TickitPen *pen, TickitPenAttr attr);
+void tickit_pen_clear(TickitPen *pen);
 
 int tickit_pen_equiv_attr(const TickitPen *a, const TickitPen *b, TickitPenAttr attr);
 int tickit_pen_equiv(const TickitPen *a, const TickitPen *b);
@@ -230,6 +231,13 @@ typedef enum {
 } TickitTermCtl;
 
 typedef enum {
+  TICKIT_TERM_MOUSEMODE_OFF,
+  TICKIT_TERM_MOUSEMODE_CLICK,
+  TICKIT_TERM_MOUSEMODE_DRAG,
+  TICKIT_TERM_MOUSEMODE_MOVE,
+} TickitTermMouseMode;
+
+typedef enum {
   TICKIT_TERM_CURSORSHAPE_BLOCK = 1,
   TICKIT_TERM_CURSORSHAPE_UNDER,
   TICKIT_TERM_CURSORSHAPE_LEFT_BAR,
@@ -259,24 +267,32 @@ static inline void tickit_stringpos_zero(TickitStringPos *pos) {
   pos->bytes = pos->codepoints = pos->graphemes = pos->columns = 0;
 }
 
+#define INIT_TICKIT_STRINGPOS_LIMIT_BYTES(v) { .bytes = (v), .codepoints = -1, .graphemes = -1, .columns = -1 }
 static inline void tickit_stringpos_limit_bytes(TickitStringPos *pos, size_t bytes) {
   pos->codepoints = pos->graphemes = pos->columns = -1;
   pos->bytes = bytes;
 }
 
+#define INIT_TICKIT_STRINGPOS_LIMIT_CODEPOINTS(v) { .bytes = -1, .codepoints = (v), .graphemes = -1, .columns = -1 }
 static inline void tickit_stringpos_limit_codepoints(TickitStringPos *pos, int codepoints) {
   pos->bytes = pos->graphemes = pos->columns = -1;
   pos->codepoints = codepoints;
 }
 
+#define INIT_TICKIT_STRINGPOS_LIMIT_GRAPHEMES(v) { .bytes = -1, .codepoints = -1, .graphemes = (v), .columns = -1 }
 static inline void tickit_stringpos_limit_graphemes(TickitStringPos *pos, int graphemes) {
   pos->bytes = pos->codepoints = pos->columns = -1;
   pos->graphemes = graphemes;
 }
 
+#define INIT_TICKIT_STRINGPOS_LIMIT_COLUMNS(v) { .bytes = -1, .codepoints = -1, .graphemes = -1, .columns = (v) }
 static inline void tickit_stringpos_limit_columns(TickitStringPos *pos, int columns) {
   pos->bytes = pos->codepoints = pos->graphemes = -1;
   pos->columns = columns;
 }
+
+int    tickit_string_mbswidth(const char *str);
+int    tickit_string_byte2col(const char *str, size_t byte);
+size_t tickit_string_col2byte(const char *str, int col);
 
 #endif

@@ -13,7 +13,7 @@ use Test::More;
 use Test::HexString;
 use Test::Refcount;
 
-use Tickit::Term;
+use Tickit::Term qw( TERM_MOUSEMODE_DRAG );
 use Tickit::Pen;
 
 $SIG{PIPE} = "IGNORE";
@@ -112,8 +112,8 @@ $term->setctl_int( altscreen => 0 );
 stream_is( "\e[?1049l", '$term->setctl_int( altscreen => 0 )' );
 
 $stream = "";
-$term->setctl_int( mouse => 1 );
-stream_is( "\e[?1002h\e[?1006h", '$term->setctl_int( mouse => 1 )' );
+$term->setctl_int( mouse => TERM_MOUSEMODE_DRAG );
+stream_is( "\e[?1002h\e[?1006h", '$term->setctl_int( mouse => DRAG )' );
 
 $stream = "";
 $term->setctl_int( mouse => 0 );

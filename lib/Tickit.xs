@@ -360,16 +360,13 @@ enum TickitRenderBufferCellState {
 
 typedef struct {
   enum TickitRenderBufferCellState state;
-  union {
-    int len;      // state != CONT
-    int startcol; // state == CONT
-  };
+  int len; // or "startcol" for state == CONT
   TickitPen *pen; // state -> {TEXT, ERASE, LINE, CHAR}
   union {
     struct { int idx; int offs; } text; // state == TEXT
     struct { int mask;          } line; // state == LINE
     struct { int codepoint;     } chr;  // state == CHAR
-  };
+  } v;
 } TickitRenderBufferCell;
 
 typedef struct TickitRenderBufferStack TickitRenderBufferStack;
@@ -473,9 +470,9 @@ static void _tickit_rb_cont_cell(TickitRenderBufferCell *cell, int startcol)
       break;
   }
 
-  cell->state    = CONT;
-  cell->startcol = startcol;
-  cell->pen      = NULL;
+  cell->state = CONT;
+  cell->len   = startcol;
+  cell->pen   = NULL;
 }
 
 static TickitRenderBufferCell *_tickit_rb_make_span(TickitRenderBuffer *rb, int line, int col, int len)
@@ -485,7 +482,7 @@ static TickitRenderBufferCell *_tickit_rb_make_span(TickitRenderBuffer *rb, int 
 
   // If the following cell is a CONT, it needs to become a new start
   if(end < rb->cols && cells[line][end].state == CONT) {
-    int spanstart = cells[line][end].startcol;
+    int spanstart = cells[line][end].len;
     TickitRenderBufferCell *spancell = &cells[line][spanstart];
     int spanend = spanstart + spancell->len;
     int afterlen = spanend - end;
@@ -497,11 +494,11 @@ static TickitRenderBufferCell *_tickit_rb_make_span(TickitRenderBuffer *rb, int 
         endcell->len   = afterlen;
         break;
       case TEXT:
-        endcell->state     = TEXT;
-        endcell->len       = afterlen;
-        endcell->pen       = tickit_pen_clone(spancell->pen);
-        endcell->text.idx  = spancell->text.idx;
-        endcell->text.offs = spancell->text.offs + end - spanstart;
+        endcell->state       = TEXT;
+        endcell->len         = afterlen;
+        endcell->pen         = tickit_pen_clone(spancell->pen);
+        endcell->v.text.idx  = spancell->v.text.idx;
+        endcell->v.text.offs = spancell->v.text.offs + end - spanstart;
         break;
       case ERASE:
         endcell->state = ERASE;
@@ -516,12 +513,12 @@ static TickitRenderBufferCell *_tickit_rb_make_span(TickitRenderBuffer *rb, int 
     // We know these are already CONT cells
     int c;
     for(c = end + 1; c < spanend; c++)
-      cells[line][c].startcol = end;
+      cells[line][c].len = end;
   }
 
   // If the initial cell is a CONT, shorten its start
   if(cells[line][col].state == CONT) {
-    int beforestart = cells[line][col].startcol;
+    int beforestart = cells[line][col].len;
     TickitRenderBufferCell *spancell = &cells[line][beforestart];
     int beforelen = col - beforestart;
 
@@ -602,6 +599,11 @@ static void setup_constants(void)
   DO_CONSTANT(TICKIT_TERM_CURSORSHAPE_BLOCK)
   DO_CONSTANT(TICKIT_TERM_CURSORSHAPE_UNDER)
   DO_CONSTANT(TICKIT_TERM_CURSORSHAPE_LEFT_BAR)
+
+  DO_CONSTANT(TICKIT_TERM_MOUSEMODE_OFF)
+  DO_CONSTANT(TICKIT_TERM_MOUSEMODE_CLICK)
+  DO_CONSTANT(TICKIT_TERM_MOUSEMODE_DRAG)
+  DO_CONSTANT(TICKIT_TERM_MOUSEMODE_MOVE)
 }
 
 MODULE = Tickit             PACKAGE = Tickit::Pen
@@ -1078,8 +1080,8 @@ _xs_new(class,lines,cols)
       rb->cells[line][0].pen   = NULL;
 
       for(col = 1; col < rb->cols; col++) {
-        rb->cells[line][col].state    = CONT;
-        rb->cells[line][col].startcol = 0;
+        rb->cells[line][col].state = CONT;
+        rb->cells[line][col].len   = 0;
       }
     }
 
@@ -1272,9 +1274,7 @@ setpen(self,pen)
       if(!rb->pen)
         rb->pen = tickit_pen_new();
       else
-        // TODO: tickit_pen_clear()
-        for(a = 0; a < TICKIT_N_PEN_ATTRS; a++)
-          tickit_pen_clear_attr(rb->pen, a);
+        tickit_pen_clear(rb->pen);
 
       if(pen)
         tickit_pen_copy(rb->pen, pen->pen, 1);
@@ -1502,10 +1502,10 @@ text_at(self,line,col,text,pen=NULL)
     rb->texts[rb->n_texts] = savepv(textbytes);
 
     cell = _tickit_rb_make_span(rb, line, col, len);
-    cell->state     = TEXT;
-    cell->pen       = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
-    cell->text.idx  = rb->n_texts;
-    cell->text.offs = startcol;
+    cell->state       = TEXT;
+    cell->pen         = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
+    cell->v.text.idx  = rb->n_texts;
+    cell->v.text.offs = startcol;
 
     rb->n_texts++;
 done:
@@ -1572,10 +1572,10 @@ linecell(self,line,col,bits,pen=NULL)
     cell = &rb->cells[line][col];
     if(cell->state != LINE) {
       _tickit_rb_make_span(rb, line, col, len);
-      cell->state     = LINE;
-      cell->len       = 1;
-      cell->pen       = cellpen;
-      cell->line.mask = 0;
+      cell->state       = LINE;
+      cell->len         = 1;
+      cell->pen         = cellpen;
+      cell->v.line.mask = 0;
     }
     else if(!tickit_pen_equiv(cell->pen, cellpen)) {
       warn("Pen collision for line cell (%d,%d)", line, col);
@@ -1585,7 +1585,7 @@ linecell(self,line,col,bits,pen=NULL)
     else
       tickit_pen_destroy(cellpen);
 
-    cell->line.mask |= bits;
+    cell->v.line.mask |= bits;
 
 void
 char_at(self,line,col,codepoint,pen=NULL)
@@ -1614,9 +1614,9 @@ char_at(self,line,col,codepoint,pen=NULL)
       croak("$col+$len out of range");
 
     cell = _tickit_rb_make_span(rb, line, col, len);
-    cell->state         = CHAR;
-    cell->pen           = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
-    cell->chr.codepoint = codepoint;
+    cell->state           = CHAR;
+    cell->pen             = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
+    cell->v.chr.codepoint = codepoint;
 
 MODULE = Tickit             PACKAGE = Tickit::RenderBuffer::Cell
 
@@ -1665,7 +1665,7 @@ textidx(self)
     cell = (void *)SvIV(SvRV(self));
     if(cell->state != TEXT)
       croak("Cannot call ->textidx on a non-TEXT cell");
-    RETVAL = cell->text.idx;
+    RETVAL = cell->v.text.idx;
   OUTPUT:
     RETVAL
 
@@ -1678,7 +1678,7 @@ textoffs(self)
     cell = (void *)SvIV(SvRV(self));
     if(cell->state != TEXT)
       croak("Cannot call ->textoffs on a non-TEXT cell");
-    RETVAL = cell->text.offs;
+    RETVAL = cell->v.text.offs;
   OUTPUT:
     RETVAL
 
@@ -1691,7 +1691,7 @@ linemask(self)
     cell = (void *)SvIV(SvRV(self));
     if(cell->state != LINE)
       croak("Cannot call ->linemask on a non-LINE cell");
-    RETVAL = cell->line.mask;
+    RETVAL = cell->v.line.mask;
   OUTPUT:
     RETVAL
 
@@ -1704,7 +1704,7 @@ codepoint(self)
     cell = (void *)SvIV(SvRV(self));
     if(cell->state != CHAR)
       croak("Cannot call ->codepoint on a non-CHAR cell");
-    RETVAL = cell->chr.codepoint;
+    RETVAL = cell->v.chr.codepoint;
   OUTPUT:
     RETVAL
 

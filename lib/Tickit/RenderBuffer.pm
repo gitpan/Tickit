@@ -8,8 +8,9 @@ package Tickit::RenderBuffer;
 use strict;
 use warnings;
 use feature qw( switch );
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.37';
+our $VERSION = '0.38';
 
 use Carp;
 use Scalar::Util qw( refaddr );

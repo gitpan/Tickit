@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 BEGIN {
-   our $VERSION = '0.37';
+   our $VERSION = '0.38';
 }
 
 use Carp;
@@ -24,7 +24,7 @@ BEGIN {
    XSLoader::load( __PACKAGE__, our $VERSION );
 }
 
-use Tickit::Term;
+use Tickit::Term qw( TERM_MOUSEMODE_DRAG );
 use Tickit::Window;
 
 use Struct::Dumb;
@@ -365,7 +365,8 @@ sub on_mouse
          col  => $self->{mouse_last_press}[2],
       };
 
-      $self->rootwin->_handle_mouse( $start_args );
+      my $win = $self->rootwin->_handle_mouse( $start_args );
+      $self->{drag_source_window} = $win;
 
       $self->{mouse_dragging} = 1;
    }
@@ -376,10 +377,29 @@ sub on_mouse
 
       $self->rootwin->_handle_mouse( $drop_args );
 
+      if( my $win = $self->{drag_source_window} ) {
+         $win->_handle_mouse( { %$args,
+            type => "drag_stop",
+            line => $args->{line} - $win->abs_top,
+            col  => $args->{col}  - $win->abs_left,
+         } );
+      }
+
       $self->{mouse_dragging} = 0;
    }
 
-   $self->rootwin->_handle_mouse( $args ) and return;
+   my $win = $self->rootwin->_handle_mouse( $args );
+
+   my $srcwin;
+   if( $type eq "drag" and
+       $srcwin = $self->{drag_source_window} and
+       !$win || ( $win && $win != $srcwin ) ) {
+      $srcwin->_handle_mouse( { %$args,
+         type => "drag_outside",
+         line => $args->{line} - $srcwin->abs_top,
+         col  => $args->{col}  - $srcwin->abs_left,
+      } );
+   }
 }
 
 =head2 $tickit->rootwin
@@ -423,7 +443,7 @@ sub setup_term
 
    $term->setctl_int( altscreen => 1 );
    $term->setctl_int( cursorvis => 0 );
-   $term->setctl_int( mouse     => 1 );
+   $term->setctl_int( mouse     => TERM_MOUSEMODE_DRAG );
    $term->clear;
 
    if( my $widget = $self->{root_widget} ) {

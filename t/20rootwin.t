@@ -139,15 +139,15 @@ $win->scrollrect( 20,0,1,80, 0,1 );
 
 is_termlog( [ SETBG(undef),
               GOTO(20,0),
-              INSERTCH(1) ],
-            'Termlog after scrollrect ICH emulation' );
+              DELETECH(1) ],
+            'Termlog after scrollrect DCH emulation' );
 
 $win->scrollrect( 21,10,1,70, 0,-1 );
 
 is_termlog( [ SETBG(undef),
               GOTO(21,10),
-              DELETECH(1) ],
-            'Termlog after scrollrect DCH emulation' );
+              INSERTCH(1) ],
+            'Termlog after scrollrect ICH emulation' );
 
 # Scrolling region exposure
 {

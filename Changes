@@ -1,5 +1,18 @@
 Revision history for Changes
 
+0.38    CHANGES:
+         * Added 'drag_stop' and 'drag_outside' mouse events
+         * More helpful error message if Tickit::Term constructor fails
+         * Support multiple mouse tracking modes in latest libtickit
+         * Bundled libtickit updates:
+
+        BUGFIXES:
+         * Disable experimental smartmatch warnings on recent perls
+         * Fixed examples/demo-dragndrop.pl for recent API changes
+         * Avoid GNU C99 anonymous unions in RenderBuffer cell struct
+           (RT87724)
+         * Bugfix to MockTerm's ICH/DCH emulation of horisontal scrollrect
+
 0.37    CHANGES:
          * Allow Style files to use :: in widget type names
          * Added an experiment to test making child window list changes
