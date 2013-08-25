@@ -258,7 +258,6 @@ flush_tickit;
 
    my @exposed_rects;
    $win->set_on_expose( sub { push @exposed_rects, $_[1] } );
-   $win->set_expose_after_scroll( 1 );
 
    ok( $win->scroll( 1, 0 ), 'Fullwidth $win supports scrolling' );
    flush_tickit;
@@ -286,7 +285,9 @@ flush_tickit;
 
    undef @exposed_rects;
 
-   ok( $win->scrollrect( 2, 0, 3, 80, -1, 0 ), 'Fullwidth $win supports scrolling a region' );
+   ok( $win->scrollrect( Tickit::Rect->new( top => 2, left => 0, lines => 3, cols => 80 ),
+                         -1, 0 ),
+       'Fullwidth $win supports scrolling a region' );
    flush_tickit;
 
    is_termlog( [ SETPEN,
@@ -299,7 +300,8 @@ flush_tickit;
 
    undef @exposed_rects;
 
-   $win->scrollrect( 2, 0, 3, 80, 1, 0 );
+   $win->scrollrect( Tickit::Rect->new( top => 2, left => 0, lines => 3, cols => 80 ),
+                     1, 0 );
    flush_tickit;
 
    is_termlog( [ SETPEN,
@@ -312,7 +314,46 @@ flush_tickit;
 
    undef @exposed_rects;
 
+   # Now check that ->scroll_with_children scrolls the entire content even
+   # with obscuring children
+   my $child = $win->make_sub( 0, 70, 1, 10 );
+
+   $win->scroll_with_children( -2, 0 );
+   flush_tickit;
+
+   is_termlog( [ SETPEN,
+                 SCROLLRECT(5,0,10,80, -2,0) ],
+               'Termlog after ->scroll_with_children' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 0, left => 0, lines => 2, cols => 80 ) ],
+              'Exposed area after ->scroll_with_children' );
+
+   undef @exposed_rects;
+
+   # Sibling to obscure part of it
+   my $sibling = $rootwin->make_sub( 0, 0, 10, 20 );
+   $sibling->raise;
+   flush_tickit;
+   undef @exposed_rects;
+
+   $win->scroll_with_children( -2, 0 );
+   flush_tickit;
+
+   is_termlog( [ SETPEN,
+                 SETPEN,
+                 SCROLLRECT(10,0,5,80, -2,0) ],
+               'Termlog after ->scroll_with_children with sibling' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 0, left => 20, lines => 5, cols => 60 ),
+                Tickit::Rect->new( top => 5, left =>  0, lines => 2, cols => 80 ) ],
+              'Exposed area after ->scroll_with_children with sibling' );
+
+   undef @exposed_rects;
+
    $win->close;
+   $sibling->close;
    flush_tickit;
 }
 

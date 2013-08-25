@@ -81,8 +81,6 @@ is_display( [ BLANKLINES(10),
               [TEXT("X"x10), TEXT("|-- Yipee --|"), BLANK(17), TEXT("Y"x30), TEXT("X"x10)] ],
             'Display for print to floating window' );
 
-ok( !$root->scrollrect( 0, 0, 20, 80, 0, +3 ), '$root disallows scrollrect under a float' );
-
 my $subwin = $rootfloat->make_sub( 0, 4, 1, 6 );
 $subwin->goto( 0, 0 );
 $pos = $subwin->print( "Byenow" );
@@ -109,7 +107,6 @@ $rootfloat->show;
 {
    my @exposed_rects;
    $root->set_on_expose( sub { push @exposed_rects, $_[1] } );
-   $root->set_expose_after_scroll( 1 );
 
    $root->scroll( 3, 0 );
    flush_tickit;

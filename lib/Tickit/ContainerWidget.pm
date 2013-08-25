@@ -11,7 +11,7 @@ use feature qw( switch );
 use base qw( Tickit::Widget );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 use Carp;
 

@@ -126,23 +126,24 @@ is_display( [ BLANKLINE,
               [BLANK(3), TEXT("Hello",fg => 3)], ],
             'Display scrolled' );
 
-$win->scrollrect( 5,0,10,80, 3,0 );
+$win->scrollrect( Tickit::Rect->new( top => 5, left => 0, lines => 10, cols => 80 ),
+                  3, 0 );
 
 is_termlog( [ SETBG(undef),
               SCROLLRECT(5,0,10,80, 3,0) ],
             'Termlog after scrollrect' );
 
-ok( !$win->scrollrect( 5,20,10,40, 3,0 ), '$win does not support partial line scrolling' );
-drain_termlog;
-
-$win->scrollrect( 20,0,1,80, 0,1 );
+$win->scrollrect( Tickit::Rect->new( top => 20, left => 0, lines => 1, cols => 80 ),
+                  0, 1 );
 
 is_termlog( [ SETBG(undef),
               GOTO(20,0),
               DELETECH(1) ],
             'Termlog after scrollrect DCH emulation' );
 
-$win->scrollrect( 21,10,1,70, 0,-1 );
+$win->scrollrect( Tickit::Rect->new( top => 21, left => 10, lines => 1, cols => 70 ),
+                  0, -1 );
+flush_tickit;
 
 is_termlog( [ SETBG(undef),
               GOTO(21,10),
@@ -153,7 +154,6 @@ is_termlog( [ SETBG(undef),
 {
    my @exposed_rects;
    $win->set_on_expose( sub { push @exposed_rects, $_[1] } );
-   $win->set_expose_after_scroll( 1 );
 
    $win->scroll( 1, 0 );
    flush_tickit;

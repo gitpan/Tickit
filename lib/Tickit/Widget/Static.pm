@@ -14,7 +14,7 @@ use Tickit::RenderBuffer;
 use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );
@@ -96,6 +96,7 @@ sub new
 
    my $self = $class->SUPER::new( %args );
 
+   $self->{lines} = [];
    $self->set_text( $args{text} );
    $self->set_align( $args{align} || 0 );
    $self->set_valign( $args{valign} || 0 );
@@ -141,11 +142,17 @@ sub set_text
 {
    my $self = shift;
    my ( $text ) = @_;
+
+   my $waslines = $self->lines;
+   my $wascols  = $self->cols;
+
    my @lines = split m/\n/, $text;
    # split on empty string returns empty list
    @lines = ( "" ) if !@lines;
    $self->{lines} = \@lines;
-   $self->resized;
+
+   $self->resized if $self->lines != $waslines or $self->cols != $wascols;
+
    $self->redraw;
 }
 

@@ -9,11 +9,11 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 use Carp;
 
-use Scalar::Util qw( weaken refaddr );
+use Scalar::Util qw( weaken refaddr blessed );
 use List::Util qw( first );
 
 use Tickit::Pen;
@@ -89,6 +89,7 @@ sub _init
    $self->{visible} = 1;
    $self->{pen}     = Tickit::Pen->new;
    $self->{damage}  = Tickit::RectSet->new;
+   $self->{expose_after_scroll} = 1;
 }
 
 =head1 METHODS
@@ -849,12 +850,7 @@ sub expose
 {
    my $self = shift;
    my ( $rect ) = @_;
-   $rect ||= Tickit::Rect->new(
-      top   => 0,
-      left  => 0,
-      lines => $self->lines,
-      cols  => $self->cols,
-   );
+   $rect ||= $self->selfrect;
 
    return if $self->_expose_pending( $rect );
 
@@ -902,8 +898,10 @@ be just the newly-exposed portion that was scrolled in. If it was unsuccessful
 it will be the entire window region. If set false, no expose will happen, and
 the code calling C<scrollrect> must re-expose as required.
 
-This is a temporary method to handle the transition of behaviours; it may be
-removed in the future and its behaviour implied true always.
+This behaviour now defaults to true, and this is a temporary method to handle
+the transition of behaviours. This method exists only to allow this behaviour
+to be disabled as a temporary transition measure. It will be removed in a
+later version.
 
 =cut
 
@@ -997,6 +995,25 @@ sub lines
 {
    my $self = shift;
    return $self->{lines};
+}
+
+=head2 $rect = $win->selfrect
+
+Returns a L<Tickit::Rect> containing representing the window's extent within
+itself. This will have C<top> and C<left> equal to 0.
+
+=cut
+
+sub selfrect
+{
+   my $self = shift;
+   # TODO: Cache this, invalidate it in ->change_geometry
+   return Tickit::Rect->new(
+      top   => 0,
+      left  => 0,
+      lines => $self->lines,
+      cols  => $self->cols,
+   );
 }
 
 =head2 $rect = $win->rect
@@ -1423,17 +1440,20 @@ sub clearrect
    }
 }
 
+=head2 $success = $win->scrollrect( $rect, $downward, $rightward )
+
 =head2 $success = $win->scrollrect( $top, $left, $lines, $cols, $downward, $rightward )
 
 =head2 $success = $win->scrollrect( ..., $pen )
 
 =head2 $success = $win->scrollrect( ..., %attrs )
 
-Attempt to scroll the rectangle of the window defined by the first four
-parameters by an amount given by the latter two. Since most terminals cannot
-perform arbitrary rectangle scrolling, this method returns a boolean to
-indicate if it was successful. The caller should test this return value and
-fall back to another drawing strategy if the attempt was unsuccessful.
+Attempt to scroll the rectangle of the window (either given by a
+C<Tickit::Rect> or defined by the first four parameters) by an amount given
+by the latter two. Since most terminals cannot perform arbitrary rectangle
+scrolling, this method returns a boolean to indicate if it was successful.
+The caller should test this return value and fall back to another drawing
+strategy if the attempt was unsuccessful.
 
 Optionally, a C<Tickit::Pen> instance or hash of pen attributes may be
 provided, to override the background colour used for erased sections behind
@@ -1534,26 +1554,31 @@ sub _scrollrect_inner
    return 1;
 }
 
-# TODO: This ought probably to take a Tickit::Rect instead of 4 ints
 sub scrollrect
 {
    my $self = shift;
-   my ( $top, $left, $lines, $cols, $downward, $rightward, @args ) = @_;
-
-   my $rect = Tickit::Rect->new(
-      top   => $top,
-      left  => $left,
-      lines => $lines,
-      cols  => $cols,
-   );
+   my $rect;
+   if( blessed $_[0] and $_[0]->isa( "Tickit::Rect" ) ) {
+      $rect = shift;
+   }
+   else {
+      my ( $top, $left, $lines, $cols ) = splice @_, 0, 4;
+      $rect = Tickit::Rect->new(
+         top   => $top,
+         left  => $left,
+         lines => $lines,
+         cols  => $cols,
+      );
+   }
+   my ( $downward, $rightward, @args ) = @_;
 
    my $visible = Tickit::RectSet->new;
    $visible->add( $rect );
 
-   my $right = $left + $cols;
+   my $right = $rect->right;
 
-   foreach my $line ( $top .. $top + $lines - 1 ) {
-      my $col = $left;
+   foreach my $line ( $rect->linerange ) {
+      my $col = $rect->left;
       while( $col < $right ) {
          my ( $vis, $len ) = $self->_get_span_visibility( $line, $col );
          $col += $len and next if $vis;
@@ -1575,8 +1600,8 @@ sub scrollrect
    my @rects = $self->{damage}->rects;
    $self->{damage}->clear;
    foreach my $r ( @rects ) {
-      $self->{damage}->add( $r ), next if $r->bottom < $top or $r->top > $top + $lines or
-                                          $r->right < $left or $r->left > $left + $cols;
+      $self->{damage}->add( $r ), next if $r->bottom < $rect->top or $r->top > $rect->bottom or
+                                          $r->right < $rect->left or $r->left > $rect->right;
       my $inside = $r->intersect( $rect );
       my @outside = $r->subtract( $rect );
 
@@ -1607,6 +1632,51 @@ sub scroll
       0, 0, $self->lines, $self->cols,
       $downward, $rightward
    );
+}
+
+=head2 $win->scroll_with_children( $downward, $rightward )
+
+Similar to C<scroll> but ignores child windows of this one, moving all of
+the terminal content paying attention only to obscuring by newer siblings of
+ancestor windows.
+
+This method is experimental, intended only for use by
+L<Tickit::Widget::ScrollBox>. After calling this method, the terminal content
+will have moved and the windows drawing them will be confused unless the
+window position was also updated. C<ScrollBox> takes care to do this.
+
+=cut
+
+sub scroll_with_children
+{
+   my $self = shift;
+   my ( $downward, $rightward, @args ) = @_;
+
+   my $visible = Tickit::RectSet->new;
+   $visible->add( $self->selfrect );
+
+   my $prevchild = $self;
+   my $lineoffs = 0;
+   my $coloffs = 0;
+   for( my $win = $self->parent; $win; $win = $win->parent ) {
+      $lineoffs -= $prevchild->top;
+      $coloffs  -= $prevchild->left;
+
+      foreach my $child ( $win->subwindows ) {
+         last if $child == $prevchild;
+         $visible->subtract( $child->rect->translate( $lineoffs, $coloffs ) );
+      }
+
+      $prevchild = $win;
+   }
+
+   my $root = $prevchild;
+   my $ret = 1;
+   foreach my $r ( $visible->rects ) {
+      $self->_scrollrect_inner( $r, $downward, $rightward, @args ) or $ret = 0;
+   }
+
+   return $ret;
 }
 
 =head2 $win->cursor_at( $line, $col )

@@ -1,5 +1,19 @@
 Revision history for Changes
 
+0.39    CHANGES:
+         * Default expose_after_scroll true
+         * Don't ->resize a ::Static if its size hasn't actually changed
+         * Allow $win->scrollrect to take a Tickit::Rect instead of 4 ints
+         * Added $win->scroll_with_children
+
+        BUGFIXES:
+         * Fix for libtickit ICH/DCH
+         * Bundled libtickit bugfixes:
+            + Implement tickit_term_scrollrect ICH/DCH correctly
+
+        **NOTE**: These changes will break Tickit::Widget::Entry prior to
+        Tickit-Widgets version 0.11, and so will need updating.
+
 0.38    CHANGES:
          * Added 'drag_stop' and 'drag_outside' mouse events
          * More helpful error message if Tickit::Term constructor fails
