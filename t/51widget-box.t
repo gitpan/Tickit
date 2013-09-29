@@ -16,7 +16,7 @@ my( $child_lines, $child_cols );
 my $child_render_rect;
 
 my $widget = Tickit::Widget::Box->new(
-   child => TestWidget->new,
+   child => my $child = TestWidget->new,
 );
 
 ok( defined $widget, 'defined $widget' );
@@ -47,6 +47,7 @@ is( $child_render_rect, Tickit::Rect->new( top => 10, left => 30, lines => 5, co
    'child render rect with min bounds' );
 
 $child_lines = 8; $child_cols = 40;
+$child->resized;
 
 $widget->set_child_lines_max( 6 );
 $widget->set_child_cols_max( 30 );
@@ -80,8 +81,7 @@ package TestWidget;
 
 use base qw( Tickit::Widget );
 
-use constant CLEAR_BEFORE_RENDER => 0;
-sub render
+sub render_to_rb
 {
    my $self = shift;
    $child_render_rect = $self->window->rect;

@@ -12,25 +12,27 @@ use Tickit::Widget;
 
 my $win = mk_window;
 
-# Needs declarative code
 package StyledWidget;
 
 use base qw( Tickit::Widget );
 use Tickit::Style;
 
-style_definition base =>
-   fg => 2,
-   text => "Hello, world!",
-   spacing => 1,
-   marker => "[]",
-   '<Enter>' => "activate";
+# Needs declarative code
+BEGIN {
+   style_definition base =>
+      fg => 2,
+      text => "Hello, world!",
+      spacing => 1,
+      marker => "[]",
+      '<Enter>' => "activate";
 
-style_definition ':active' =>
-   u => 1;
+   style_definition ':active' =>
+      u => 1;
 
-style_reshape_keys qw( spacing );
-style_reshape_textwidth_keys qw( text );
-style_redraw_keys qw( marker );
+   style_reshape_keys qw( spacing );
+   style_reshape_textwidth_keys qw( text );
+   style_redraw_keys qw( marker );
+}
 
 # Normally this would be a package constant, but we'll make it a method so we
 # can easily adjust it for testing
@@ -40,9 +42,8 @@ sub WIDGET_PEN_FROM_STYLE { $WIDGET_PEN_FROM_STYLE }
 sub cols  { 1 }
 sub lines { 1 }
 
-use constant CLEAR_BEFORE_RENDER => 0;
 my $RENDERED;
-sub render { $RENDERED++ }
+sub render_to_rb { $RENDERED++ }
 
 my $RESHAPED;
 sub reshape { $RESHAPED++ }
@@ -59,10 +60,22 @@ use base qw( StyledWidget );
 
 package StyledWidget::StyledSubclass;
 use base qw( StyledWidget );
-use Tickit::Style;
+use Tickit::Style -blank;
 
-style_definition base =>
-   fg => 7;
+BEGIN {
+   style_definition base =>
+      fg => 7;
+}
+
+package StyledWidget::CopiedSubclass;
+use base qw( StyledWidget );
+use Tickit::Style -copy;
+
+BEGIN {
+   # Change just one thing
+   style_definition base =>
+      text => "Altered world";
+}
 
 package main;
 
@@ -286,6 +299,15 @@ EOF
    is_deeply( { $widget->get_style_pen->getattrs },
               { fg => 7, },
               'style pen for widget subclass with independent style' );
+
+   $widget = StyledWidget::CopiedSubclass->new;
+
+   is_deeply( { $widget->get_style_pen->getattrs },
+              { fg => 2},
+              'widget subclass as -copy clones pen' );
+   is( $widget->get_style_values( "text" ),
+       "Altered world",
+       'widget subclass as -copy has altered text' );
 }
 
 done_testing;

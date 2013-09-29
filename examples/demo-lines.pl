@@ -17,8 +17,6 @@ use Tickit::RenderBuffer qw(
 sub lines { 1 }
 sub cols  { 1 }
 
-use constant CLEAR_BEFORE_RENDER => 0;
-
 sub grid_at
 {
    my ( $rb, $line, $col, $style, $pen ) = @_;
@@ -41,14 +39,10 @@ sub corner_at
    $rb->vline_at( $line, $line + 1, $col, $style_vert, $pen, CAP_END );
 }
 
-sub render
+sub render_to_rb
 {
    my $self = shift;
-   my %args = @_;
-   my $win = $self->window or return;
-
-   my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
-   $rb->clip( $args{rect} );
+   my ( $rb, $rect ) = @_;
 
    $rb->text_at( 1, 2, "Single", $self->pen );
    grid_at( $rb, 2,  2, LINE_SINGLE, Tickit::Pen->new( fg => "red" ) );
@@ -99,6 +93,4 @@ sub render
    corner_at( $rb, 17, 44, LINE_THICK,  LINE_SINGLE, $pen );
    corner_at( $rb, 17, 50, LINE_THICK,  LINE_DOUBLE, $pen );
    corner_at( $rb, 17, 56, LINE_THICK,  LINE_THICK,  $pen );
-
-   $rb->flush_to_window( $win );
 }

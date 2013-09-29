@@ -7,10 +7,13 @@ use Test::More;
 use Test::Identity;
 use Test::Refcount;
 
+my $lines = 1;
+my $cols  = 5;
 my $widget = TestWidget->new;
 my $container = TestContainer->new;
 
 my $changed = 0;
+my $resized = 0;
 
 ok( defined $container, 'defined $container' );
 
@@ -41,6 +44,21 @@ is( $changed, 2, '$changed is 2' );
 
 is( scalar $container->children, 1, 'scalar $container->children is 1' );
 is_deeply( [ $container->children ], [ $widget ], '$container->children contains widget' );
+
+{
+   $cols = 10;
+   $widget->resized;
+
+   is( $resized, 1, '$resized is 1 after child ->resized' );
+
+   $widget->resized;
+
+   is( $resized, 1, '$resized still 1 after no-op child ->resized' );
+
+   $widget->set_requested_size( 2, 15 );
+
+   is( $resized, 2, '$resized is 2 after child ->set_requested_size' );
+}
 
 $container->remove( $widget );
 
@@ -78,17 +96,14 @@ package TestWidget;
 
 use base qw( Tickit::Widget );
 
-use constant CLEAR_BEFORE_RENDER => 0;
-sub render {}
+sub render_to_rb {}
 
-sub lines { 1 }
-sub cols  { 5 }
+sub lines { $lines }
+sub cols  { $cols  }
 
 package TestContainer;
 
 use base qw( Tickit::ContainerWidget );
-
-use constant CLEAR_BEFORE_RENDER => 0;
 
 sub new
 {
@@ -98,7 +113,7 @@ sub new
    return $self;
 }
 
-sub render {}
+sub render_to_rb {}
 
 sub lines { 2 }
 sub cols  { 10 }
@@ -124,5 +139,7 @@ sub remove
    @{ $self->{children} } = grep { $_ != $child } @{ $self->{children} };
    $self->SUPER::remove( @_ );
 }
+
+sub child_resized { $resized++ }
 
 sub children_changed { $changed++ }

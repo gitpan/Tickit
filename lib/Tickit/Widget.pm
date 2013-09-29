@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -109,11 +109,17 @@ sub new
    }
 
    # Require override ->render or a ->render_to_rb
-   $class->can( "render_to_rb" ) or $class->can( "render" ) or
-      croak "$class cannot ->render_to_rb or ->render - do you subclass and implement it?";
-
-   $class->can( "render" ) and $class->CLEAR_BEFORE_RENDER and
-      carp "Constructing a ->render $class with CLEAR_BEFORE_RENDER";
+   if( $class->can( "render_to_rb" ) ) {
+      # OK
+   }
+   elsif( $class->can( "render" ) ) {
+      $class->CLEAR_BEFORE_RENDER ?
+         carp "Constructing a legacy ->render $class with CLEAR_BEFORE_RENDER" :
+         carp "Constructing a legacy ->render $class";
+   }
+   else {
+      croak "$class cannot ->render_to_rb - do you subclass and implement it?";
+   }
 
    my $self = bless {
       classes => delete $args{classes} // [ delete $args{class} ],
@@ -678,14 +684,36 @@ sub parent
 =head2 $widget->resized
 
 Provided for subclasses to call when their size requirements have or may have
-changed. Informs the parent that the widget may require a differently-sized
-window.
+changed. Re-calculates the size requirements by calling C<lines> and C<cols>
+again, then calls C<set_requested_size>.
 
 =cut
 
 sub resized
 {
    my $self = shift;
+   # 'scalar' just in case of odd behavious in subclasses
+   $self->set_requested_size( scalar $self->lines, scalar $self->cols );
+}
+
+=head2 $widget->set_requested_size( $lines, $cols )
+
+Provided for subclasses to call when their size requirements have or may have
+changed. Informs the parent that the widget requires a differently-sized
+window if the dimensions are now different to last time.
+
+=cut
+
+sub set_requested_size
+{
+   my $self = shift;
+   my ( $new_lines, $new_cols ) = @_;
+
+   return if defined $self->{req_lines} and $self->{req_lines} == $new_lines and
+             defined $self->{req_cols}  and $self->{req_cols}  == $new_cols;
+
+   $self->{req_lines} = $new_lines;
+   $self->{req_cols}  = $new_cols;
 
    if( $self->parent ) {
       $self->parent->child_resized( $self );
@@ -695,6 +723,34 @@ sub resized
       $self->redraw;
    }
 }
+
+=head2 ( $lines, $cols ) = $widget->requested_size
+
+Returns the requested size of the widget; its preferred dimensions. This
+method calls C<lines> and C<cols> and caches the result until the next call to
+C<resized>. Container widgets should use this method in preference to calling
+C<lines> and C<cols> directly.
+
+=head2 $lines = $widget->requested_lines
+
+=head2 $cols  = $widget->requested_cols
+
+Returns one or other of the requested dimensions. Shortcuts for calling
+C<requested_size>. These are I<temporary> convenience methods to assist
+container widgets during the transition to the new sizing model.
+
+=cut
+
+sub requested_size
+{
+   my $self = shift;
+
+   return ( $self->{req_lines} //= $self->lines,
+            $self->{req_cols}  //= $self->cols );
+}
+
+sub requested_lines { ( shift->requested_size )[0] }
+sub requested_cols  { ( shift->requested_size )[1] }
 
 =head2 $widget->redraw
 
@@ -961,61 +1017,36 @@ containing the bare minimum of functionallity. It displays the fixed string
  sub lines {  1 }
  sub cols  { 12 }
 
- sub render
+ sub render_to_rb
  {
     my $self = shift;
-    my $win = $self->window;
+    my ( $rb, $rect ) = @_;
 
-    $win->clear;
-    $win->goto( 0, 0 );
-    $win->print( "Hello, world" );
+    $rb->eraserect( $rect );
+
+    $rb->text_at( 0, 0, "Hello, world" );
  }
 
  1;
 
 The C<lines> and C<cols> methods tell the container of the widget what its
-minimum size requirements are, and the C<render> method actually draws it to
-the window.
+minimum size requirements are, and the C<render_to_rb> method actually draws
+it to the render buffer.
 
 A slight improvement on this would be to obtain the size of the window, and
 position the text in the centre rather than the top left corner.
 
- sub render
+ sub render_to_rb
  {
     my $self = shift;
+    my ( $rb, $rect ) = @_;
     my $win = $self->window;
 
-    $win->clear;
-    $win->goto( ( $win->lines - 1 ) / 2, ( $win->cols - 12 ) / 2 );
-    $win->print( "Hello, world" );
- }
+    $rb->eraserect( $rect );
 
-A further improvement restricts rendering to only the lines specified by the
-C<rect> argument, and also ensures not to double-print the line.
-
- sub render
- {
-    my $self = shift;
-    my %args = @_;
-    my $win = $self->window;
-    my $rect = $args{rect};
-
-    my $content_line = int( ( $win->lines - 1 ) / 2 );
-
-    foreach my $line ( $rect->top .. $content_line - 1 ) {
-       $win->goto( $line, $rect->left );
-       $win->erasech( $rect->cols );
-    }
-
-    if( $rect->top <= $content_line and $content_line < $rect->bottom ) {
-       $win->goto( $content_line, ( $win->cols - 12 ) / 2 );
-       $win->print( "Hello, world" );
-    }
-
-    foreach my $line ( $content_line + 1 .. $rect->bottom - 1 ) {
-       $win->goto( $line, $rect->left );
-       $win->erasech( $rect->cols );
-    }
+    $rb->text_at( $win->lines - 1 ) / 2, ( $win->cols - 12 ) / 2,
+       "Hello, world"
+    );
  }
 
 =head2 Reacting To User Input
@@ -1032,14 +1063,17 @@ change the pen foreground colour.
  sub lines { 1 }
  sub cols  { length $text }
 
- sub render
+ sub render_to_rb
  {
     my $self = shift;
+    my ( $rb, $rect ) = @_;
     my $win = $self->window;
 
-    $win->clear;
-    $win->goto( ( $win->lines - $self->lines ) / 2, ( $win->cols - $self->cols ) / 2 );
-    $win->print( $text );
+    $rb->eraserect( $rect );
+
+    $rb->text_at( $win->lines - 1 ) / 2, ( $win->cols - 12 ) / 2,
+       "Hello, world"
+    );
 
     $win->focus( 0, 0 );
  }
@@ -1060,10 +1094,10 @@ change the pen foreground colour.
 
  1;
 
-The C<render> method sets the focus at the window's top left corner to ensure
-that the window always has focus, so the widget will receive keypress events.
-(A real widget implementation would likely pick a more sensible place to put
-the cursor).
+The C<render_to_rb> method sets the focus at the window's top left corner to
+ensure that the window always has focus, so the widget will receive keypress
+events. (A real widget implementation would likely pick a more sensible place
+to put the cursor).
 
 The C<on_key> method then gets invoked for keypresses. It returns a true value
 to indicate the keys it handles, returning false for the others, to allow
@@ -1082,15 +1116,15 @@ list of the last 10 mouse clicks and renders them with an C<X>.
  sub lines { 1 }
  sub cols  { 1 }
 
- sub render
+ sub render_to_rb
  {
     my $self = shift;
-    my $win = $self->window;
+    my ( $rb, $rect ) = @_;
 
-    $win->clear;
+    $rb->eraserect( $rect );
+
     foreach my $point ( @points ) {
-       $win->goto( $point->[0], $point->[1] );
-       $win->print( "X" );
+       $rb->text_at( $point->[0], $point->[1], "X" );
     }
  }
 

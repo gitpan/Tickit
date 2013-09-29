@@ -1,5 +1,20 @@
 Revision history for Changes
 
+0.40    2013/09/29 19:08:09
+        [CHANGES]
+         * New size model; ->requested_{size,lines,cols} which cache
+         * Lazy $parent->resize only when required
+         * Updated all examples/docs for new ->render_to_rb
+         * Print a legacy deprecation warning when constructing a
+           ->render-based widget
+         * Allow Styled widgets to copy their base class
+         * Allow HBox/VBox to take a 'children' ARRAY to constructor
+
+        [BUGFIXES]
+         * Specify minimum required version of Alien::libtermkey to get
+           libtermkey >= 0.16
+         * Need to force TERM=xterm during sequence testing
+
 0.39    CHANGES:
          * Default expose_after_scroll true
          * Don't ->resize a ::Static if its size hasn't actually changed

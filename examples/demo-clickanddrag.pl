@@ -15,8 +15,7 @@ use List::Util qw( min max );
 sub lines { 1 }
 sub cols  { 1 }
 
-use constant CLEAR_BEFORE_RENDER => 0;
-sub render {}
+sub render_to_rb {}
 
 # In a real Widget these would be stored in an attribute of $self
 my @start;

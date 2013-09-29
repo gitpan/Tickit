@@ -4,14 +4,13 @@ use base 'Tickit::Widget';
 sub lines {  1 }
 sub cols  { 12 }
 
-sub render
+sub render_to_rb
 {
    my $self = shift;
-   my $win = $self->window;
+   my ( $rb, $rect ) = @_;
 
-   $win->clear;
-   $win->goto( 0, 0 );
-   $win->print( "Hello, world" );
+   $rb->eraserect( $rect );
+   $rb->text_at( 0, 0, "Hello, world" );
 }
 
 1;

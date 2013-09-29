@@ -20,8 +20,8 @@ my $win = mk_window;
    };
 
    like( $warnings,
-         qr/^Constructing a ->render WidgetWithClear with CLEAR_BEFORE_RENDER at /,
-         'Constructing a Widget with CLEAR_BEFORE_RENDER yields a warning');
+         qr/^Constructing a legacy ->render WidgetWithClear with CLEAR_BEFORE_RENDER at /,
+         'Constructing a ->render Widget with CLEAR_BEFORE_RENDER yields a warning');
 
    $widget->set_window( $win );
 
@@ -42,7 +42,17 @@ my $win = mk_window;
 }
 
 {
-   my $widget = WidgetNoClear->new;
+   my $warnings = "";
+
+   my $widget = do {
+      local $SIG{__WARN__} = sub { $warnings .= join "", @_ };
+      WidgetNoClear->new;
+   };
+
+   like( $warnings,
+         qr/^Constructing a legacy ->render WidgetNoClear at /,
+         'Constructing a ->render Widget yields a warning');
+
    $widget->set_window( $win );
 
    flush_tickit;

@@ -10,7 +10,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 use Carp;
 use Scalar::Util qw( refaddr );
@@ -59,21 +59,13 @@ L<Tickit> windows
  package Tickit::Widget::Something;
  ...
 
- sub render
+ sub render_to_rb
  {
     my $self = shift;
-    my %args = @_;
-    my $win = $self->window or return;
+    my ( $rb, $rect ) = @_;
 
-    my $rb = Tickit::RenderBuffer->new(
-       lines => $win->lines,
-       cols  => $win->cols,
-    );
-    $rb->clip( $args{rect} );
-
+    $rb->eraserect( $rect );
     $rb->text_at( 2, 2, "Hello, world!", $self->pen );
-
-    $rb->flush_to_window( $win );
  }
 
 =head1 DESCRIPTION

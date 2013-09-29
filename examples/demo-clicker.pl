@@ -14,16 +14,16 @@ my @points;
 sub lines { 1 }
 sub cols  { 1 }
 
-use constant CLEAR_BEFORE_RENDER => 0;
-sub render
+sub render_to_rb
 {
    my $self = shift;
+   my ( $rb, $rect ) = @_;
+
    my $win = $self->window;
 
-   $win->clear;
+   $rb->eraserect( $rect );
    foreach my $point ( @points ) {
-      $win->goto( $point->[0], $point->[1] );
-      $win->print( "X" );
+      $rb->text_at( $point->[0], $point->[1], "X" );
    }
 }
 

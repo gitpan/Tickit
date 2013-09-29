@@ -14,7 +14,7 @@ use Tickit::RenderBuffer;
 
 use Tickit::Utils qw( bound );
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 use constant WIDGET_PEN_FROM_STYLE => 1;
 
@@ -119,13 +119,13 @@ sub new
 sub lines
 {
    my $self = shift;
-   return bound( $self->child_lines_min, $self->child->lines, $self->child_lines_max );
+   return bound( $self->child_lines_min, $self->child->requested_lines, $self->child_lines_max );
 }
 
 sub cols
 {
    my $self = shift;
-   return bound( $self->child_cols_min, $self->child->cols, $self->child_cols_max );
+   return bound( $self->child_cols_min, $self->child->requested_cols, $self->child_cols_max );
 }
 
 sub render_to_rb

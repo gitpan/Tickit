@@ -3,6 +3,12 @@
 use strict;
 use warnings;
 
+BEGIN {
+   # We need to force TERM=xterm so that we can guarantee the right byte
+   # sequences for testing
+   $ENV{TERM} = "xterm";
+}
+
 use Test::More;
 use Test::Identity;
 

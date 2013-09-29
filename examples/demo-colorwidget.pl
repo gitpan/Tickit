@@ -13,15 +13,16 @@ my $text = "Press 0 to 7 to change the colour of this text";
 sub lines { 1 }
 sub cols  { length $text }
 
-use constant CLEAR_BEFORE_RENDER => 0;
-sub render
+sub render_to_rb
 {
    my $self = shift;
+   my ( $rb, $rect ) = @_;
+
    my $win = $self->window;
 
-   $win->clear;
-   $win->goto( ( $win->lines - $self->lines ) / 2, ( $win->cols - $self->cols ) / 2 );
-   $win->print( $text );
+   $rb->eraserect( $rect );
+
+   $rb->text_at( ( $win->lines - $self->lines ) / 2, ( $win->cols - $self->cols ) / 2, $text );
 
    $win->focus( 0, 0 );
 }

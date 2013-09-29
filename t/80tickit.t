@@ -88,12 +88,13 @@ use base qw( Tickit::Widget );
 sub lines { 1 }
 sub cols  { 5 }
 
-use constant CLEAR_BEFORE_RENDER => 0;
-sub render
+sub render_to_rb
 {
    my $self = shift;
+   my ( $rb, $rect ) = @_;
    my $win = $self->window or return;
 
-   $win->goto( $win->lines / 2, ( $win->cols - 5 ) / 2 );
-   $win->print( "Hello" );
+   $rb->text_at( $win->lines / 2, ( $win->cols - 5 ) / 2,
+      "Hello"
+   );
 }

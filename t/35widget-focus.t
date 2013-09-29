@@ -58,8 +58,7 @@ use constant WIDGET_PEN_FROM_STYLE => 1;
 
 use constant CAN_FOCUS => 1;
 
-use constant CLEAR_BEFORE_RENDER => 0;
-sub render {}
+sub render_to_rb {}
 
 sub lines  { 1 }
 sub cols   { 1 }

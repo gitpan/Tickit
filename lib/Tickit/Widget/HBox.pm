@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::Widget::LinearBox );
 use Tickit::Style;
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 use List::Util qw( sum max );
 
@@ -76,14 +76,14 @@ use constant WIDGET_PEN_FROM_STYLE => 1;
 sub lines
 {
    my $self = shift;
-   return max( 1, map { $_->lines } $self->children );
+   return max( 1, map { $_->requested_lines } $self->children );
 }
 
 sub cols
 {
    my $self = shift;
    my $spacing = $self->get_style_values( "spacing" );
-   return ( sum( map { $_->cols } $self->children ) || 1 ) +
+   return ( sum( map { $_->requested_cols } $self->children ) || 1 ) +
           $spacing * ( $self->children - 1 );
 }
 
@@ -98,7 +98,7 @@ sub get_child_base
 {
    my $self = shift;
    my ( $child ) = @_;
-   return $child->cols;
+   return $child->requested_cols;
 }
 
 sub set_child_window

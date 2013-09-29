@@ -65,6 +65,9 @@ is_oneref( $widget, '$widget has refcount 1 at EOF' );
 my $render_called = 0;
 my %render_args;
 {
+   # Suppress the warning
+   local $SIG{__WARN__} = sub {};
+
    my $widget = TestWidgetRenderToWindow->new;
 
    is( $render_called, 0, 'render not yet called' );

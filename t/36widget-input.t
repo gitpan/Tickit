@@ -20,6 +20,7 @@ my $widget = TestWidget->new;
 is_oneref( $widget, '$widget has refcount 1 initially' );
 
 $widget->set_window( $win );
+$widget->take_focus;
 
 flush_tickit;
 
@@ -46,15 +47,21 @@ package TestWidget;
 use base qw( Tickit::Widget );
 use Tickit::Style;
 
-use constant CLEAR_BEFORE_RENDER => 0;
-sub render
-{
-   my $self = shift;
-   $self->window->focus( 0, 0 );
-}
+use constant CAN_FOCUS => 1;
 
 sub lines  { 1 }
 sub cols   { 1 }
+
+sub render_to_rb {}
+
+sub window_gained
+{
+   my $self = shift;
+   my ( $win ) = @_;
+   $self->SUPER::window_gained( $win );
+
+   $win->cursor_at( 0, 0 );
+}
 
 use constant KEYPRESSES_FROM_STYLE => 1;
 

@@ -136,8 +136,7 @@ package TestWidget;
 
 use base qw( Tickit::Widget );
 
-use constant CLEAR_BEFORE_RENDER => 0;
-sub render {}
+sub render_to_rb {}
 
 sub lines { 1 }
 sub cols  { 5 }

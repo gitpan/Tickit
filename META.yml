@@ -11,12 +11,12 @@ build_requires:
   Test::More: 0.88
   Test::Refcount: 0
 configure_requires:
-  Alien::libtermkey: 0
+  Alien::libtermkey: 0.13
   Alien::unibilium: 0.09
   ExtUtils::PkgConfig: 0
   Module::Build: 0
 dynamic_config: 1
-generated_by: 'Module::Build version 0.4005, CPAN::Meta::Converter version 2.120921'
+generated_by: 'Module::Build version 0.4007, CPAN::Meta::Converter version 2.132140'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -25,87 +25,84 @@ name: Tickit
 provides:
   Tickit:
     file: lib/Tickit.pm
-    version: 0.39
+    version: 0.40
   Tickit::ContainerWidget:
     file: lib/Tickit/ContainerWidget.pm
-    version: 0.39
+    version: 0.40
   Tickit::OneLineWidget:
     file: lib/Tickit/OneLineWidget.pm
-    version: 0.39
+    version: 0.40
   Tickit::Pen:
     file: lib/Tickit/Pen.pm
-    version: 0.39
+    version: 0.40
   Tickit::Pen::Immutable:
     file: lib/Tickit/Pen.pm
-    version: 0
   Tickit::Pen::Mutable:
     file: lib/Tickit/Pen.pm
-    version: 0
   Tickit::Rect:
     file: lib/Tickit/Rect.pm
-    version: 0.39
+    version: 0.40
   Tickit::RectSet:
     file: lib/Tickit/RectSet.pm
-    version: 0.39
+    version: 0.40
   Tickit::RenderBuffer:
     file: lib/Tickit/RenderBuffer.pm
-    version: 0.39
+    version: 0.40
   Tickit::SingleChildWidget:
     file: lib/Tickit/SingleChildWidget.pm
-    version: 0.39
+    version: 0.40
   Tickit::StringPos:
     file: lib/Tickit/StringPos.pm
-    version: 0.39
+    version: 0.40
   Tickit::Style:
     file: lib/Tickit/Style.pm
-    version: 0.39
+    version: 0.40
   Tickit::Style::Parser:
     file: lib/Tickit/Style/Parser.pm
-    version: 0
   Tickit::Term:
     file: lib/Tickit/Term.pm
-    version: 0.39
+    version: 0.40
   Tickit::Test:
     file: lib/Tickit/Test.pm
-    version: 0.39
+    version: 0.40
   Tickit::Test::MockTerm:
     file: lib/Tickit/Test/MockTerm.pm
-    version: 0.39
+    version: 0.40
   Tickit::Utils:
     file: lib/Tickit/Utils.pm
-    version: 0.39
+    version: 0.40
   Tickit::Widget:
     file: lib/Tickit/Widget.pm
-    version: 0.39
+    version: 0.40
   Tickit::Widget::Box:
     file: lib/Tickit/Widget/Box.pm
-    version: 0.39
+    version: 0.40
   Tickit::Widget::HBox:
     file: lib/Tickit/Widget/HBox.pm
-    version: 0.39
+    version: 0.40
   Tickit::Widget::LinearBox:
     file: lib/Tickit/Widget/LinearBox.pm
-    version: 0.39
+    version: 0.40
   Tickit::Widget::Static:
     file: lib/Tickit/Widget/Static.pm
-    version: 0.39
+    version: 0.40
   Tickit::Widget::VBox:
     file: lib/Tickit/Widget/VBox.pm
-    version: 0.39
+    version: 0.40
   Tickit::WidgetRole:
     file: lib/Tickit/WidgetRole.pm
-    version: 0.39
+    version: 0.40
   Tickit::WidgetRole::Alignable:
     file: lib/Tickit/WidgetRole/Alignable.pm
-    version: 0.39
+    version: 0.40
   Tickit::WidgetRole::Penable:
     file: lib/Tickit/WidgetRole/Penable.pm
-    version: 0.39
+    version: 0.40
   Tickit::Window:
     file: lib/Tickit/Window.pm
-    version: 0.39
+    version: 0.40
 requires:
-  Alien::libtermkey: 0
+  Alien::libtermkey: 0.13
   Alien::unibilium: 0.09
   Exporter: 5.57
   List::MoreUtils: 0
@@ -114,4 +111,4 @@ requires:
   perl: 5.010
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.39
+version: 0.40

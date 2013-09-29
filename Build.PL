@@ -123,11 +123,11 @@ my $build = Module::Build->new(
    # by some other mechanism
    meta_merge => {
       configure_requires => {
-         'Alien::libtermkey' => 0,
+         'Alien::libtermkey' => '0.13',
          'Alien::unibilium' => '0.09',
       },
       requires => {
-         'Alien::libtermkey' => 0,
+         'Alien::libtermkey' => '0.13',
          'Alien::unibilium' => '0.09',
       },
    },

@@ -10,7 +10,7 @@ use warnings;
 use base qw( Tickit::ContainerWidget );
 use Tickit::RenderBuffer;
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 use Carp;
 
@@ -53,6 +53,27 @@ returned by C<get_child_base>.
 
 =cut
 
+=head1 CONSTRUCTOR
+
+=cut
+
+=head2 $widget = Tickit::Widget::LinearBox->new( %args )
+
+Returns a new C<Tickit::Widget::LinearBox>.
+
+Takes the following named argmuents:
+
+=over 8
+
+=item children => ARRAY[Tickit::Widget]
+
+Optional. If provided, the widgets in this array will be added, with no
+additional options.
+
+=back
+
+=cut
+
 sub new
 {
    my $class = shift;
@@ -63,6 +84,8 @@ sub new
    my $self = $class->SUPER::new( %args );
 
    $self->{children} = [];
+
+   $self->add( $_ ) for @{ $args{children} };
 
    return $self;
 }

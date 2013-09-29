@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 use Carp;
 
@@ -49,13 +49,12 @@ C<Tickit::Style> - declare customisable style information on widgets
 
  ...
 
- sub render
+ sub render_to_rb
  {
     my $self = shift;
-    my $win = $self->window or return;
+    my ( $rb, $rect ) = @_;
 
-    $win->goto( 0, 0 );
-    $win->print( "Here is my text", $self->get_style_pen );
+    $rb->text_at( 0, 0, "Here is my text", $self->get_style_pen );
  }
 
 =head1 DESCRIPTION
@@ -165,9 +164,22 @@ C<use Tickit::Style> again, the subclass will be transparent from the point of
 view of style. Any style applied to the base class will apply equally to the
 subclass, and the name of the subclass does not take part in style decisions.
 
-If the subclass does C<use Tickit::Style> again then the new subclass will be
-a distinct widget type for style purposes, and it will require its own new set
-of base style definitions.
+If the subclass does C<use Tickit::Style> again then the new subclass has a
+distinct widget type for style purposes. It can optionally copy the style
+information from its base class, but thereafter the stored information is
+distinct, and changes in the base class (such as loading style files) will not
+affect it.
+
+To copy the style information from the base, apply the C<-copy> keyword:
+
+ use Tickit::Style -copy;
+
+Alternatively, to start with a new blank state, use the C<-blank> keyword:
+
+ use Tickit::Style -blank;
+
+Currently, C<-blank> is the default behaviour, but this may change in a future
+version, with a deprecation warning if no keyword is specified.
 
 =cut
 
@@ -176,8 +188,35 @@ sub import
 {
    my $class = shift;
    my $pkg = caller;
+   my @symbols = @_;
 
    ( my $type = $pkg ) =~ s/^Tickit::Widget:://;
+
+   my $mode = "blank";
+   foreach ( @symbols ) {
+      $mode = "blank", next if $_ eq "-blank";
+      $mode = "copy",  next if $_ eq "-copy";
+
+      croak "Unrecognised symbol $_ to Tickit::Style->import";
+   }
+
+   my $srctype = $pkg->can( "_widget_style_type" ) && $pkg->_widget_style_type;
+
+   if( $mode eq "blank" ) {
+      # OK
+   }
+   elsif( $mode eq "copy" ) {
+      defined $srctype or croak "Cannot Tickit::Style -copy in $pkg as there is no source type";
+
+      foreach my $c ( keys %{ $TAGSETS_BY_TYPE_CLASS{$srctype} || {} } ) {
+         $TAGSETS_BY_TYPE_CLASS{$type}{$c} = $TAGSETS_BY_TYPE_CLASS{$srctype}{$c}->clone;
+      }
+
+      foreach my $hash ( \%RESHAPE_KEYS, \%RESHAPE_TEXTWIDTH_KEYS, \%REDRAW_KEYS ) {
+         # shallow copy is sufficient
+         $hash->{$type} = { %{ $hash->{$srctype} } } if $hash->{$srctype};
+      }
+   }
 
    # Import the symbols
    {
@@ -393,6 +432,13 @@ sub new
 {
    my $class = shift;
    return bless [], $class;
+}
+
+sub clone
+{
+   my $proto = shift;
+   return bless [ map { Keyset( $_->tags, { %{$_->style} } ) }
+                      @$proto ], ref $proto;
 }
 
 sub add
