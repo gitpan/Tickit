@@ -11,7 +11,7 @@ use feature qw( switch );
 use base qw( Tickit::Widget );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use Carp;
 
@@ -300,7 +300,7 @@ sub focus_next
          elsif( $how eq "before" ) { $childhow = "last" }
 
          # See if child has it
-         return if $next->focus_next( $childhow => undef );
+         return 1 if $next->focus_next( $childhow => undef );
 
          $other = $next;
          redo;

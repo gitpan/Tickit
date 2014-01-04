@@ -8,7 +8,7 @@ package Tickit::RectSet;
 use strict;
 use warnings;
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use List::Util qw( min max );
 

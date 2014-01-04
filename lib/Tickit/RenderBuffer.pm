@@ -10,7 +10,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use Carp;
 use Scalar::Util qw( refaddr );
@@ -251,6 +251,16 @@ C<restore> stack.
 
 =cut
 
+=head2 $rb->mask( $rect )
+
+Masks off the given area against any further changes. This will apply to
+subsequent rendering operations but does not affect the existing content, nor
+the actual rendering to the window.
+
+Areas within the clipping region may be arbitrarily masked. Masks are scoped
+to the depth of the stack they are applied at; once the C<restore> method is
+invoked, any masks applied since its corresponding C<save> will be removed.
+
 =head2 $rb->translate( $downward, $rightward )
 
 Applies a translation to the coordinate system used by C<goto> and the
@@ -360,17 +370,23 @@ sub skip_to
    $self->goto( $self->line, $col );
 }
 
-=head2 $rb->text_at( $line, $col, $text, $pen )
+=head2 $cols = $rb->text_at( $line, $col, $text, $pen )
 
 Sets the range of cells starting at the given position, to render the given
 text in the given pen.
 
+Returns the number of columns wide the actual C<$text> is (which may be more
+than was actually printed).
+
 =cut
 
-=head2 $rb->text( $text, $pen )
+=head2 $cols = $rb->text( $text, $pen )
 
 Sets the range of cells at the virtual cursor position to render the given
 text in the given pen, and updates the position.
+
+Returns the number of columns wide the actual C<$text> is (which may be more
+than was actually printed).
 
 =cut
 
@@ -382,6 +398,7 @@ sub text
    my $len = $self->text_at( $self->line, $self->col, $text, $pen );
    # $self->{col} += $len;
    $self->goto( $self->line, $self->col + $len );
+   return $len;
 }
 
 =head2 $rb->erase_at( $line, $col, $len, $pen )
@@ -751,10 +768,6 @@ As this code is still experimental, there are many planned features it
 currently lacks:
 
 =over 2
-
-=item *
-
-Hole regions, to directly support shadows made by floating windows.
 
 =item *
 

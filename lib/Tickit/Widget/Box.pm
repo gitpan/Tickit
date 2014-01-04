@@ -14,7 +14,7 @@ use Tickit::RenderBuffer;
 
 use Tickit::Utils qw( bound );
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use constant WIDGET_PEN_FROM_STYLE => 1;
 
@@ -218,8 +218,8 @@ foreach my $dir (qw( lines cols )) {
    *{$_} = $subs{$_} for keys %subs;
 }
 
-use Tickit::WidgetRole::Alignable name =>  "align", style => "h", reshape => 1;
-use Tickit::WidgetRole::Alignable name => "valign", style => "v", reshape => 1;
+use Tickit::WidgetRole::Alignable name =>  "align", dir => "h", reshape => 1;
+use Tickit::WidgetRole::Alignable name => "valign", dir => "v", reshape => 1;
 
 sub reshape
 {

@@ -66,6 +66,16 @@ is_termlog( [ GOTO(7,17), ],
             'Termlog after ->cursor_shape' );
 is( $term->{cursorshape}, "under", 'Cursor shape after ->cursor_shape' );
 
+$win->cursor_visible( 0 );
+flush_tickit;
+
+is_termlog( [ ],
+            'Termlog empty after ->cursor_visible 0' );
+
+ok( !$term->{cursorvis}, 'Cursor is invisible after ->cursor_visible 0' );
+
+$win->cursor_visible( 1 );
+
 $win->hide;
 flush_tickit;
 

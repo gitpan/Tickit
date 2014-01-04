@@ -80,6 +80,7 @@ t/11renderbuffer-line.t
 t/12renderbuffer-char.t
 t/13renderbuffer-clip.t
 t/14renderbuffer-stack.t
+t/15renderbuffer-mask.t
 t/20rootwin.t
 t/21window.t
 t/22window-expose.t

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use Carp;
 
@@ -90,6 +90,7 @@ sub _init
    $self->{pen}     = Tickit::Pen->new;
    $self->{damage}  = Tickit::RectSet->new;
    $self->{expose_after_scroll} = 1;
+   $self->{cursor_visible} = 1;
 }
 
 =head1 METHODS
@@ -1694,12 +1695,27 @@ sub cursor_at
    $self->tickit->enqueue_redraw if $self->is_focused;
 }
 
+=head2 $win->cursor_visible( $visible )
+
+Sets whether the terminal cursor is visible on the window when it has focus.
+Normally it is, but passing a false value will make the cursor hidden even
+when the window is focused.
+
+=cut
+
+sub cursor_visible
+{
+   my $self = shift;
+   ( $self->{cursor_visible} ) = @_;
+   $self->tickit->enqueue_redraw if $self->is_focused;
+}
+
 =head2 $win->cursor_shape( $shape )
 
 Sets the shape that the terminal cursor will have if this window has focus.
 This method does I<not> force the window to take the focus though; for that
 see C<take_focus>. Valid values for C<$shape> are the various
-C<TERMCTL_CURSORSHAPE_*> constants from L<Tickit::Term>.
+C<TERM_CURSORSHAPE_*> constants from L<Tickit::Term>.
 
 =cut
 
@@ -1812,10 +1828,11 @@ sub restore
       $win = $win->{focused_child};
    }
 
-   if( $win and $win->is_visible and $win->is_focused ) {
+   if( $win and $win->is_visible and $win->is_focused and $win->{cursor_visible} ) {
+      my $cursorshape = $win->{cursor_shape} // Tickit::Term::TERM_CURSORSHAPE_BLOCK;
       $term->setctl_int( cursorvis => 1 );
       $win->goto( $win->{cursor_line}, $win->{cursor_col} );
-      $win->term->setctl_int( cursorshape => $win->{cursor_shape} // Tickit::Term::TERM_CURSORSHAPE_BLOCK );
+      $win->term->setctl_int( cursorshape => $cursorshape );
    }
    else {
       $term->setctl_int( cursorvis => 0 );

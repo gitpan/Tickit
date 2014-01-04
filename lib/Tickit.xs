@@ -361,6 +361,7 @@ enum TickitRenderBufferCellState {
 typedef struct {
   enum TickitRenderBufferCellState state;
   int len; // or "startcol" for state == CONT
+  int maskdepth; // -1 if not masked
   TickitPen *pen; // state -> {TEXT, ERASE, LINE, CHAR}
   union {
     struct { int idx; int offs; } text; // state == TEXT
@@ -390,6 +391,7 @@ typedef struct {
   TickitRect clip;
   TickitPen *pen;
 
+  int depth;
   TickitRenderBufferStack *stack;
 
   char **texts;
@@ -470,15 +472,19 @@ static void _tickit_rb_cont_cell(TickitRenderBufferCell *cell, int startcol)
       break;
   }
 
-  cell->state = CONT;
-  cell->len   = startcol;
-  cell->pen   = NULL;
+  cell->state     = CONT;
+  cell->maskdepth = -1;
+  cell->len       = startcol;
+  cell->pen       = NULL;
 }
 
 static TickitRenderBufferCell *_tickit_rb_make_span(TickitRenderBuffer *rb, int line, int col, int len)
 {
   int end = col + len;
   TickitRenderBufferCell **cells = rb->cells;
+
+  if(cells[line][col].maskdepth > -1)
+    croak("TODO: cannot _make_span on a masked cell");
 
   // If the following cell is a CONT, it needs to become a new start
   if(end < rb->cols && cells[line][end].state == CONT) {
@@ -1075,13 +1081,15 @@ _xs_new(class,lines,cols)
     for(line = 0; line < rb->lines; line++) {
       Newx(rb->cells[line], rb->cols, TickitRenderBufferCell);
 
-      rb->cells[line][0].state = SKIP;
-      rb->cells[line][0].len   = rb->cols;
-      rb->cells[line][0].pen   = NULL;
+      rb->cells[line][0].state     = SKIP;
+      rb->cells[line][0].maskdepth = -1;
+      rb->cells[line][0].len       = rb->cols;
+      rb->cells[line][0].pen       = NULL;
 
       for(col = 1; col < rb->cols; col++) {
-        rb->cells[line][col].state = CONT;
-        rb->cells[line][col].len   = 0;
+        rb->cells[line][col].state     = CONT;
+        rb->cells[line][col].maskdepth = -1;
+        rb->cells[line][col].len       = 0;
       }
     }
 
@@ -1095,6 +1103,7 @@ _xs_new(class,lines,cols)
     rb->pen = NULL;
 
     rb->stack = NULL;
+    rb->depth = 0;
 
     rb->n_texts = 0;
     rb->size_texts = 4;
@@ -1221,6 +1230,29 @@ clip(self,rect)
       rb->clip.lines = 0;
 
 void
+mask(self,rect)
+  Tickit::RenderBuffer self
+  Tickit::Rect rect
+  INIT:
+    TickitRenderBuffer *rb;
+    TickitRect hole;
+    int line, col;
+  CODE:
+    rb = self;
+
+    hole = *rect;
+    hole.top  += rb->xlate_line;
+    hole.left += rb->xlate_col;
+
+    for(line = hole.top; line < hole.top + hole.lines && line < rb->lines; line++) {
+      for(col = hole.left; col < hole.left + hole.cols && col < rb->cols; col++) {
+        TickitRenderBufferCell *cell = &rb->cells[line][col];
+        if(cell->maskdepth == -1)
+          cell->maskdepth = rb->depth;
+      }
+    }
+
+void
 goto(self,line,col)
   Tickit::RenderBuffer self
   SV *line
@@ -1296,8 +1328,9 @@ reset(self)
       for(col = 0; col < rb->cols; col++)
         _tickit_rb_cont_cell(&rb->cells[line][col], 0);
 
-      rb->cells[line][0].state = SKIP;
-      rb->cells[line][0].len   = rb->cols;
+      rb->cells[line][0].state     = SKIP;
+      rb->cells[line][0].maskdepth = -1;
+      rb->cells[line][0].len       = rb->cols;
     }
 
     rb->vc_pos_set = 0;
@@ -1315,6 +1348,7 @@ reset(self)
     if(rb->stack) {
       _tickit_rb_free_stack(rb->stack);
       rb->stack = NULL;
+      rb->depth = 0;
     }
 
     _tickit_rb_free_texts(rb);
@@ -1339,6 +1373,7 @@ save(self)
 
     stack->prev = rb->stack;
     rb->stack = stack;
+    rb->depth++;
 
 void
 savepen(self)
@@ -1355,6 +1390,7 @@ savepen(self)
 
     stack->prev = rb->stack;
     rb->stack = stack;
+    rb->depth++;
 
 void
 restore(self)
@@ -1381,6 +1417,16 @@ restore(self)
     rb->pen = stack->pen;
     // We've now definitely taken ownership of the old stack frame's pen, so
     //   it doesn't need destroying now
+
+    rb->depth--;
+    {
+      // TODO: this could be done more efficiently by remembering the edges of masking
+      int line, col;
+      for(line = 0; line < rb->lines; line++)
+        for(col = 0; col < rb->cols; col++)
+          if(rb->cells[line][col].maskdepth > rb->depth)
+            rb->cells[line][col].maskdepth = -1;
+    }
 
     Safefree(stack);
 
@@ -1470,12 +1516,14 @@ text_at(self,line,col,text,pen=NULL)
   INIT:
     TickitRenderBuffer *rb;
     TickitRenderBufferCell *cell;
+    TickitRenderBufferCell *linecells;
     TickitStringPos endpos;
     int len;
     int startcol;
     char *textbytes;
   CODE:
     rb = self;
+    linecells = rb->cells[line];
 
     textbytes = SvPVutf8_nolen(text);
 
@@ -1501,11 +1549,32 @@ text_at(self,line,col,text,pen=NULL)
 
     rb->texts[rb->n_texts] = savepv(textbytes);
 
-    cell = _tickit_rb_make_span(rb, line, col, len);
-    cell->state       = TEXT;
-    cell->pen         = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
-    cell->v.text.idx  = rb->n_texts;
-    cell->v.text.offs = startcol;
+    while(len) {
+      while(len && linecells[col].maskdepth > -1) {
+        col++;
+        len--;
+        startcol++;
+      }
+      if(!len)
+        break;
+
+      int spanlen = 0;
+      while(len && linecells[col + spanlen].maskdepth == -1) {
+        spanlen++;
+        len--;
+      }
+      if(!spanlen)
+        break;
+
+      cell = _tickit_rb_make_span(rb, line, col, spanlen);
+      cell->state       = TEXT;
+      cell->pen         = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
+      cell->v.text.idx  = rb->n_texts;
+      cell->v.text.offs = startcol;
+
+      col      += spanlen;
+      startcol += spanlen;
+    }
 
     rb->n_texts++;
 done:
@@ -1522,8 +1591,10 @@ erase_at(self,line,col,len,pen=NULL)
   INIT:
     TickitRenderBuffer *rb;
     TickitRenderBufferCell *cell;
+    TickitRenderBufferCell *linecells;
   CODE:
     rb = self;
+    linecells = rb->cells[line];
 
     if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
       XSRETURN_UNDEF;
@@ -1537,9 +1608,28 @@ erase_at(self,line,col,len,pen=NULL)
     if(col + len > rb->cols)
       croak("$col+$len out of range");
 
-    cell = _tickit_rb_make_span(rb, line, col, len);
-    cell->state = ERASE;
-    cell->pen   = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
+    while(len) {
+      while(len && linecells[col].maskdepth > -1) {
+        col++;
+        len--;
+      }
+      if(!len)
+        break;
+
+      int spanlen = 0;
+      while(len && linecells[col + spanlen].maskdepth == -1) {
+        spanlen++;
+        len--;
+      }
+      if(!spanlen)
+        break;
+
+      cell = _tickit_rb_make_span(rb, line, col, spanlen);
+      cell->state = ERASE;
+      cell->pen   = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
+
+      col += spanlen;
+    }
 
 void
 linecell(self,line,col,bits,pen=NULL)
@@ -1566,6 +1656,9 @@ linecell(self,line,col,bits,pen=NULL)
       croak("$len out of range");
     if(col + len > rb->cols)
       croak("$col+$len out of range");
+
+    if(rb->cells[line][col].maskdepth > -1)
+      XSRETURN_UNDEF;
 
     TickitPen *cellpen = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
 
@@ -1612,6 +1705,9 @@ char_at(self,line,col,codepoint,pen=NULL)
       croak("$len out of range");
     if(col + len > rb->cols)
       croak("$col+$len out of range");
+
+    if(rb->cells[line][col].maskdepth > -1)
+      XSRETURN_UNDEF;
 
     cell = _tickit_rb_make_span(rb, line, col, len);
     cell->state           = CHAR;

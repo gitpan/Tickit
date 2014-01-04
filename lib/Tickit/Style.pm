@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use Carp;
 
@@ -362,13 +362,13 @@ sub _load_style
    }
 }
 
-=head1 ADDITIONAL FUNCTIONS
+=head1 ADDITIONAL FUNCTIONS/METHODS
 
 These functions are not exported, but may be called directly.
 
 =cut
 
-=head2 Tickit::Style::load_style( $string )
+=head2 Tickit::Style->load_style( $string )
 
 Loads definitions from a stylesheet given in a string.
 
@@ -384,7 +384,7 @@ sub load_style
    _load_style( Tickit::Style::Parser->new->from_string( $str ) );
 }
 
-=head2 Tickit::Style::load_style_file( $path )
+=head2 Tickit::Style->load_style_file( $path )
 
 Loads definitions from a stylesheet file given by the path.
 

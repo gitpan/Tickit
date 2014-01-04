@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::WidgetRole );
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use Carp;
 

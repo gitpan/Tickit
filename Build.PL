@@ -112,26 +112,20 @@ my $build = Module::Build->new(
       'Struct::Dumb' => 0,
    },
    configure_requires => {
+      # Note to downstream package maintainers:
+      # We don't -actually- depend directly on these Alien modules but it's far
+      # easier to get CPAN smoketest machines to install them this way than
+      # anything else.
+      # These dependencies can be omitted if libtermkey/unibilium are installed
+      # by some other mechanism
+      'Alien::libtermkey' => '0.16',
+      'Alien::unibilium' => '0.11',
       'ExtUtils::PkgConfig' => 0,
       'Module::Build' => 0,
    },
-   # Note to downstream package maintainers:
-   # We don't -actually- depend directly on these Alien modules but it's far
-   # easier to get CPAN smoketest machines to install them this way than
-   # anything else.
-   # These dependencies can be omitted if libtermkey/unibilium are installed
-   # by some other mechanism
-   meta_merge => {
-      configure_requires => {
-         'Alien::libtermkey' => '0.13',
-         'Alien::unibilium' => '0.09',
-      },
-      requires => {
-         'Alien::libtermkey' => '0.13',
-         'Alien::unibilium' => '0.09',
-      },
-   },
    build_requires => {
+      'Alien::libtermkey' => '0.16',
+      'Alien::unibilium' => '0.11',
       'Test::Builder::Tester' => 0,
       'Test::Fatal' => 0,
       'Test::HexString' => 0,
