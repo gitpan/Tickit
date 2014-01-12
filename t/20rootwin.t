@@ -21,7 +21,9 @@ my $geom_changed = 0;
 $win->set_on_geom_changed( sub { $geom_changed++ } );
 
 my $exposed_rect;
-$win->set_on_expose( sub { shift; ( $exposed_rect ) = @_ } );
+$win->set_on_expose( with_rb =>
+   sub { shift; shift; ( $exposed_rect ) = @_ }
+);
 
 is( $win->top,  0, '$win->top is 0' );
 is( $win->left, 0, '$win->left is 0' );
@@ -153,7 +155,7 @@ is_termlog( [ SETBG(undef),
 # Scrolling region exposure
 {
    my @exposed_rects;
-   $win->set_on_expose( sub { push @exposed_rects, $_[1] } );
+   $win->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
 
    $win->scroll( 1, 0 );
    flush_tickit;

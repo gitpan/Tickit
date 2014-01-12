@@ -106,7 +106,7 @@ $rootfloat->show;
 # Scrolling with float obscurations
 {
    my @exposed_rects;
-   $root->set_on_expose( sub { push @exposed_rects, $_[1] } );
+   $root->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
 
    $root->scroll( 3, 0 );
    flush_tickit;

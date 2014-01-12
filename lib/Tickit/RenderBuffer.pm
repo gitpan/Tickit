@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2013-2014 -- leonerd@leonerd.org.uk
 
 package Tickit::RenderBuffer;
 
@@ -10,7 +10,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use Carp;
 use Scalar::Util qw( refaddr );
@@ -117,11 +117,6 @@ cursor is not affected by the absolute-position methods.
 
 =back
 
-This code is still in the experiment stage. At some future point it may be
-merged into the main L<Tickit> distribution, and reimplemented in efficient XS
-or C code. As such, recommendations and best-practices are still subject to
-change and evolution as the code progresses.
-
 =head2 State Stack
 
 The C<RenderBuffer> stores a stack of saved state. The state of the buffer can
@@ -146,6 +141,10 @@ The render pen
 =item *
 
 The translation offset
+
+=item *
+
+The set of masked regions
 
 =back
 

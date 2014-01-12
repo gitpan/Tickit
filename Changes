@@ -1,5 +1,14 @@
 Revision history for Changes
 
+0.42    2014/01/12 13:40:39
+        [CHANGES]
+         * Added Window on_expose callback type with RenderBuffer
+         * Added legacy-detecting $win->set_on_* methods to set new-style
+           Window callbacks
+         * Perform Widget rendering onto Window using new with_rb expose event
+         * Deprecate legacy versions of Window on_expose, on_key, on_mouse
+         * Removed CLEAR_BEFORE_RENDER
+
 0.41    2013/12/19 19:17:07
         [CHANGES]
          * Allow cursors to be entirely hidden on a Window

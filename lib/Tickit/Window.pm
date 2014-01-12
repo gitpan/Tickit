@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2014 -- leonerd@leonerd.org.uk
 
 package Tickit::Window;
 
@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use Carp;
 
@@ -19,6 +19,7 @@ use List::Util qw( first );
 use Tickit::Pen;
 use Tickit::Rect;
 use Tickit::RectSet;
+use Tickit::RenderBuffer;
 use Tickit::Utils qw( string_countmore );
 
 use constant WEAKEN_CHILDREN => 1;
@@ -29,6 +30,29 @@ use constant CHILD_WINDOWS_LATER => $ENV{TICKIT_CHILD_WINDOWS_LATER};
 C<Tickit::Window> - a window for drawing operations
 
 =head1 SYNOPSIS
+
+ use Tickit;
+ use Tickit::Pen;
+
+ my $tickit = Tickit->new;
+
+ my $rootwin = $tickit->rootwin;
+
+ $rootwin->set_on_expose( with_rb => sub {
+    my ( $win, $rb, $rect ) = @_;
+
+    $rb->clear;
+
+    $rb->text_at(
+       int( $win->lines / 2 ), int( ($win->cols - 12) / 2 ),
+       "Hello, world"
+    );
+ });
+ $rootwin->set_on_geom_changed( sub { shift->expose } );
+ $rootwin->set_pen( Tickit::Pen->new( fg => "white" ) );
+
+ $rootwin->expose;
+ $tickit->run;
 
 =head1 DESCRIPTION
 
@@ -566,31 +590,19 @@ sub set_on_geom_changed
    ( $self->{on_geom_changed} ) = @_;
 }
 
-=head2 $win->set_on_key( $on_key )
+=head2 $win->set_on_key( with_ev => $on_key )
 
 Set the callback to invoke whenever a key is pressed while this window, or one
-of its child windows, has the input focus.
-
-In a future release, this callback will be invoked in the following way:
+of its child windows, has the input focus. The callback will be passed the
+window and an event structure.
 
  $handled = $on_key->( $win, $event )
 
-where C<$event> is an object supporting methods called C<type>, C<str> and
-C<mod>. C<type> will be C<"text"> for normal unmodified Unicode, or C<"key">
-for special keys or modified Unicode. C<str> will be the UTF-8 string for
-C<text> events, or the textual description of the key as rendered by
-L<Term::TermKey> for C<key> events. C<mod> will be a bitmask of the modifier
-state.
-
-For backward-compatibility however, the event arguments are also
-expanded positionally, and the object itself responds to stringification
-overloading as the C<type> method, such that it can be considered that it
-is called in the following way instead:
-
- $handled = $on_key->( $win, $type, $str, $mod )
-
-Newly-written code should be written to use the event structure directly, as
-eventually this legacy handling will be removed.
+C<$event> is an object supporting methods called C<type>, C<str> and C<mod>.
+C<type> will be C<"text"> for normal unmodified Unicode, or C<"key"> for
+special keys or modified Unicode. C<str> will be the UTF-8 string for C<text>
+events, or the textual description of the key as rendered by L<Term::TermKey>
+for C<key> events. C<mod> will be a bitmask of the modifier state.
 
 The invoked code should return a true value if it considers the keypress dealt
 with, or false to pass it up to its parent window.
@@ -610,11 +622,29 @@ that really make sense; for example to capture the C<PageUp> and C<PageDown>
 keys in a scrolling list, or a numbered function key that performs some
 special action.
 
+=head2 $win->set_on_key( $on_key )
+
+A backward-compatibility wrapper which passes the event details as positional
+arguments rather than as a structure.
+
+ $handled = $on_key->( $win, $type, $str, $mod )
+
+This form is now discouraged, and may be removed in a later version.
+
 =cut
 
 sub set_on_key
 {
    my $self = shift;
+
+   if( @_ > 1 and $_[0] eq "with_ev" ) {
+      $self->{on_key_with_ev} = 1;
+      shift;
+   }
+   else {
+      $self->{on_key_with_ev} = 0;
+   }
+
    ( $self->{on_key} ) = @_;
 }
 
@@ -638,12 +668,10 @@ sub _handle_key
    }
 
    if( my $on_key = $self->{on_key} ) {
-      $on_key->( $self,
-         Tickit::Window::Event->new( %$args ),
-         # legacy arguments
-         $args->{str},
-         $args->{mod},
-      ) and return 1;
+      my @args = ( $self, Tickit::Window::Event->new( %$args ) );
+      push @args, @{$args}{qw( str mod )} unless $self->{on_key_with_ev};
+
+      $on_key->( @args ) and return 1;
    }
 
    if( $children ) {
@@ -658,31 +686,20 @@ sub _handle_key
    return 0;
 }
 
-=head2 $win->set_on_mouse( $on_mouse )
+=head2 $win->set_on_mouse( with_ev => $on_mouse )
 
 Set the callback to invoke whenever a mouse event is received within the
-window's rectangle.
-
-In a future release, this callback will be invoked in the following way:
+window's rectangle. The callback will be passed the window and an event
+structure.
 
  $handled = $on_mouse->( $win, $event )
 
-where C<$event> is an object supporting methods called C<type>, C<button>,
-C<line>, C<col> and C<mod>. C<type> will contain the event name. C<button>
-will contain the button number, though it may not be present for C<release>
-events. C<line> and C<col> are 0-based. C<mod> is a bitmask of modifier
-state. Behaviour of events involving more than one mouse button is not
-well-specified by terminals.
-
-For backward-compatibility however, the event arguments are also
-expanded positionally, and the object itself responds to stringification
-overloading as the C<type> method, such that it can be considered that it
-is called in the following way instead:
-
- $handled = $on_mouse->( $win, $ev, $buttons, $line, $col, $mod )
-
-Newly-written code should be written to use the event structure directly, as
-eventually this legacy handling will be removed.
+C<$event> is an object supporting methods called C<type>, C<button>, C<line>,
+C<col> and C<mod>. C<type> will contain the event name. C<button> will contain
+the button number, though it may not be present for C<release> events. C<line>
+and C<col> are 0-based. C<mod> is a bitmask of modifier state. Behaviour of
+events involving more than one mouse button is not well-specified by
+terminals.
 
 The following event names may be observed:
 
@@ -731,11 +748,29 @@ C<drag_stop> event even if the mouse moves outside that window. No other
 window will receive a C<drag_outside> or C<drag_stop> event than the one that
 started the operation.
 
+=head2 $win->set_on_mouse( $on_mouse )
+
+A backward-compatibility wrapper which passes the event detials as positional
+arguments rather than as a structure.
+
+ $handled = $on_mouse->( $win, $type, $button, $line, $col, $mod )
+
+This form is now discouraged, and may be removed in a later version.
+
 =cut
 
 sub set_on_mouse
 {
    my $self = shift;
+
+   if( @_ > 1 and $_[0] eq "with_ev" ) {
+      $self->{on_mouse_with_ev} = 1;
+      shift;
+   }
+   else {
+      $self->{on_mouse_with_ev} = 0;
+   }
+
    ( $self->{on_mouse} ) = @_;
 }
 
@@ -773,33 +808,52 @@ sub _handle_mouse
    }
 
    if( my $on_mouse = $self->{on_mouse} ) {
-      return $self if $on_mouse->( $self,
-         Tickit::Window::Event->new( %$args ),
-         # legacy arguments
-         $args->{button},
-         $args->{line},
-         $args->{col},
-         $args->{mod},
-      );
+      my @args = ( $self, Tickit::Window::Event->new( %$args ) );
+      push @args, @{$args}{qw( button line col mod )} unless $self->{on_mouse_with_ev};
+
+      $on_mouse->( @args ) and return $self;
    }
 
    return 0;
 }
 
-=head2 $win->set_on_expose( $on_expose )
+=head2 $win->set_on_expose( with_rb => $on_expose )
 
 Set the callback to invoke whenever a region of the window is exposed by the
-C<expose> event.
+C<expose> event. When invoked, it is passed the window itself, a
+L<Tickit::RenderBuffer> and a L<Tickit::Rect> representing the portion of the
+window that was exposed.
+
+ $on_expose->( $win, $rb, $rect )
+
+The buffer's origin will be that of the window, and its clipping region will
+already be set to the expose rect. This will automatically be flushed to the
+window when the callback returns.
+
+=head2 $win->set_on_expose( $on_expose )
+
+Legacy form that is passes only the rect and not a render buffer to the
+callback. Callbacks in this form will have to call the direct window drawing
+methods themselves.
 
  $on_expose->( $win, $rect )
 
-Will be passed a L<Tickit::Rect> representing the exposed region.
+This form is now discouraged, and may be removed in a later version.
 
 =cut
 
 sub set_on_expose
 {
    my $self = shift;
+
+   if( @_ > 1 and $_[0] eq "with_rb" ) {
+      $self->{expose_with_rb} = 1;
+      shift;
+   }
+   else {
+      $self->{expose_with_rb} = 0;
+   }
+
    ( $self->{on_expose} ) = @_;
 }
 
@@ -815,7 +869,32 @@ sub _do_expose
    $self->{damage}->clear;
 
    if( my $on_expose = $self->{on_expose} ) {
-      $on_expose->( $self, $_ ) for @rects;
+      my $rb;
+      if( $self->{expose_with_rb} ) {
+         $rb = Tickit::RenderBuffer->new(
+            lines => $self->lines,
+            cols  => $self->cols,
+         );
+         $rb->setpen( $self->pen );
+      }
+
+      foreach my $rect ( @rects ) {
+         if( $rb ) {
+            $rb->save;
+
+            $rb->clip( $rect );
+            $on_expose->( $self, $rb, $rect );
+
+            $rb->restore;
+         }
+         else {
+            $on_expose->( $self, $rect );
+         }
+      }
+
+      if( $rb ) {
+         $rb->flush_to_window( $self );
+      }
    }
 
    my $children = $self->{child_windows} or return;

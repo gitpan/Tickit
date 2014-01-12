@@ -12,8 +12,9 @@ my $rootwin = mk_window;
 # dragging within one window
 {
    my @mouse_events;
-   $rootwin->set_on_mouse( sub {
-      push @mouse_events, [ @_[1..4] ];
+   $rootwin->set_on_mouse( with_ev => sub {
+      my ( $win, $ev ) = @_;
+      push @mouse_events, [ $ev->type => $ev->button, $ev->line, $ev->col ];
       return 1;
    } );
 
@@ -53,8 +54,16 @@ my $rootwin = mk_window;
    my $winA = $rootwin->make_sub(  0, 0, 10, 80 );
    my $winB = $rootwin->make_sub( 15, 0, 10, 80 );
 
-   my @eventsA; $winA->set_on_mouse( sub { push @eventsA, [ @_[1..4] ]; 1 } );
-   my @eventsB; $winB->set_on_mouse( sub { push @eventsB, [ @_[1..4] ]; 1 } );
+   my @eventsA; $winA->set_on_mouse( with_ev => sub {
+      my ( undef, $ev ) = @_;
+      push @eventsA, [ $ev->type => $ev->button, $ev->line, $ev->col ];
+      return 1;
+   });
+   my @eventsB; $winB->set_on_mouse( with_ev => sub {
+      my ( undef, $ev ) = @_;
+      push @eventsB, [ $ev->type => $ev->button, $ev->line, $ev->col ];
+      return 1;
+   });
 
    flush_tickit;
 

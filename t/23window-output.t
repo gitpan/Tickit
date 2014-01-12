@@ -257,7 +257,7 @@ flush_tickit;
    my $win = $rootwin->make_sub( 5, 0, 10, 80 );
 
    my @exposed_rects;
-   $win->set_on_expose( sub { push @exposed_rects, $_[1] } );
+   $win->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
 
    ok( $win->scroll( 1, 0 ), 'Fullwidth $win supports scrolling' );
    flush_tickit;
@@ -333,6 +333,8 @@ flush_tickit;
 
    # Sibling to obscure part of it
    my $sibling = $rootwin->make_sub( 0, 0, 10, 20 );
+   flush_tickit;
+
    $sibling->raise;
    flush_tickit;
    undef @exposed_rects;
@@ -364,19 +366,19 @@ flush_tickit;
    my $win_C = $rootwin->make_sub( 0, 0, 4, 80 );
    flush_tickit;
 
-   $win_A->set_on_expose( sub {
-      my ( $win ) = @_;
-      $win->goto( 0, 0 ); $win->print( "Window A" );
+   $win_A->set_on_expose( with_rb => sub {
+      my ( $win, $rb ) = @_;
+      $rb->text_at( 0, 0, "Window A" );
    });
 
-   $win_B->set_on_expose( sub {
-      my ( $win ) = @_;
-      $win->goto( 0, 0 ); $win->print( "Window B" );
+   $win_B->set_on_expose( with_rb => sub {
+      my ( $win, $rb ) = @_;
+      $rb->text_at( 0, 0, "Window B" );
    });
 
-   $win_C->set_on_expose( sub {
-      my ( $win ) = @_;
-      $win->goto( 0, 0 ); $win->print( "Window C" );
+   $win_C->set_on_expose( with_rb => sub {
+      my ( $win, $rb ) = @_;
+      $rb->text_at( 0, 0, "Window C" );
    });
 
    $rootwin->expose;

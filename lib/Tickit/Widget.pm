@@ -1,21 +1,20 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2014 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use Carp;
 use Scalar::Util qw( weaken );
 use List::MoreUtils qw( all );
 
 use Tickit::Pen;
-use Tickit::RenderBuffer;
 use Tickit::Style;
 use Tickit::Utils qw( textwidth );
 
@@ -113,9 +112,7 @@ sub new
       # OK
    }
    elsif( $class->can( "render" ) ) {
-      $class->CLEAR_BEFORE_RENDER ?
-         carp "Constructing a legacy ->render $class with CLEAR_BEFORE_RENDER" :
-         carp "Constructing a legacy ->render $class";
+      carp "Constructing a legacy ->render $class";
    }
    else {
       croak "$class cannot ->render_to_rb - do you subclass and implement it?";
@@ -531,8 +528,6 @@ sub set_window
    }
 }
 
-use constant CLEAR_BEFORE_RENDER => 1;
-
 sub window_gained
 {
    my $self = shift;
@@ -547,24 +542,19 @@ sub window_gained
    } );
 
    if( $self->can( "render_to_rb" ) ) {
-      $window->set_on_expose( sub {
-         my ( $win, $rect ) = @_;
+      $window->set_on_expose( with_rb => sub {
+         my ( $win, $rb, $rect ) = @_;
          $win->is_visible or return;
 
-         my $rb = Tickit::RenderBuffer->new( lines => $win->lines, cols => $win->cols );
-         $rb->clip( $rect );
          $rb->setpen( $self->pen );
 
          $self->render_to_rb( $rb, $rect );
-
-         $rb->flush_to_window( $win );
       });
    }
    else {
       # Legacy rendering to Window
       $window->set_on_expose( sub {
          my ( $win, $rect ) = @_;
-         $self->_do_clear( $rect ) if $self->CLEAR_BEFORE_RENDER;
          $self->render(
             rect => $rect,
             top   => $rect->top,
@@ -879,44 +869,9 @@ subclass which implements the following methods.
 
 Called to redraw the widget's content to the given L<Tickit::RenderBuffer>.
 
-Will be passed the clipping rectangle region to be rendered; the method does
-not have to render any content outside of this region.
-
-=head2 $widget->render( %args )
-
-An alternative to C<render_to_rb>. Called to redraw the widget's content
-directly to its window. Methods can be called on the contained
-L<Tickit::Window> object obtained from C<< $widget->window >>.
-
-Will be passed hints on the region of the window that requires rendering; the
-method implementation may choose to use this information to restrict drawing,
-or it may ignore it entirely. Container widget should make sure to restrict
-drawing to only this rectangle, however, as they may otherwise overwrite
-content of contained widgets that will not be redrawn.
-
-=over 8
-
-=item rect => Tickit::Rect
-
-A L<Tickit::Rect> object representing the region of the screen that requires
-rendering, relative to the widget's window.
-
-Also provided by the following four named integers:
-
-=item top => INT
-
-=item left => INT
-
-The top-left corner of the region that requires rendering, relative to the
-widget's window.
-
-=item lines => INT
-
-=item cols => INT
-
-The size of the region that requires rendering.
-
-=back
+Will be passed the clipping rectangle region to be rendered as a
+L<Tickit::Rect>. the method does not have to render any content outside of
+this region.
 
 =head2 $widget->reshape
 

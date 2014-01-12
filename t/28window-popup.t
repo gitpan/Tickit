@@ -25,16 +25,18 @@ is( $popupwin->abs_top,  12, '$popupwin->abs_top' );
 is( $popupwin->abs_left, 22, '$popupwin->abs_left' );
 
 my @key_events;
-$popupwin->set_on_key( sub {
-   push @key_events, [ $_[1] => $_[2] ];
+$popupwin->set_on_key( with_ev => sub {
+   my ( $win, $ev ) = @_;
+   push @key_events, [ $ev->type => $ev->str ];
    return 1;
 } );
 
 presskey( text => "G" );
 
 my @mouse_events;
-$popupwin->set_on_mouse( sub {
-   push @mouse_events, [ @_[1..4] ];
+$popupwin->set_on_mouse( with_ev => sub {
+   my ( $win, $ev ) = @_;
+   push @mouse_events, [ $ev->type => $ev->button, $ev->line, $ev->col ];
    return 1;
 } );
 

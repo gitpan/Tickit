@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2014 -- leonerd@leonerd.org.uk
 
 package Tickit::ContainerWidget;
 
@@ -11,14 +11,12 @@ use feature qw( switch );
 use base qw( Tickit::Widget );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use Carp;
 
 use Scalar::Util qw( refaddr );
 use List::MoreUtils qw( firstidx );
-
-use constant CLEAR_BEFORE_RENDER => 0;
 
 =head1 NAME
 

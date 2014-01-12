@@ -15,7 +15,7 @@ $win->focus( 0, 0 );
 flush_tickit;
 
 my @key_events;
-$win->set_on_key( sub {
+$win->set_on_key( with_ev => sub {
    my ( $self, $ev ) = @_;
    push @key_events, [ $ev->type => $ev->str ];
    return 1;
@@ -26,7 +26,7 @@ presskey( text => "A" );
 is_deeply( \@key_events, [ [ text => "A" ] ], 'on_key A' );
 
 my @mouse_events;
-$win->set_on_mouse( sub {
+$win->set_on_mouse( with_ev => sub {
    my ( $self, $ev ) = @_;
    push @mouse_events, [ $ev->type => $ev->button, $ev->line, $ev->col ];
    return 1;
@@ -50,12 +50,12 @@ flush_tickit;
 my @subkey_events;
 my @submouse_events;
 my $subret = 1;
-$subwin->set_on_key( sub {
+$subwin->set_on_key( with_ev => sub {
    my ( $self, $ev ) = @_;
    push @subkey_events, [ $ev->type => $ev->str ];
    return $subret;
 } );
-$subwin->set_on_mouse( sub {
+$subwin->set_on_mouse( with_ev => sub {
    my ( $self, $ev ) = @_;
    push @submouse_events, [ $ev->type => $ev->button, $ev->line, $ev->col ];
    return $subret;
@@ -97,9 +97,9 @@ my $otherwin = $rootwin->make_sub( 10, 10, 4, 20 );
 flush_tickit;
 
 my @handlers;
-$win->set_on_key     ( sub { push @handlers, "win";      return 0 } );
-$subwin->set_on_key  ( sub { push @handlers, "subwin";   return 0 } );
-$otherwin->set_on_key( sub { push @handlers, "otherwin"; return 0 } );
+$win->set_on_key     ( with_ev => sub { push @handlers, "win";      return 0 } );
+$subwin->set_on_key  ( with_ev => sub { push @handlers, "subwin";   return 0 } );
+$otherwin->set_on_key( with_ev => sub { push @handlers, "otherwin"; return 0 } );
 
 presskey( text => "D" );
 
