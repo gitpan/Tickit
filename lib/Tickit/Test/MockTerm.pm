@@ -5,7 +5,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 use Tickit::Utils qw( textwidth substrwidth );
 
@@ -173,8 +173,11 @@ sub _clearline
 sub clear
 {
    my $self = shift;
+   my ( $pen ) = @_;
 
-   $self->_push_methodlog( clear => @_ );
+   $self->setpen( $pen ) if $pen;
+
+   $self->_push_methodlog( clear => );
 
    local $_;
    $self->_clearline( $_ ) for 0 .. $self->lines-1;
@@ -185,7 +188,9 @@ sub clear
 sub erasech
 {
    my $self = shift;
-   my ( $count, $moveend ) = @_;
+   my ( $count, $moveend, $pen ) = @_;
+
+   $self->setpen( $pen ) if $pen;
 
    $self->_push_methodlog( erasech => $count, $moveend || 0 );
 
@@ -208,9 +213,11 @@ sub goto
 sub print
 {
    my $self = shift;
-   my ( $text ) = @_;
+   my ( $text, $pen ) = @_;
 
-   $self->_push_methodlog( print => @_ );
+   $self->setpen( $pen ) if $pen;
+
+   $self->_push_methodlog( print => $text );
 
    my $cols = textwidth $text;
    foreach my $col ( 0 .. $cols-1 ) {

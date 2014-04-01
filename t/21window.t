@@ -24,9 +24,6 @@ is_refcount( $rootwin, 3, '$rootwin has refcount 3 after ->make_sub' );
 is( "$win", 'Tickit::Window[20x4 abs@10,3]', '$win string overload' );
 ok( $win != $rootwin, '$win numeric comparison compares object identities' );
 
-my $geom_changed = 0;
-$win->set_on_geom_changed( sub { $geom_changed++ } );
-
 isa_ok( $win, "Tickit::Window", '$win isa Tickit::Window' );
 
 is( $win->top,   3, '$win->top' );
@@ -53,6 +50,9 @@ identical( $win->root,   $rootwin, '$win->root' );
 is_deeply( [ $rootwin->subwindows ],
            [ $win ], '$rootwin->subwindows' );
 
+is_deeply( [ $win->subwindows ],
+           [], '$win->subwindows' );
+
 identical( $win->term, $term, '$win->term' );
 
 is_deeply( [ $win->_get_span_visibility( 0, 0 ) ],
@@ -70,48 +70,57 @@ is_deeply( [ $win->_get_span_visibility( -2, 0 ) ],
 is_deeply( [ $win->_get_span_visibility( 5, 0 ) ],
            [ 0, undef ], '$win 5,0 invisible indefinitely' );
 
-is( $geom_changed, 0, '$reshaped is 0 before resize' );
+# geometry change event
+{
+   my $geom_changed = 0;
+   $win->set_on_geom_changed( sub { $geom_changed++ } );
 
-$win->resize( 4, 15 );
+   is( $geom_changed, 0, '$reshaped is 0 before resize' );
 
-is( $win->lines, 4, '$win->lines is 4 after resize' );
-is( $win->cols, 15, '$win->cols is 15 after resize' );
+   $win->resize( 4, 15 );
 
-is( $geom_changed, 1, '$reshaped is 1 after resize' );
+   is( $win->lines, 4, '$win->lines is 4 after resize' );
+   is( $win->cols, 15, '$win->cols is 15 after resize' );
 
-my $subwin = $win->make_sub( 2, 2, 1, 10 );
-flush_tickit;
+   is( $geom_changed, 1, '$reshaped is 1 after resize' );
 
-is( $subwin->top,  2, '$subwin->top' );
-is( $subwin->left, 2, '$subwin->left' );
+   $win->reposition( 5, 15 );
 
-is( $subwin->abs_top,   5, '$subwin->abs_top' );
-is( $subwin->abs_left, 12, '$subwin->abs_left' );
+   is( $win->top,   5, '$win->top after reposition' );
+   is( $win->left, 15, '$win->left after reposition' );
 
-is( $subwin->lines,  1, '$subwin->lines' );
-is( $subwin->cols,  10, '$subwin->cols' );
+   is( $win->abs_top,   5, '$win->abs_top after reposition' );
+   is( $win->abs_left, 15, '$win->abs_left after reposition' );
 
-identical( $subwin->parent, $win, '$subwin->parent' );
-identical( $subwin->root,   $rootwin, '$subwin->root' );
+   is( $geom_changed, 2, '$reshaped is 2 after reposition' );
+}
 
-identical( $subwin->term, $term, '$subwin->term' );
+# sub-window nesting
+{
+   my $subwin = $win->make_sub( 2, 2, 1, 10 );
+   flush_tickit;
 
-$win->reposition( 5, 15 );
+   is( $subwin->top,  2, '$subwin->top' );
+   is( $subwin->left, 2, '$subwin->left' );
 
-is( $win->top,   5, '$win->top after reposition' );
-is( $win->left, 15, '$win->left after reposition' );
+   is( $subwin->abs_top,   7, '$subwin->abs_top' );
+   is( $subwin->abs_left, 17, '$subwin->abs_left' );
 
-is( $win->abs_top,   5, '$win->abs_top after reposition' );
-is( $win->abs_left, 15, '$win->abs_left after reposition' );
+   is( $subwin->lines,  1, '$subwin->lines' );
+   is( $subwin->cols,  10, '$subwin->cols' );
 
-is( $geom_changed, 2, '$reshaped is 2 after reposition' );
+   identical( $subwin->parent, $win, '$subwin->parent' );
+   identical( $subwin->root,   $rootwin, '$subwin->root' );
 
-is_refcount( $win, 2, '$win has refcount 2 at EOF' );
-is_refcount( $rootwin, 3, '$rootwin has refcount 3 before $win drop' );
+   identical( $subwin->term, $term, '$subwin->term' );
 
-$subwin->close; undef $subwin;
-$win->close; undef $win;
-flush_tickit;
+   is_refcount( $win, 2, '$win has refcount 2 at EOF' );
+   is_refcount( $rootwin, 3, '$rootwin has refcount 3 before $win drop' );
+
+   $subwin->close; undef $subwin;
+   $win->close; undef $win;
+   flush_tickit;
+}
 
 is_refcount( $rootwin, 2, '$rootwin has refcount 3 at EOF' );
 

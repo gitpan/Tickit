@@ -1,5 +1,22 @@
 Revision history for Changes
 
+0.43    2013/04/01 16:29:58
+        [CHANGES]
+         * Default TICKIT_CHILD_WINDOWS_LATER on; with env. var to disable it
+         * Allow optional $pen argument to $term->{print,clear,erasech}
+         * Support flushing of RenderBuffer directly to a Tickit::Term
+         * Store pending 'later' geometry changes separately from expose logic
+           to ensure correct output
+         * Rewrite of Window rendering logic:
+            + accumulate damage and run expose logic only on root window
+         * Provide a more robust associative version of is_termlog() to avoid
+           test logic that depends on exact rendering order
+        
+        [BUGFIXES]
+         * Ensure that $win->subwindows works on windows with no subs
+         * $win->restore should remember to flush the actual terminal buffer
+         * Ensure that RB masks are correctly interpreted during translations
+
 0.42    2014/01/12 13:40:39
         [CHANGES]
          * Added Window on_expose callback type with RenderBuffer

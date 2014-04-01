@@ -61,34 +61,6 @@ identical( $lost_window, $win, '$widget->window_lost called' );
 
 is_oneref( $widget, '$widget has refcount 1 at EOF' );
 
-# Legacy ->render method
-my $render_called = 0;
-my %render_args;
-{
-   # Suppress the warning
-   local $SIG{__WARN__} = sub {};
-
-   my $widget = TestWidgetRenderToWindow->new;
-
-   is( $render_called, 0, 'render not yet called' );
-
-   $widget->set_window( $win );
-   flush_tickit;
-
-   is( $render_called, 1, 'render is called after set_window' );
-   is_deeply( \%render_args,
-      {
-         rect  => Tickit::Rect->new( top => 0, left => 0, lines => 25, cols => 80 ),
-         top   => 0,
-         left  => 0,
-         lines => 25,
-         cols  => 80,
-      }, 'render arguments after set_window' );
-
-   is_display( [ [TEXT("Goodbye")] ],
-               'Display from ->render on Widget' );
-}
-
 done_testing;
 
 package TestWidget;
@@ -119,22 +91,3 @@ sub window_lost
    ( $lost_window ) = @_;
    $self->SUPER::window_lost( @_ );
 }
-
-package TestWidgetRenderToWindow;
-
-use base qw( Tickit::Widget );
-
-use constant CLEAR_BEFORE_RENDER => 0;
-sub render
-{
-   my $self = shift;
-   %render_args = @_;
-
-   $render_called++;
-
-   $self->window->goto( 0, 0 );
-   $self->window->print( "Goodbye" );
-}
-
-sub lines { 1 }
-sub cols  { 7 }

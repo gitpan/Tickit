@@ -4,11 +4,14 @@ use strict;
 use warnings;
 
 use Test::More;
+use Tickit::Test;
 use t::TestWindow qw( $win @methods );
 
 use Tickit::RenderBuffer;
 
 use Tickit::Pen;
+
+my $term = mk_term;
 
 my $rb = Tickit::RenderBuffer->new(
    lines => 10,
@@ -26,11 +29,16 @@ is( $rb->cols,  20, '$rb->cols' );
 
    is_deeply( \@methods,
               [],
-              'Empty RC renders nothing' );
+              'Empty RC renders nothing to window' );
+
+   $rb->flush_to_term( $term );
+
+   is_termlog( [],
+               'Empty RC renders nothing to term' );
 }
 
 # Absolute spans
-{
+foreach my $op (qw( term win )) {
    # Direct pen
    my $pen = Tickit::Pen->new( fg => 1 );
    $rb->text_at( 0, 1, "text span", $pen );
@@ -45,26 +53,45 @@ is( $rb->cols,  20, '$rb->cols' );
    $rb->text_at( 4, 1, "third span", $pen );
    $rb->erase_at( 5, 1, 7, $pen );
 
-   $rb->flush_to_window( $win );
+   if( $op eq "term" ) {
+      $rb->flush_to_term( $term );
 
-   is_deeply( \@methods,
-              [
-                 [ goto => 0, 1 ], [ print => "text span", { fg => 1 } ],
-                 [ goto => 1, 1 ], [ erasech => 5, undef, { fg => 1 } ],
-                 [ goto => 2, 1 ], [ print => "another span", { bg => 2 } ],
-                 [ goto => 3, 1 ], [ erasech => 10, undef, { bg => 2 } ],
-                 [ goto => 4, 1 ], [ print => "third span", { fg => 1, bg => 2 } ],
-                 [ goto => 5, 1 ], [ erasech => 7, undef, { fg => 1, bg => 2 } ],
-              ],
-              'RC renders text' );
-   undef @methods;
+      is_termlog( [ GOTO(0,1), SETPEN(fg=>1), PRINT("text span"),
+                    GOTO(1,1), SETPEN(fg=>1), ERASECH(5,undef),
+                    GOTO(2,1), SETPEN(bg=>2), PRINT("another span"),
+                    GOTO(3,1), SETPEN(bg=>2), ERASECH(10,undef),
+                    GOTO(4,1), SETPEN(fg=>1,bg=>2), PRINT("third span"),
+                    GOTO(5,1), SETPEN(fg=>1,bg=>2), ERASECH(7,undef) ],
+                  'RC renders text to terminal' );
+   }
+   if( $op eq "win" ) {
+      $rb->flush_to_window( $win );
+
+      is_deeply( \@methods,
+                 [
+                    [ goto => 0, 1 ], [ print => "text span", { fg => 1 } ],
+                    [ goto => 1, 1 ], [ erasech => 5, undef, { fg => 1 } ],
+                    [ goto => 2, 1 ], [ print => "another span", { bg => 2 } ],
+                    [ goto => 3, 1 ], [ erasech => 10, undef, { bg => 2 } ],
+                    [ goto => 4, 1 ], [ print => "third span", { fg => 1, bg => 2 } ],
+                    [ goto => 5, 1 ], [ erasech => 7, undef, { fg => 1, bg => 2 } ],
+                 ],
+                 'RC renders text to window' );
+      undef @methods;
+   }
 
    # cheating
    $rb->setpen( undef );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods, [], 'RC now empty after render' );
-   undef @methods;
+   if( $op eq "term" ) {
+      $rb->flush_to_term( $term );
+      is_termlog( [], 'RC now empty after render to terminal' );
+   }
+   if( $op eq "win" ) {
+      $rb->flush_to_window( $win );
+      is_deeply( \@methods, [], 'RC now empty after render to window' );
+      undef @methods;
+   }
 }
 
 # Span splitting

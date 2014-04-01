@@ -4,11 +4,14 @@ use strict;
 use warnings;
 
 use Test::More;
+use Tickit::Test;
 use t::TestWindow qw( $win @methods );
 
 use Tickit::RenderBuffer;
 
 use Tickit::Pen;
+
+my $term = mk_term;
 
 my $rb = Tickit::RenderBuffer->new(
    lines => 10,
@@ -18,21 +21,31 @@ my $rb = Tickit::RenderBuffer->new(
 my $pen = Tickit::Pen->new;
 
 # Characters
-{
+foreach my $op (qw( term win )) {
    $rb->char_at( 5, 5, 0x41, $pen );
    $rb->char_at( 5, 6, 0x42, $pen );
    $rb->char_at( 5, 7, 0x43, $pen );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 5, 5 ],
-                 [ print => "A", {} ],
-                 [ print => "B", {} ],
-                 [ print => "C", {} ],
-              ],
-              'RC renders char_at' );
-   undef @methods;
+   if( $op eq "term" ) {
+      $rb->flush_to_term( $term );
+      is_termlog( [ GOTO(5,5),
+                    SETPEN, PRINT("A"),
+                    SETPEN, PRINT("B"),
+                    SETPEN, PRINT("C") ],
+                  'RC renders char_at to terminal' );
+   }
+   if( $op eq "win" ) {
+      $rb->flush_to_window( $win );
+      is_deeply( \@methods,
+                 [
+                    [ goto => 5, 5 ],
+                    [ print => "A", {} ],
+                    [ print => "B", {} ],
+                    [ print => "C", {} ],
+                 ],
+                 'RC renders char_at to window' );
+      undef @methods;
+   }
 }
 
 # Characters setpen

@@ -7,8 +7,9 @@ package Tickit::Style::Parser;
 
 use strict;
 use warnings;
-
 use base qw( Parser::MGC );
+
+our $VERSION = '0.43';
 
 use Struct::Dumb;
 

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 use Carp;
 
@@ -23,7 +23,7 @@ use Tickit::RenderBuffer;
 use Tickit::Utils qw( string_countmore );
 
 use constant WEAKEN_CHILDREN => 1;
-use constant CHILD_WINDOWS_LATER => $ENV{TICKIT_CHILD_WINDOWS_LATER};
+use constant CHILD_WINDOWS_LATER => $ENV{TICKIT_CHILD_WINDOWS_LATER} // 1;
 
 =head1 NAME
 
@@ -81,6 +81,19 @@ input events before lower siblings. The extent of windows also obscures lower
 windows; drawing on lower windows may not be visible because higher windows
 are above it.
 
+=head2 Deferred Child Window Operations
+
+In order to minimise the chances of ordering-specific bugs in window event
+handlers that cause child window creation, reordering or deletion, the actual
+child window list is only mutated after the event processing has finished, by
+using a L<Tickit> C<later> block. As this behaviour is relatively new, it may
+result in bugs in legacy code that isn't expecting it. For now, it can be
+disabled by setting the environment variable C<TICKIT_CHILD_WINDOWS_LATER> to
+a false value; though this is a temporary measure and will be removed in a
+subsequent version.
+
+ $ TICKIT_CHILD_WINDOWS_LATER=0 perl my-program.pl
+
 =cut
 
 # Internal constructor
@@ -98,6 +111,8 @@ sub new
       left    => 0,
       cols    => $cols,
       lines   => $lines,
+      # Only root window now accumulates damage
+      damage  => Tickit::RectSet->new,
    }, $class;
    $self->_init;
 
@@ -112,9 +127,59 @@ sub _init
    my $self = shift;
    $self->{visible} = 1;
    $self->{pen}     = Tickit::Pen->new;
-   $self->{damage}  = Tickit::RectSet->new;
    $self->{expose_after_scroll} = 1;
    $self->{cursor_visible} = 1;
+}
+
+# We need to ensure all geomety changes happen before any redrawing
+
+sub _needs_restore
+{
+   my $self = shift;
+   my $root = $self->root;
+
+   $root->{needs_restore} and return;
+   $root->{needs_restore}++;
+   $root->_needs_later;
+}
+
+sub _needs_later
+{
+   my $self = shift;
+
+   $self->{later_queued} and return;
+   $self->{later_queued}++;
+   $self->tickit->later( sub { $self->_on_later } );
+}
+
+sub _on_later
+{
+   my $self = shift;
+   undef $self->{later_queued};
+
+   if( $self->{needs_geom_change} ) {
+      foreach ( @{ delete $self->{needs_geom_change} } ) {
+         my ( $win, @change ) = @$_;
+         $win->_do_change_children( @change );
+      }
+   }
+
+   if( $self->{needs_expose} ) {
+      undef $self->{needs_expose};
+      my @rects = $self->{damage}->rects;
+      $self->{damage}->clear;
+
+      $self->term->setctl_int( cursorvis => 0 );
+
+      $self->_do_expose( $_ ) for @rects;
+
+      $self->{needs_restore}++;
+   }
+
+   if( $self->{needs_restore} ) {
+      undef $self->{needs_restore};
+      $self->restore;
+   }
 }
 
 =head1 METHODS
@@ -193,20 +258,15 @@ sub _do_change_children
 sub _change_children
 {
    my $self = shift;
+   my @change = @_;
 
    if( CHILD_WINDOWS_LATER ) {
-      my $queue = $self->{pending_geom_changes} ||= do {
-         my @queue;
-         $self->tickit->later( sub {
-            $self->_do_change_children( @$_ ) for @queue;
-            undef $self->{pending_geom_changes};
-         });
-         \@queue;
-      };
-      push @$queue, [ @_ ];
+      my $root = $self->root;
+      push @{ $root->{needs_geom_change} }, [ $self => @change ];
+      $root->_needs_later;
    }
    else {
-      $self->_do_change_children( @_ );
+      $self->_do_change_children( @change );
    }
 }
 
@@ -417,7 +477,8 @@ highest first.
 sub subwindows
 {
    my $self = shift;
-   return @{ $self->{child_windows} };
+   return unless my $children = $self->{child_windows};
+   return grep { defined } @$children;
 }
 
 =head2 $rootwin = $win->root
@@ -499,10 +560,8 @@ sub hide
       if( $parent->{focused_child} and $parent->{focused_child} == $self ) {
          undef $parent->{focused_child};
       }
-      $parent->_do_expose( $self->rect );
+      $parent->expose( $self->rect );
    }
-
-   $self->restore;
 }
 
 =head2 $visible = $win->is_visible
@@ -543,8 +602,7 @@ sub reposition
    my ( $top, $left ) = @_;
 
    $self->change_geometry( $top, $left, $self->lines, $self->cols );
-
-   $self->restore if $self->is_focused;
+   $self->_needs_restore if $self->is_focused;
 }
 
 =head2 $win->change_geometry( $top, $left, $lines, $cols )
@@ -862,49 +920,38 @@ sub _do_expose
    my $self = shift;
    my ( $rect ) = @_;
 
-   # This might be a call from the parent, so flush all pending areas as well
-   $self->{damage}->add( $rect );
-
-   my @rects = $self->{damage}->rects;
-   $self->{damage}->clear;
-
    if( my $on_expose = $self->{on_expose} ) {
-      my $rb;
+      my $rb = Tickit::RenderBuffer->new(
+         lines => $self->lines,
+         cols  => $self->cols,
+      );
+      $rb->setpen( $self->pen );
+
+      local $self->{exposure_rb} = $rb;
+
+      $rb->save;
+
+      $rb->clip( $rect );
+
       if( $self->{expose_with_rb} ) {
-         $rb = Tickit::RenderBuffer->new(
-            lines => $self->lines,
-            cols  => $self->cols,
-         );
-         $rb->setpen( $self->pen );
+         $on_expose->( $self, $rb, $rect );
+      }
+      else {
+         $on_expose->( $self, $rect );
       }
 
-      foreach my $rect ( @rects ) {
-         if( $rb ) {
-            $rb->save;
+      $rb->restore;
 
-            $rb->clip( $rect );
-            $on_expose->( $self, $rb, $rect );
-
-            $rb->restore;
-         }
-         else {
-            $on_expose->( $self, $rect );
-         }
-      }
-
-      if( $rb ) {
-         $rb->flush_to_window( $self );
-      }
+      undef $self->{exposure_rb};
+      $rb->flush_to_window( $self );
    }
 
    my $children = $self->{child_windows} or return;
 
    foreach my $win ( sort { $a->top <=> $b->top || $a->left <=> $b->left } grep { defined } @$children ) {
-      foreach my $rect ( @rects ) {
-         next unless my $winrect = $rect->intersect( $win->rect );
-         next unless $win->{visible};
-         $win->_do_expose( $winrect->translate( -$win->top, -$win->left ) );
-      }
+      next unless my $winrect = $rect->intersect( $win->rect );
+      next unless $win->{visible};
+      $win->_do_expose( $winrect->translate( -$win->top, -$win->left ) );
    }
 }
 
@@ -930,27 +977,24 @@ sub expose
 {
    my $self = shift;
    my ( $rect ) = @_;
-   $rect ||= $self->selfrect;
 
-   return if $self->_expose_pending( $rect );
+   if( $rect ) {
+      $rect = $rect->intersect( $self->selfrect ) or return;
+   }
+   else {
+      $rect = $self->selfrect;
+   }
+
+   if( my $parent = $self->parent ) {
+      return $parent->expose( $rect->translate( $self->top, $self->left ) );
+   }
+
+   return if $self->{damage}->contains( $rect );
 
    $self->{damage}->add( $rect );
 
-   $self->tickit->enqueue_redraw( sub {
-      my @rects = $self->{damage}->rects;
-      $self->{damage}->clear;
-
-      $self->_expose_pending( $_ ) or $self->_do_expose( $_ ) for @rects;
-   } );
-}
-
-sub _expose_pending
-{
-   my $self = shift;
-   my ( $rect ) = @_;
-   return 1 if $self->{damage}->contains( $rect );
-   return 0 unless $self->parent;
-   return $self->parent->_expose_pending( $rect->translate( $self->top, $self->left ) );
+   $self->{needs_expose} = 1;
+   $self->_needs_later;
 }
 
 =head2 $win->set_on_focus( $on_refocus )
@@ -1305,6 +1349,11 @@ sub goto
    my $win = shift;
    my ( $line, $col ) = @_;
 
+   if( my $rb = $win->{exposure_rb} ) {
+      $rb->goto( $line, $col );
+      return;
+   }
+
    $win->{output_line}   = $line;
    $win->{output_column} = $col;
    $win->{output_needs_goto} = 0;
@@ -1349,6 +1398,10 @@ sub print
    my $text = shift;
 
    my $pen = ( @_ == 1 ) ? shift->as_mutable : Tickit::Pen::Mutable->new( @_ );
+
+   if( my $rb = $self->{exposure_rb} ) {
+      return $rb->text( $text, $pen );
+   }
 
    # First collect up the pen attributes and abort early if any window is
    # invisible
@@ -1438,6 +1491,10 @@ sub erasech
    my $moveend = shift;
 
    my $pen = ( @_ == 1 ) ? shift->as_mutable : Tickit::Pen::Mutable->new( @_ );
+
+   if( my $rb = $self->{exposure_rb} ) {
+      return $rb->erase( $count, $pen );
+   }
 
    # First collect up the pen attributes and abort early if any window is
    # invisible
@@ -1550,88 +1607,112 @@ the return value is not interesting.
 
 =cut
 
-sub _scrollrect_inner
+sub _scrollrectset
 {
-   my $self = shift;
-   my ( $rect, $downward, $rightward, @args ) = @_;
+   my $win = shift;
+   my ( $rectset, $downward, $rightward, $pen ) = @_;
 
-   if( abs($downward) >= $rect->lines or abs($rightward) >= $rect->cols ) {
-      $self->expose( $rect ) if $self->{expose_after_scroll};
-      return 1;
-   }
+   my $origwin = $win;
+   my $expose_after_scroll = $win->{expose_after_scroll};
 
-   my $pen = ( @args == 1 ) ? $args[0]->as_mutable : Tickit::Pen::Mutable->new( @args );
-
-   my $top  = $rect->top;
-   my $left = $rect->left;
-
-   my $lines = $rect->lines;
-   my $cols  = $rect->cols;
-
-   my $win = $self;
    while( $win ) {
-      $top  >= 0 and $top  < $win->lines or croak '$top out of bounds';
-      $left >= 0 and $left < $win->cols  or croak '$left out of bounds';
-
-      $lines > 0 and $top + $lines <= $win->lines or croak '$lines out of bounds';
-      $cols  > 0 and $left + $cols <= $win->cols  or croak '$cols out of bounds';
-
-      return unless $win->{visible};
+      return 0 unless $win->is_visible;
 
       $pen->default_from( $win->pen );
 
-      $top  += $win->top;
-      $left += $win->left;
-
       my $parent = $win->parent or last;
+
+      my $parentset = Tickit::RectSet->new;
+      $parentset->add( $_->translate( $win->top, $win->left ) ) for $rectset->rects;
+
+      foreach my $sibling ( $parent->subwindows ) {
+         last if $sibling == $win;
+         next unless $sibling->is_visible;
+
+         $parentset->subtract( $sibling->rect );
+      }
+
       $win = $parent;
+      $rectset = $parentset;
    }
 
    my $term = $win->term;
 
    $term->setpen( bg => $pen->getattr( 'bg' ) );
 
-   unless( $term->scrollrect( $top, $left, $lines, $cols, $downward, $rightward ) ) {
-      $self->expose( $rect ) if $self->{expose_after_scroll};
-      return 0;
-   }
+   my $ret = 1;
+   foreach my $rect ( $rectset->rects ) {
+      my $top  = $rect->top;
+      my $left = $rect->left;
 
-   if( $self->{expose_after_scroll} ) {
-      if( $downward > 0 ) {
-         # "scroll down" means lines moved upward, so the bottom needs redrawing
-         $self->expose( Tickit::Rect->new(
-               top  => $rect->bottom - $downward, lines => $downward,
-               left => $rect->left,               cols  => $rect->cols,
-         ) );
-      }
-      elsif( $downward < 0 ) {
-         # "scroll up" means lines moved downward, so top needs redrawing
-         $self->expose( Tickit::Rect->new(
-               top  => $rect->top,  lines => -$downward,
-               left => $rect->left, cols  => $rect->cols,
-         ) );
+      my $lines = $rect->lines;
+      my $cols  = $rect->cols;
+
+      my $origrect = $rect->translate( -$origwin->abs_top, -$origwin->abs_left );
+
+      if( abs($downward) >= $lines or abs($rightward) >= $cols ) {
+         $origwin->expose( $rect ) if $expose_after_scroll;
+         next;
       }
 
-      if( $rightward > 0 ) {
-         # "scroll right" means columns moved leftward, so the right edge needs redrawing
-         $self->expose( Tickit::Rect->new(
-               top  => $rect->top,                lines => $rect->lines,
-               left => $rect->right - $rightward, cols  => $rightward,
-         ) );
+      # Move damage
+      my $damageset = $win->{damage};
+      my @damage = $damageset->rects;
+      $damageset->clear;
+      foreach my $r ( @damage ) {
+         $damageset->add( $r ), next if $r->bottom < $rect->top or $r->top > $rect->bottom or
+                                        $r->right < $rect->left or $r->left > $rect->right;
+         my $inside = $r->intersect( $rect );
+         my @outside = $r->subtract( $rect );
+
+         $damageset->add( $_ ) for @outside;
+         $damageset->add( $inside->translate( -$downward, -$rightward ) ) if $inside;
       }
-      elsif( $rightward < 0 ) {
-         # "scroll left" means lines moved rightward, so left edge needs redrawing
-         $self->expose( Tickit::Rect->new(
-               top  => $rect->top,  lines => $rect->lines,
-               left => $rect->left, cols  => -$rightward,
-         ) );
+
+      if( not $term->scrollrect( $top, $left, $lines, $cols, $downward, $rightward ) ) {
+         $ret = 0;
+         if( $expose_after_scroll ) {
+            $origwin->expose( $origrect );
+         }
       }
-   }
-   else {
-      $self->_needs_flush;
+
+      if( $expose_after_scroll ) {
+         if( $downward > 0 ) {
+            # "scroll down" means lines moved upward, so the bottom needs redrawing
+            $origwin->expose( Tickit::Rect->new(
+                  top  => $origrect->bottom - $downward, lines => $downward,
+                  left => $origrect->left,               cols  => $cols,
+            ) );
+         }
+         elsif( $downward < 0 ) {
+            # "scroll up" means lines moved downward, so top needs redrawing
+            $origwin->expose( Tickit::Rect->new(
+                  top  => $origrect->top,  lines => -$downward,
+                  left => $origrect->left, cols  => $cols,
+            ) );
+         }
+
+         if( $rightward > 0 ) {
+            # "scroll right" means columns moved leftward, so the right edge needs redrawing
+            $origwin->expose( Tickit::Rect->new(
+                  top  => $origrect->top,                lines => $lines,
+                  left => $origrect->right - $rightward, cols  => $rightward,
+            ) );
+         }
+         elsif( $rightward < 0 ) {
+            # "scroll left" means lines moved rightward, so left edge needs redrawing
+            $origwin->expose( Tickit::Rect->new(
+                  top  => $origrect->top,  lines => $lines,
+                  left => $origrect->left, cols  => -$rightward,
+            ) );
+         }
+      }
+      else {
+         $origwin->_needs_flush;
+      }
    }
 
-   return 1;
+   return $ret;
 }
 
 sub scrollrect
@@ -1652,49 +1733,16 @@ sub scrollrect
    }
    my ( $downward, $rightward, @args ) = @_;
 
+   my $pen = ( @args == 1 ) ? $args[0]->as_mutable : Tickit::Pen::Mutable->new( @args );
+
    my $visible = Tickit::RectSet->new;
    $visible->add( $rect );
 
-   my $right = $rect->right;
-
-   foreach my $line ( $rect->linerange ) {
-      my $col = $rect->left;
-      while( $col < $right ) {
-         my ( $vis, $len ) = $self->_get_span_visibility( $line, $col );
-         $col += $len and next if $vis;
-         my $until = defined $len ? $col + $len : $right;
-
-         return 0 unless $self->{expose_after_scroll};
-
-         $visible->subtract( Tickit::Rect->new(
-            top    => $line,
-            bottom => $line+1,
-            left   => $col,
-            right  => $until,
-         ) );
-
-         $col = $until;
-      }
+   foreach my $child ( $self->subwindows ) {
+      $visible->subtract( $child->rect );
    }
 
-   my @rects = $self->{damage}->rects;
-   $self->{damage}->clear;
-   foreach my $r ( @rects ) {
-      $self->{damage}->add( $r ), next if $r->bottom < $rect->top or $r->top > $rect->bottom or
-                                          $r->right < $rect->left or $r->left > $rect->right;
-      my $inside = $r->intersect( $rect );
-      my @outside = $r->subtract( $rect );
-
-      $self->{damage}->add( $_ ) for @outside;
-      $self->{damage}->add( $inside->translate( -$downward, -$rightward ) ) if $inside;
-   }
-
-   my $ret = 1;
-   foreach my $r ( $visible->rects ) {
-      $self->_scrollrect_inner( $r, $downward, $rightward, @args ) or $ret = 0;
-   }
-
-   return $ret;
+   $self->_scrollrectset( $visible, $downward, $rightward, $pen );
 }
 
 =head2 $success = $win->scroll( $downward, $rightward )
@@ -1732,31 +1780,12 @@ sub scroll_with_children
    my $self = shift;
    my ( $downward, $rightward, @args ) = @_;
 
+   my $pen = ( @args == 1 ) ? $args[0]->as_mutable : Tickit::Pen::Mutable->new( @args );
+
    my $visible = Tickit::RectSet->new;
    $visible->add( $self->selfrect );
 
-   my $prevchild = $self;
-   my $lineoffs = 0;
-   my $coloffs = 0;
-   for( my $win = $self->parent; $win; $win = $win->parent ) {
-      $lineoffs -= $prevchild->top;
-      $coloffs  -= $prevchild->left;
-
-      foreach my $child ( $win->subwindows ) {
-         last if $child == $prevchild;
-         $visible->subtract( $child->rect->translate( $lineoffs, $coloffs ) );
-      }
-
-      $prevchild = $win;
-   }
-
-   my $root = $prevchild;
-   my $ret = 1;
-   foreach my $r ( $visible->rects ) {
-      $self->_scrollrect_inner( $r, $downward, $rightward, @args ) or $ret = 0;
-   }
-
-   return $ret;
+   $self->_scrollrectset( $visible, $downward, $rightward, $pen );
 }
 
 =head2 $win->cursor_at( $line, $col )
@@ -1771,7 +1800,7 @@ sub cursor_at
 {
    my $self = shift;
    ( $self->{cursor_line}, $self->{cursor_col} ) = @_;
-   $self->tickit->enqueue_redraw if $self->is_focused;
+   $self->_needs_restore if $self->is_focused;
 }
 
 =head2 $win->cursor_visible( $visible )
@@ -1786,7 +1815,7 @@ sub cursor_visible
 {
    my $self = shift;
    ( $self->{cursor_visible} ) = @_;
-   $self->tickit->enqueue_redraw if $self->is_focused;
+   $self->_needs_restore if $self->is_focused;
 }
 
 =head2 $win->cursor_shape( $shape )
@@ -1802,7 +1831,7 @@ sub cursor_shape
 {
    my $self = shift;
    ( $self->{cursor_shape} ) = @_;
-   $self->tickit->enqueue_redraw if $self->is_focused;
+   $self->_needs_restore if $self->is_focused;
 }
 
 =head2 $win->take_focus
@@ -1848,7 +1877,7 @@ sub _focus_gained
       $parent->_focus_gained( $self ) if $self->is_visible;
    }
    else {
-      $self->tickit->enqueue_redraw;
+      $self->_needs_restore;
    }
 
    if( !$child ) {
@@ -1916,6 +1945,8 @@ sub restore
    else {
       $term->setctl_int( cursorvis => 0 );
    }
+
+   $term->flush;
 }
 
 =head2 $win->clearline( $line )

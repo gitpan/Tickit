@@ -20,10 +20,12 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
 
    my $exposed_rb;
    my @exposed_rects;
+   my $expose_cb;
    $win->set_on_expose( with_rb => sub {
       ( undef, $exposed_rb, my $rect ) = @_;
       push @exposed_rects, $rect;
       $win_exposed++;
+      $expose_cb->( $exposed_rb, $rect ) if $expose_cb;
    });
 
    $rootwin->expose;
@@ -48,7 +50,7 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
 
    flush_tickit;
 
-   is( $root_exposed, 1, '$root expose count 1 after $win->expose' );
+   is( $root_exposed, 2, '$root expose count 2 after $win->expose' );
    is( $win_exposed, 2, '$win expose count 2 after $win->expose' );
 
    is_deeply( \@exposed_rects,
@@ -63,7 +65,7 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
 
    flush_tickit;
 
-   is( $root_exposed, 2, '$root expose count 2 after root-then-win' );
+   is( $root_exposed, 3, '$root expose count 3 after root-then-win' );
    is( $win_exposed, 3, '$win expose count 3 after root-then-win' );
 
    $win->expose;
@@ -71,21 +73,21 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
 
    flush_tickit;
 
-   is( $root_exposed, 3, '$root expose count 3 after win-then-root' );
+   is( $root_exposed, 4, '$root expose count 4 after win-then-root' );
    is( $win_exposed, 4, '$win expose count 4 after win-then-root' );
 
    $win->hide;
 
    flush_tickit;
 
-   is( $root_exposed, 4, '$root expose count 4 after $win hide' );
+   is( $root_exposed, 5, '$root expose count 5 after $win hide' );
    is( $win_exposed, 4, '$win expose count 5 after $win hide' );
 
    $win->show;
 
    flush_tickit;
 
-   is( $root_exposed, 4, '$root expose count 4 after $win show' );
+   is( $root_exposed, 6, '$root expose count 6 after $win show' );
    is( $win_exposed, 5, '$win expose count 5 after $win show' );
 
    undef @exposed_rects;
@@ -116,29 +118,69 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
       [ Tickit::Rect->new( top => 0, left => 5, lines => 1, cols => 10 ) ],
       'Exposed regions after expose separate root+win'
    );
-}
 
-# Legacy rect-only callback
-{
-   my $win_exposed;
-   my @exposed_rects;
-   $win->set_on_expose( with_rb => sub {
-      push @exposed_rects, $_[2];
-      $win_exposed++;
-   });
+   undef @exposed_rects;
 
-   $rootwin->expose;
-
-   ok( !$win_exposed, 'Legacy on_expose not yet invoked' );
+   $win->expose( Tickit::Rect->new( top => -2, left => -2, lines => 50, cols => 200 ) );
 
    flush_tickit;
 
-   is( $win_exposed,  1, '$win expose count 1 after $rootwin->expose' );
-
    is_deeply( \@exposed_rects,
       [ Tickit::Rect->new( top => 0, left => 0, lines => 4, cols => 20 ) ],
-      'Exposed regions after $rootwin->expose'
+      'Exposed regions clipped by window extent'
    );
+
+   $expose_cb = sub {
+      my ( $rb, $rect ) = @_;
+
+      $rb->text_at( 1, 1, "The text" );
+      $rb->erase_at( 2, 2, 4 );
+   };
+
+   $win->expose;
+   flush_tickit;
+
+   is_termlog( [ GOTO(4,11),
+                 SETPEN,
+                 PRINT("The text"),
+                 GOTO(5,12),
+                 SETPEN,
+                 ERASECH(4,0) ],
+               'Termlog after Window expose with output' );
+
+   is_display( [ BLANKLINES(4),
+                 [BLANK(11), TEXT("The text")] ],
+               'Display after Window expose with output' );
+
+   $win->set_on_expose( undef );
+   $win->clear;
+   flush_tickit;
+}
+
+{
+   $win->set_on_expose( with_rb => sub {
+      my ( undef, $rb ) = @_;
+      $rb->text_at( 0,  0, "Parent" );
+      $rb->text_at( 0, 14, "Parent" );
+   });
+
+   $win->expose( Tickit::Rect->new( top => 0, left => 0, lines => 1, cols => 20 ) );
+
+   my $subwin = $win->make_sub( 0, 7, 1, 7 );
+   $subwin->set_on_expose( with_rb => sub {
+      my ( undef, $rb ) = @_;
+      $rb->text_at( 0, 0, "Child" );
+   });
+
+   flush_tickit;
+
+   is_display( [ BLANKLINES(3),
+                 [BLANK(10), TEXT("Parent Child  Parent")] ],
+               'Display after simultaneous set_on_expose on parent + child' );
+
+   $win->set_on_expose( undef );
+   $subwin->close;
+   $win->clear;
 }
 
 {
@@ -153,6 +195,67 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
    }
 
    is( $exposed, 100, '$exposed 100 times' );
+
+   $subwin->close;
+}
+
+$win->close; undef $win;
+flush_tickit;
+drain_termlog;
+
+# Window ordering
+{
+   my $win_A = $rootwin->make_sub( 0, 0, 4, 80 );
+   my $win_B = $rootwin->make_sub( 0, 0, 4, 80 );
+   my $win_C = $rootwin->make_sub( 0, 0, 4, 80 );
+   flush_tickit;
+
+   $win_A->set_on_expose( with_rb => sub {
+      my ( $win, $rb ) = @_;
+      $rb->text_at( 0, 0, "Window A" );
+   });
+
+   $win_B->set_on_expose( with_rb => sub {
+      my ( $win, $rb ) = @_;
+      $rb->text_at( 0, 0, "Window B" );
+   });
+
+   $win_C->set_on_expose( with_rb => sub {
+      my ( $win, $rb ) = @_;
+      $rb->text_at( 0, 0, "Window C" );
+   });
+
+   $rootwin->expose;
+   flush_tickit;
+
+   is_termlog( [ GOTO(0,0),
+                 SETPEN,
+                 PRINT("Window A") ],
+                 'Termlog for overlapping initially' );
+
+   $win_B->raise;
+   flush_tickit;
+
+   is_termlog( [ GOTO(0,0),
+                 SETPEN,
+                 PRINT("Window B") ],
+                 'Termlog for overlapping after $win_B->raise' );
+
+   $win_B->lower;
+   flush_tickit;
+
+   is_termlog( [ GOTO(0,0),
+                 SETPEN,
+                 PRINT("Window A") ],
+                 'Termlog for overlapping after $win_B->lower' );
+
+   $win_C->raise_to_front;
+   flush_tickit;
+
+   is_termlog( [ GOTO(0,0),
+                 SETPEN,
+                 PRINT("Window C") ],
+                 'Termlog for overlapping after $win_C->raise_to_front' );
 }
 
 done_testing;

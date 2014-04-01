@@ -37,10 +37,6 @@ isa_ok( $term, "Tickit::Term", '$term isa Tickit::Term' );
 is( $term->get_output_handle, undef, '$term->get_output_handle undef' );
 
 $stream = "";
-$term->print( "Hello" );
-stream_is( "Hello", '$term->print' );
-
-$stream = "";
 $term->goto( 0, 0 );
 stream_is( "\e[1H", '$term->goto( 0, 0 )' );
 
@@ -96,12 +92,31 @@ $term->chpen( b => 0 );
 stream_is( "\e[m", '$term->chpen( b => 0 )' );
 
 $stream = "";
+$term->print( "Hello" );
+stream_is( "Hello", '$term->print' );
+
+$term->setpen( Tickit::Pen->new );
+$stream = "";
+$term->print( "colour", Tickit::Pen->new( fg => 1 ) );
+stream_is( "\e[31mcolour", '$term->print with pen' );
+
+$stream = "";
 $term->clear;
 stream_is( "\e[2J", '$term->clear' );
+
+$term->setpen( Tickit::Pen->new );
+$stream = "";
+$term->clear( Tickit::Pen->new( bg => 2 ) );
+stream_is( "\e[42m\e[2J", '$term->clear with pen' );
 
 $stream = "";
 $term->erasech( 23, undef );
 stream_is( "\e[23X", '$term->erasech( 23 )' );
+
+$term->setpen( Tickit::Pen->new );
+$stream = "";
+$term->erasech( 18, undef, Tickit::Pen->new( bg => 3 ) );
+stream_is( "\e[43m\e[18X", '$term->erasech with pen' );
 
 $stream = "";
 $term->setctl_int( altscreen => 1 );

@@ -4,23 +4,15 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Refcount;
 
 use Tickit::Test;
 
 my ( $term, $rootwin ) = mk_term_and_window;
 
-# Already 2 references; Tickit object keeps a permanent one, and we have one
-# here. This is fine.
-is_refcount( $rootwin, 2, '$rootwin has refcount 2 initially' );
-
 ok( !$term->{cursorvis}, 'Cursor not yet visible initially' );
 
 my $win = $rootwin->make_sub( 3, 10, 4, 20 );
 flush_tickit;
-
-is_oneref( $win, '$win has refcount 1 initially' );
-is_refcount( $rootwin, 3, '$rootwin has refcount 3 after ->make_sub' );
 
 my $focused;
 $win->set_on_focus( sub {
@@ -91,9 +83,6 @@ ok( $term->{cursorvis}, 'Cursor is visible after focus window show' );
 
 is_termlog( [ GOTO(7,17), ],
             'Termlog after focus window show' );
-
-is_oneref( $win, '$win has refcount 1 at EOF' );
-is_refcount( $rootwin, 3, '$rootwin has refcount 3 at EOF' );
 
 {
    my $winA = $rootwin->make_sub( 5, 0, 1, 80 );

@@ -14,17 +14,23 @@ my $rootwin = mk_window;
 my $win = $rootwin->make_sub( 3, 10, 4, 30 );
 
 $win->goto( 2, 3 );
-$win->print( "Hello" );
+my $len = $win->print( "Hello" );
+
+is( $len->bytes,      5, '->print()->bytes is 5' );
+is( $len->codepoints, 5, '->print()->codepoints is 5' );
+is( $len->graphemes,  5, '->print()->graphemes is 5' );
+is( $len->columns,    5, '->print()->columns is 5' );
+
 flush_tickit;
 
 is_termlog( [ GOTO(5,13),
               SETPEN,
               PRINT("Hello"), ],
-            'Termlog' );
+            'Termlog for $win->print' );
 
 is_display( [ BLANKLINES(5),
               [BLANK(13), TEXT("Hello")] ],
-            'Display' );
+            'Display for $win->print' );
 
 $win->pen->chattr( b => 1 );
 
@@ -145,9 +151,6 @@ is_display( [ BLANKLINES(3),
               ( [BLANK(10), BLANK(30,bg=>4)] ) x 4 ],
             'Display after $win->clear' );
 
-ok( !$win->scroll( 1, 0 ), '$win does not support scrolling' );
-drain_termlog;
-
 {
    my $subwin = $win->make_sub( 2, 2, 1, 10 );
    flush_tickit;
@@ -251,167 +254,5 @@ drain_termlog;
 
 $win->close; undef $win;
 flush_tickit;
-
-# Scrollable window probably needs to be fullwidth
-{
-   my $win = $rootwin->make_sub( 5, 0, 10, 80 );
-
-   my @exposed_rects;
-   $win->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
-
-   ok( $win->scroll( 1, 0 ), 'Fullwidth $win supports scrolling' );
-   flush_tickit;
-
-   is_termlog( [ SETPEN,
-                 SCROLLRECT(5,0,10,80,1,0) ],
-               'Termlog after fullwidth $win->scroll downward' );
-
-   is_deeply( \@exposed_rects,
-              [ Tickit::Rect->new( top => 9, lines => 1, left => 0, cols => 80 ) ],
-              'Exposed area after ->scroll downward' );
-
-   undef @exposed_rects;
-
-   $win->scroll( -1, 0 );
-   flush_tickit;
-
-   is_termlog( [ SETPEN,
-                 SCROLLRECT(5,0,10,80,-1,0) ],
-               'Termlog after fullwidth $win->scroll upward' );
-
-   is_deeply( \@exposed_rects,
-              [ Tickit::Rect->new( top => 0, lines => 1, left => 0, cols => 80 ) ],
-              'Exposed area after ->scroll upward' );
-
-   undef @exposed_rects;
-
-   ok( $win->scrollrect( Tickit::Rect->new( top => 2, left => 0, lines => 3, cols => 80 ),
-                         -1, 0 ),
-       'Fullwidth $win supports scrolling a region' );
-   flush_tickit;
-
-   is_termlog( [ SETPEN,
-                 SCROLLRECT(7,0,3,80,-1,0) ],
-               'Termlog after fullwidth $win->scrollrect downward' );
-
-   is_deeply( \@exposed_rects,
-              [ Tickit::Rect->new( top => 2, lines => 1, left => 0, cols => 80 ) ],
-              'Exposed area after ->scroll downward' );
-
-   undef @exposed_rects;
-
-   $win->scrollrect( Tickit::Rect->new( top => 2, left => 0, lines => 3, cols => 80 ),
-                     1, 0 );
-   flush_tickit;
-
-   is_termlog( [ SETPEN,
-                 SCROLLRECT(7,0,3,80,1,0) ],
-               'Termlog after fullwidth $win->scrollrect upward' );
-
-   is_deeply( \@exposed_rects,
-              [ Tickit::Rect->new( top => 4, lines => 1, left => 0, cols => 80 ) ],
-              'Exposed area after ->scroll upward' );
-
-   undef @exposed_rects;
-
-   # Now check that ->scroll_with_children scrolls the entire content even
-   # with obscuring children
-   my $child = $win->make_sub( 0, 70, 1, 10 );
-
-   $win->scroll_with_children( -2, 0 );
-   flush_tickit;
-
-   is_termlog( [ SETPEN,
-                 SCROLLRECT(5,0,10,80, -2,0) ],
-               'Termlog after ->scroll_with_children' );
-
-   is_deeply( \@exposed_rects,
-              [ Tickit::Rect->new( top => 0, left => 0, lines => 2, cols => 80 ) ],
-              'Exposed area after ->scroll_with_children' );
-
-   undef @exposed_rects;
-
-   # Sibling to obscure part of it
-   my $sibling = $rootwin->make_sub( 0, 0, 10, 20 );
-   flush_tickit;
-
-   $sibling->raise;
-   flush_tickit;
-   undef @exposed_rects;
-
-   $win->scroll_with_children( -2, 0 );
-   flush_tickit;
-
-   is_termlog( [ SETPEN,
-                 SETPEN,
-                 SCROLLRECT(10,0,5,80, -2,0) ],
-               'Termlog after ->scroll_with_children with sibling' );
-
-   is_deeply( \@exposed_rects,
-              [ Tickit::Rect->new( top => 0, left => 20, lines => 5, cols => 60 ),
-                Tickit::Rect->new( top => 5, left =>  0, lines => 2, cols => 80 ) ],
-              'Exposed area after ->scroll_with_children with sibling' );
-
-   undef @exposed_rects;
-
-   $win->close;
-   $sibling->close;
-   flush_tickit;
-}
-
-# Window ordering
-{
-   my $win_A = $rootwin->make_sub( 0, 0, 4, 80 );
-   my $win_B = $rootwin->make_sub( 0, 0, 4, 80 );
-   my $win_C = $rootwin->make_sub( 0, 0, 4, 80 );
-   flush_tickit;
-
-   $win_A->set_on_expose( with_rb => sub {
-      my ( $win, $rb ) = @_;
-      $rb->text_at( 0, 0, "Window A" );
-   });
-
-   $win_B->set_on_expose( with_rb => sub {
-      my ( $win, $rb ) = @_;
-      $rb->text_at( 0, 0, "Window B" );
-   });
-
-   $win_C->set_on_expose( with_rb => sub {
-      my ( $win, $rb ) = @_;
-      $rb->text_at( 0, 0, "Window C" );
-   });
-
-   $rootwin->expose;
-   flush_tickit;
-
-   is_termlog( [ GOTO(0,0),
-                 SETPEN,
-                 PRINT("Window A") ],
-                 'Termlog for overlapping initially' );
-
-   $win_B->raise;
-   flush_tickit;
-
-   is_termlog( [ GOTO(0,0),
-                 SETPEN,
-                 PRINT("Window B") ],
-                 'Termlog for overlapping after $win_B->raise' );
-
-   $win_B->lower;
-   flush_tickit;
-
-   is_termlog( [ GOTO(0,0),
-                 SETPEN,
-                 PRINT("Window A") ],
-                 'Termlog for overlapping after $win_B->lower' );
-
-   $win_C->raise_to_front;
-   flush_tickit;
-
-   is_termlog( [ GOTO(0,0),
-                 SETPEN,
-                 PRINT("Window C") ],
-                 'Termlog for overlapping after $win_C->raise_to_front' );
-}
 
 done_testing;

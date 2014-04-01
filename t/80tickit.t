@@ -13,6 +13,8 @@ use Test::More;
 use Test::HexString;
 use Test::Refcount;
 
+use Errno qw( EAGAIN );
+
 use Tickit;
 
 pipe my( $my_rd, $term_wr ) or die "Cannot pipepair - $!";
@@ -41,9 +43,17 @@ sub stream_is
    my ( $expect, $name ) = @_;
 
    my $stream = "";
-   do {
-      sysread( $my_rd, $stream, 8192, length $stream );
-   } while length $stream < length $expect and $stream eq substr( $expect, 0, length $stream );
+   while(1) {
+      my $ret = sysread( $my_rd, $stream, 8192, length $stream );
+      defined $ret or
+         ( $! == EAGAIN and last ) or
+         die "sysread() - $!";
+
+      $ret or die "sysread() - EOF";
+
+      last if length $stream >= length $expect or
+              $stream ne substr( $expect, 0, length $stream );
+   }
 
    is_hexstr( substr( $stream, 0, length $expect, "" ), $expect, $name );
 }
@@ -62,8 +72,6 @@ $term->print( "\x{109}" );
 $term->flush;
 stream_is( "\xc4\x89", 'print outputs UTF-8' );
 
-is_oneref( $tickit, '$tickit has refcount 1 at EOF' );
-
 $tickit->set_root_widget( TestWidget->new );
 
 $tickit->setup_term;
@@ -78,6 +86,8 @@ stream_is(
    "\e[2J\e[13;38H\e[mHello"            , # Widget
    'root widget rendered'
 );
+
+is_oneref( $tickit, '$tickit has refcount 1 at EOF' );
 
 done_testing;
 

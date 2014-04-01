@@ -1,14 +1,14 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2014 -- leonerd@leonerd.org.uk
 
 package Tickit::Test;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 use Exporter 'import';
 
@@ -259,7 +259,7 @@ sub _pen2string
    return "{" . join( ",", map { defined $pen->{$_} ? "$_=" . ($pen->{$_} || 0) : "!$_" } sort keys %$pen ) . "}";
 }
 
-=head2 is_termlog( $log, $name )
+=head2 is_termlog( [ @log ], $name )
 
 Asserts that the mock terminal log contains exactly the given sequence of
 methods. See also the helper functions below.
@@ -268,43 +268,66 @@ Because this test is quite fragile, relying on the exact nature and order of
 drawing methods invoked on the terminal, it should only be used rarely. Most
 normal cases of widget unit tests should instead only use C<is_display>.
 
+=head2 is_termlog( { $pos => \@log, ... }, $name )
+
+The expectation HASH is keyed by strings giving a GOTO position, and the test
+asserts that a sequence of GOTO and other operations were performed equivalent
+to the expectations given in the HASH.
+
+This differs from the simpler ARRAY reference form by being somewhat more
+robust against rendering order. It checks that every expectation sequence
+happens exactly once, but does not care which order the sections happen in.
+
+ is_termlog( { "0,0" => [ PRINT("Hello") ],
+               "0,6" => [ PRINT("World!") ] } );
+
 =cut
 
-sub is_termlog
+sub _step_to_text
 {
-   my ( $log, $name ) = @_;
+   my ( $step ) = @_;
 
-   my $tb = Test::Builder->new;
+   return "none" unless defined $step;
 
-   my @want_log = @$log;
-   my @got_log  = $term->methodlog;
+   my ( $op, @args ) = @$step;
+
+   if( $op eq "chpen" ) {
+      return "$op(" . _pen2string( $args[0] ) . ")";
+   }
+   else {
+      return "$op(" . join( ",", map { defined $_ ? $_ =~ m/^-?\d+$/ ? $_ : qq("$_") : "undef" } @args ) . ")";
+   }
+}
+
+sub _steps_ok
+{
+   my ( $tb, $want_log, $got_log, $stop_before_GOTO, $name ) = @_;
 
    my $prev_line;
 
-   for( my $idx = 0; @want_log or @got_log; $idx++ ) {
-      my $want_line = shift @want_log;
-      my $got_line  = shift @got_log;
+   for( my $idx = 0; @$want_log or @$got_log; $idx++ ) {
+      my $got_line;
+
+      if( $stop_before_GOTO and @$got_log and $got_log->[0][0] eq "goto" ) {
+         $got_line = undef;
+      }
+      else {
+         $got_line = shift @$got_log;
+      }
+
+      my $want_line = shift @$want_log;
 
       if( $want_line and $want_line->[0] eq "chpen_bg" and
           $got_line  and $got_line->[0] eq "chpen" ) {
          $got_line = [ chpen_bg => $got_line->[1]->{bg} ];
       }
 
-      foreach ( $want_line, $got_line ) {
-         ( $_ = "none" ), next unless defined $_;
-
-         my ( $op, @args ) = @$_;
-
-         if( $op eq "chpen" ) {
-            $_ = "$op(" . _pen2string( $args[0] ) . ")";
-         }
-         else {
-            $_ = "$op(" . join( ",", map { defined $_ ? $_ =~ m/^-?\d+$/ ? $_ : qq("$_") : "undef" } @args ) . ")";
-         }
-      }
+      $_ = _step_to_text($_) for $want_line, $got_line;
 
       if( $want_line eq $got_line ) {
          $prev_line = $want_line;
+
+         return 1 if $stop_before_GOTO and @$got_log and $got_log->[0][0] eq "goto";
          next;
       }
 
@@ -313,6 +336,55 @@ sub is_termlog
       $tb->diag( "Expected terminal operation $want_line, got $got_line at step $idx" );
       $tb->diag( "  after $prev_line" ) if defined $prev_line;
       return $ok;
+   }
+
+   return 1;
+}
+
+sub is_termlog
+{
+   my ( $log, $name ) = @_;
+
+   my $tb = Test::Builder->new;
+
+   my @got_log = $term->methodlog;
+
+   if( ref $log eq "ARRAY" ) {
+      local $Test::Builder::Level = $Test::Builder::Level + 1;
+      return unless _steps_ok( $tb, $log, \@got_log, 0, $name );
+   }
+   elsif( ref $log eq "HASH" ) {
+      my %regions = %$log;
+
+      while( keys %regions and @got_log ) {
+         if( !$got_log[0]->[0] eq "goto" ) {
+            my $ok = $tb->ok( 0, $name );
+            $tb->diag( "Expected a goto terminal operation, got " . _step_to_text( $got_log[0] ) );
+            return $ok;
+         }
+
+         my $pos = sprintf "%d,%d", @{ shift @got_log }[1,2];
+         my $want_log = delete $regions{$pos};
+         unless( $want_log ) {
+            my $ok = $tb->ok( 0, $name );
+            $tb->diag( "Did not expect goto($pos)" );
+            return $ok;
+         }
+
+         local $Test::Builder::Level = $Test::Builder::Level + 1;
+         return unless _steps_ok( $tb, $want_log, \@got_log, 1, $name );
+      }
+
+      if( keys %regions ) {
+         my $ok = $tb->ok( 0, $name );
+         $tb->diag( "Expected a goto(" . ( keys %regions )[0] . ", got none" );
+         return $ok;
+      }
+      if( @got_log ) {
+         my $ok = $tb->ok( 0, $name );
+         $tb->diag( "Expected none, got " . _step_to_text( $got_log[0] ) );
+         return $ok;
+      }
    }
 
    return $tb->ok( 1, $name );

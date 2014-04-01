@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 BEGIN {
-   our $VERSION = '0.42';
+   our $VERSION = '0.43';
 }
 
 use Carp;
@@ -245,32 +245,6 @@ sub timer
 
    # TODO: bin-search insert position then splice
    @{ $self->{timer_queue} } = sort { $a->time <=> $b->time } @{ $self->{timer_queue} }, TimeQueue( $at => $code );
-}
-
-sub enqueue_redraw
-{
-   my $self = shift;
-   my ( $code ) = @_;
-
-   my $queue = $self->{redraw_queue};
-   push @$queue, $code if $code;
-
-   return if $self->{redraw_queued};
-
-   weaken( my $weakself = $self );
-
-   $self->{redraw_queued} = 1;
-   $self->later( sub {
-      $weakself->term->setctl_int( cursorvis => 0 );
-
-      my @queue = @$queue;
-      @$queue = ();
-
-      $_->() for @queue;
-
-      $weakself->rootwin->restore;
-      $weakself->{redraw_queued} = 0;
-   } );
 }
 
 =head2 $term = $tickit->term

@@ -128,4 +128,25 @@ my $mask = Tickit::Rect->new(
    undef @methods;
 }
 
+# translate over mask
+{
+   $rb->mask( Tickit::Rect->new( top => 2, left => 2, lines => 1, cols => 1 ) );
+
+   { $rb->save; $rb->translate( 0, 0 ); $rb->text_at( 0, 0, "A" ); $rb->restore }
+   { $rb->save; $rb->translate( 0, 2 ); $rb->text_at( 0, 0, "B" ); $rb->restore }
+   { $rb->save; $rb->translate( 2, 0 ); $rb->text_at( 0, 0, "C" ); $rb->restore }
+   { $rb->save; $rb->translate( 2, 2 ); $rb->text_at( 0, 0, "D" ); $rb->restore }
+
+   $rb->flush_to_window( $win );
+
+   is_deeply( \@methods,
+              [
+                 [ goto => 0, 0 ], [ print => "A", {} ],
+                 [ goto => 0, 2 ], [ print => "B", {} ],
+                 [ goto => 2, 0 ], [ print => "C", {} ],
+                 # D was masked
+              ],
+              '@methods for text_at after mask over translate' );
+}
+
 done_testing;

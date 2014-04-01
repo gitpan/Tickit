@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Test::More;
+use Test::Identity;
 use Test::Refcount;
 
 use Tickit::Test;
@@ -66,6 +67,37 @@ is( $pos->columns, 80, '$pos->columns is 80 for print under floating window' );
 
    is( $pos->columns, 50, '$pos->columns is 50 for print sibling under floating window' );
 
+   my $popupwin = $win->make_popup( 2, 2, 10, 10 );
+   flush_tickit;
+
+   is_oneref( $popupwin, '$popupwin has refcount 1 initially' );
+
+   identical( $popupwin->parent, $root, '$popupwin->parent is $root' );
+
+   is( $popupwin->abs_top,  12, '$popupwin->abs_top' );
+   is( $popupwin->abs_left, 22, '$popupwin->abs_left' );
+
+   my @key_events;
+   $popupwin->set_on_key( with_ev => sub {
+      my ( $win, $ev ) = @_;
+      push @key_events, [ $ev->type => $ev->str ];
+      return 1;
+   } );
+
+   presskey( text => "G" );
+
+   my @mouse_events;
+   $popupwin->set_on_mouse( with_ev => sub {
+      my ( $win, $ev ) = @_;
+      push @mouse_events, [ $ev->type => $ev->button, $ev->line, $ev->col ];
+      return 1;
+   } );
+
+   pressmouse( press => 1, 5, 12 );
+
+   is_deeply( \@mouse_events, [ [ press => 1, -7, -10 ] ] );
+
+   $popupwin->close;
    $win->close;
 }
 
@@ -97,11 +129,13 @@ is_display( [ BLANKLINES(10),
 is( $pos->columns, 6, '$pos->columns is 6 for print to child of floating window' );
 
 $rootfloat->hide;
+flush_tickit;
 
 is_deeply( [ $root->_get_span_visibility( 10, 0 ) ],
            [ 1, 80 ], '$root 10,0 visible for 80 columns after $rootfloat->hide' );
 
 $rootfloat->show;
+flush_tickit;
 
 # Scrolling with float obscurations
 {
@@ -113,9 +147,6 @@ $rootfloat->show;
 
    is_termlog( [ SETPEN,
                  SCROLLRECT(0,0,10,80, 3,0),
-                 SETPEN,
-                 SETPEN,
-                 SETPEN,
                  SCROLLRECT(15,0,10,80, 3,0) ],
                'Termlog after scroll with floats' );
 

@@ -1,7 +1,7 @@
 /*  You may distribute under the terms of either the GNU General Public License
  *  or the Artistic License (the same terms as Perl itself)
  *
- *  (C) Paul Evans, 2011-2013 -- leonerd@leonerd.org.uk
+ *  (C) Paul Evans, 2011-2014 -- leonerd@leonerd.org.uk
  */
 
 
@@ -1523,7 +1523,6 @@ text_at(self,line,col,text,pen=NULL)
     char *textbytes;
   CODE:
     rb = self;
-    linecells = rb->cells[line];
 
     textbytes = SvPVutf8_nolen(text);
 
@@ -1548,6 +1547,8 @@ text_at(self,line,col,text,pen=NULL)
     }
 
     rb->texts[rb->n_texts] = savepv(textbytes);
+
+    linecells = rb->cells[line];
 
     while(len) {
       while(len && linecells[col].maskdepth > -1) {
@@ -1594,7 +1595,6 @@ erase_at(self,line,col,len,pen=NULL)
     TickitRenderBufferCell *linecells;
   CODE:
     rb = self;
-    linecells = rb->cells[line];
 
     if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
       XSRETURN_UNDEF;
@@ -1607,6 +1607,8 @@ erase_at(self,line,col,len,pen=NULL)
       croak("$len out of range");
     if(col + len > rb->cols)
       croak("$col+$len out of range");
+
+    linecells = rb->cells[line];
 
     while(len) {
       while(len && linecells[col].maskdepth > -1) {
@@ -2152,13 +2154,6 @@ check_timeout(self)
   OUTPUT:
     RETVAL
 
-void
-print(self,text)
-  Tickit::Term  self
-  SV           *text
-  CODE:
-    tickit_term_print(self->tt, SvPVutf8_nolen(text));
-
 bool
 goto(self,line,col)
   Tickit::Term  self
@@ -2232,17 +2227,33 @@ setpen(self,...)
       tickit_pen_destroy(pen);
 
 void
-clear(self)
+print(self,text,pen=NULL)
   Tickit::Term  self
+  SV           *text
+  Tickit::Pen   pen
   CODE:
+    if(pen)
+      tickit_term_setpen(self->tt, pen->pen);
+    tickit_term_print(self->tt, SvPVutf8_nolen(text));
+
+void
+clear(self,pen=NULL)
+  Tickit::Term  self
+  Tickit::Pen   pen
+  CODE:
+    if(pen)
+      tickit_term_setpen(self->tt, pen->pen);
     tickit_term_clear(self->tt);
 
 void
-erasech(self,count,moveend)
+erasech(self,count,moveend,pen=NULL)
   Tickit::Term  self
   int           count
   SV           *moveend
+  Tickit::Pen   pen
   CODE:
+    if(pen)
+      tickit_term_setpen(self->tt, pen->pen);
     tickit_term_erasech(self->tt, count, SvOK(moveend) ? SvIV(moveend) : -1);
 
 int

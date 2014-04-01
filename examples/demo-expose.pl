@@ -38,7 +38,7 @@ $rootwin->set_on_mouse( with_ev => sub {
    my $bottom = max( $start[0], $ev->line ) + 1;
    my $right  = max( $start[1], $ev->col )  + 1;
 
-   $rootwin->_do_expose( Tickit::Rect->new(
+   $rootwin->expose( Tickit::Rect->new(
       top   => $top,
       left  => $left,
       bottom => $bottom,

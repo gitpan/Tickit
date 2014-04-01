@@ -1,14 +1,14 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2014 -- leonerd@leonerd.org.uk
 
 package Tickit::Term;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 use Carp;
 
@@ -267,12 +267,6 @@ C<set_size> operation.
 sub lines { ( shift->get_size )[0] }
 sub cols  { ( shift->get_size )[1]  }
 
-=head2 $term->print( $text )
-
-Print the given text to the terminal at the current cursor position
-
-=cut
-
 =head2 $success = $term->goto( $line, $col )
 
 Move the cursor to the given position on the screen. If only one parameter is
@@ -323,13 +317,25 @@ attribute not given will be reset to its default value.
 
 =cut
 
-=head2 $term->clear
+=head2 $term->print( $text, [ $pen ] )
 
-Erase the entire screen
+Print the given text to the terminal at the current cursor position.
+
+An optional C<Tickit::Pen> may be provided; if present it will be set as if
+given to C<setpen> first.
 
 =cut
 
-=head2 $term->erasech( $count, $moveend )
+=head2 $term->clear( [ $pen ] )
+
+Erase the entire screen.
+
+An optional C<Tickit::Pen> may be provided; if present it will be set as if
+given to C<setpen> first.
+
+=cut
+
+=head2 $term->erasech( $count, $moveend, [ $pen ] )
 
 Erase C<$count> characters forwards. If C<$moveend> is true, the cursor is
 moved to the end of the erased region. If defined but false, the cursor will
@@ -340,6 +346,9 @@ location.
 Using C<$moveend> may be more efficient than separate C<erasech> and C<goto>
 calls on terminals that do not have an erase function, as it will be
 implemented by printing spaces. This removes the need for two cursor jumps.
+
+An optional C<Tickit::Pen> may be provided; if present it will be set as if
+given to C<setpen> first.
 
 =cut
 

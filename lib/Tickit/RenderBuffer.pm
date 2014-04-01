@@ -10,7 +10,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 use Carp;
 use Scalar::Util qw( refaddr );
@@ -67,6 +67,15 @@ L<Tickit> windows
     $rb->eraserect( $rect );
     $rb->text_at( 2, 2, "Hello, world!", $self->pen );
  }
+
+Z<>
+
+ $win->set_on_expose( with_rb => sub {
+    my ( $win, $rb, $rect ) = @_;
+
+    $rb->eraserect( $rect );
+    $rb->text_at( 2, 2, "Hello, world!" );
+ });
 
 =head1 DESCRIPTION
 
@@ -692,12 +701,31 @@ library rewrite.
 Renders the stored content to the given L<Tickit::Window>. After this, the
 buffer will be cleared and reset back to initial state.
 
+=head2 $rb->flush_to_term( $term )
+
+Renders the stored content to the given L<Tickit::Term>. After this, the
+buffer will be cleared and reset back to initial state.
+
 =cut
 
 sub flush_to_window
 {
    my $self = shift;
    my ( $win ) = @_;
+   $self->_flush( win => $win );
+}
+
+sub flush_to_term
+{
+   my $self = shift;
+   my ( $term ) = @_;
+   $self->_flush( term => $term );
+}
+
+sub _flush
+{
+   my $self = shift;
+   my ( $type, $target ) = @_;
 
    foreach my $line ( 0 .. $self->lines-1 ) {
       my $phycol;
@@ -708,13 +736,13 @@ sub flush_to_window
          $col += $cell->len, next if $cell->state == SKIP;
 
          if( !defined $phycol or $phycol < $col ) {
-            $win->goto( $line, $col );
+            $target->goto( $line, $col );
          }
          $phycol = $col;
 
          given( $cell->state ) {
             when( TEXT ) {
-               $win->print( $self->_xs_get_text_substr( $cell->textidx, $cell->textoffs, $cell->len ), $cell->pen );
+               $target->print( $self->_xs_get_text_substr( $cell->textidx, $cell->textoffs, $cell->len ), $cell->pen );
                $phycol += $cell->len;
             }
             when( ERASE ) {
@@ -723,7 +751,7 @@ sub flush_to_window
                my $moveend = $col + $cell->len < $self->cols &&
                              $self->_xs_getcell( $line, $col + $cell->len )->state != SKIP;
 
-               $win->erasech( $cell->len, $moveend || undef, $cell->pen );
+               $target->erasech( $cell->len, $moveend || undef, $cell->pen );
                $phycol += $cell->len;
                undef $phycol unless $moveend;
             }
@@ -736,17 +764,18 @@ sub flush_to_window
                do {
                   $chars .= $linechars[$cell->linemask];
                   $col++;
+                  $phycol += $cell->len;
                } while( $col < $self->cols and
                         $cell = $self->_xs_getcell( $line, $col ) and
                         $cell->state == LINE and
                         $cell->pen->equiv( $pen ) );
 
-               $phycol += $win->print( $chars, $pen )->columns;
+               $target->print( $chars, $pen );
 
                next;
             }
             when( CHAR ) {
-               $win->print( chr $cell->codepoint, $cell->pen );
+               $target->print( chr $cell->codepoint, $cell->pen );
                $phycol += $cell->len;
             }
             default {
@@ -760,21 +789,6 @@ sub flush_to_window
 
    $self->reset;
 }
-
-=head1 TODO
-
-As this code is still experimental, there are many planned features it
-currently lacks:
-
-=over 2
-
-=item *
-
-Direct rendering to a L<Tickit::Term> instead of a Window.
-
-=back
-
-=cut
 
 =head1 AUTHOR
 
