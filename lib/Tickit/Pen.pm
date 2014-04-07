@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Carp;
 
@@ -304,18 +304,21 @@ Remove an observer previously added by C<add_on_changed>.
 
 =cut
 
-use overload
-   '""' => "STRING",
-   bool => sub { 1 };
-
-sub STRING
+sub sprintf
 {
    my $self = shift;
 
-   return ref($self) . "={" . join( ",", map {
+   return "{" . join( ",", map {
       $self->hasattr($_) ? "$_=" . $self->getattr($_) : ()
    } @ALL_ATTRS ) . "}";
 }
+
+use overload
+   '""' => sub {
+      my $self = shift;
+      return ref($self) . $self->sprintf
+   },
+   bool => sub { 1 };
 
 use Scalar::Util qw( refaddr );
 use overload '==' => sub { refaddr($_[0]) == refaddr($_[1]) };
@@ -323,14 +326,14 @@ use overload '==' => sub { refaddr($_[0]) == refaddr($_[1]) };
 package Tickit::Pen::Immutable;
 use base qw( Tickit::Pen );
 use constant mutable => 0;
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 sub as_immutable { return $_[0] }
 
 package Tickit::Pen::Mutable;
 use base qw( Tickit::Pen );
 use constant mutable => 1;
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 # Adds further methods in XS
 

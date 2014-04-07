@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2009-2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2009-2014 -- leonerd@leonerd.org.uk
 
 package Tickit;
 
@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 BEGIN {
-   our $VERSION = '0.43';
+   our $VERSION = '0.44';
 }
 
 use Carp;
@@ -26,6 +26,8 @@ BEGIN {
 
 use Tickit::Term qw( TERM_MOUSEMODE_DRAG );
 use Tickit::Window;
+
+use Tickit::Debug;
 
 use Struct::Dumb;
 struct TimeQueue => [qw( time code )];
@@ -156,18 +158,21 @@ sub new
    $term->bind_event( resize => sub {
       $weakself or return;
       my ( $term, $ev, $args ) = @_;
+      Tickit::Debug->log( Ir => "Resize to $args->{cols}x$args->{lines}" ) if DEBUG;
       $weakself->rootwin->resize( $args->{lines}, $args->{cols} );
    } );
 
    $term->bind_event( key => sub {
       $weakself or return;
       my ( $term, $ev, $args ) = @_;
+      Tickit::Debug->log( Ik => "Key event %s %s (mod=%d)", @{$args}{qw( type str mod )} ) if DEBUG;
       $weakself->on_key( $args );
    } );
 
    $term->bind_event( mouse => sub {
       $weakself or return;
       my ( $term, $ev, $args ) = @_;
+      Tickit::Debug->log( Im => "Mouse event %s => %s @%d,%d (mod=%d)", @{$args}{qw( type button col line mod )} ) if DEBUG;
       $weakself->on_mouse( $args );
    } );
 

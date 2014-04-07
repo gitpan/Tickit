@@ -358,6 +358,18 @@ enum TickitRenderBufferCellState {
   CHAR  = 5,
 };
 
+enum {
+  CAP_START = 0x01,
+  CAP_END   = 0x02,
+};
+
+enum {
+  NORTH_SHIFT = 0,
+  EAST_SHIFT  = 2,
+  SOUTH_SHIFT = 4,
+  WEST_SHIFT  = 6,
+};
+
 typedef struct {
   enum TickitRenderBufferCellState state;
   int len; // or "startcol" for state == CONT
@@ -566,6 +578,564 @@ static TickitPen *_tickit_rb_merge_pen(TickitRenderBuffer *rb, TickitPen *direct
   return pen;
 }
 
+static void tickit_renderbuffer_erase_at(TickitRenderBuffer *rb, int line, int col, int len, TickitPen *pen);
+
+static TickitRenderBuffer *tickit_renderbuffer_new(int lines, int cols)
+{
+  TickitRenderBuffer *rb;
+  int line, col;
+
+  Newx(rb, 1, TickitRenderBuffer);
+
+  rb->lines = lines;
+  rb->cols  = cols;
+
+  Newx(rb->cells, rb->lines, TickitRenderBufferCell *);
+  for(line = 0; line < rb->lines; line++) {
+    Newx(rb->cells[line], rb->cols, TickitRenderBufferCell);
+
+    rb->cells[line][0].state     = SKIP;
+    rb->cells[line][0].maskdepth = -1;
+    rb->cells[line][0].len       = rb->cols;
+    rb->cells[line][0].pen       = NULL;
+
+    for(col = 1; col < rb->cols; col++) {
+      rb->cells[line][col].state     = CONT;
+      rb->cells[line][col].maskdepth = -1;
+      rb->cells[line][col].len       = 0;
+    }
+  }
+
+  rb->vc_pos_set = 0;
+
+  rb->xlate_line = 0;
+  rb->xlate_col  = 0;
+
+  tickit_rect_init_sized(&rb->clip, 0, 0, rb->lines, rb->cols);
+
+  rb->pen = NULL;
+
+  rb->stack = NULL;
+  rb->depth = 0;
+
+  rb->n_texts = 0;
+  rb->size_texts = 4;
+  Newx(rb->texts, rb->size_texts, char *);
+
+  return rb;
+}
+
+static void tickit_renderbuffer_free(TickitRenderBuffer *rb)
+{
+  SV *cellsv;
+  int line, col;
+
+  for(line = 0; line < rb->lines; line++) {
+    for(col = 0; col < rb->cols; col++) {
+      TickitRenderBufferCell *cell = &rb->cells[line][col];
+      switch(cell->state) {
+        case TEXT:
+        case ERASE:
+        case LINE:
+        case CHAR:
+          tickit_pen_destroy(cell->pen);
+          break;
+      }
+    }
+    Safefree(rb->cells[line]);
+  }
+
+  Safefree(rb->cells);
+  rb->cells = NULL;
+
+  if(rb->pen)
+    tickit_pen_destroy(rb->pen);
+
+  if(rb->stack)
+    _tickit_rb_free_stack(rb->stack);
+
+  _tickit_rb_free_texts(rb);
+  Safefree(rb->texts);
+
+  Safefree(rb);
+}
+
+static void tickit_renderbuffer_translate(TickitRenderBuffer *rb, int downward, int rightward)
+{
+  rb->xlate_line += downward;
+  rb->xlate_col  += rightward;
+}
+
+static void tickit_renderbuffer_clip(TickitRenderBuffer *rb, TickitRect *rect)
+{
+  TickitRect other;
+
+  other = *rect;
+  other.top  += rb->xlate_line;
+  other.left += rb->xlate_col;
+
+  if(!tickit_rect_intersect(&rb->clip, &rb->clip, &other))
+    rb->clip.lines = 0;
+}
+
+static void tickit_renderbuffer_mask(TickitRenderBuffer *rb, TickitRect *mask)
+{
+  TickitRect hole;
+  int line, col;
+
+  hole = *mask;
+  hole.top  += rb->xlate_line;
+  hole.left += rb->xlate_col;
+
+  if(hole.top < 0) {
+    hole.lines += hole.top;
+    hole.top = 0;
+  }
+  if(hole.left < 0) {
+    hole.cols += hole.left;
+    hole.left = 0;
+  }
+
+  for(line = hole.top; line < hole.top + hole.lines && line < rb->lines; line++) {
+    for(col = hole.left; col < hole.left + hole.cols && col < rb->cols; col++) {
+      TickitRenderBufferCell *cell = &rb->cells[line][col];
+      if(cell->maskdepth == -1)
+        cell->maskdepth = rb->depth;
+    }
+  }
+}
+
+static void tickit_renderbuffer_goto(TickitRenderBuffer *rb, int line, int col)
+{
+  rb->vc_pos_set = 1;
+  rb->vc_line = line;
+  rb->vc_col  = col;
+}
+
+static void tickit_renderbuffer_ungoto(TickitRenderBuffer *rb)
+{
+  rb->vc_pos_set = 0;
+}
+
+static void tickit_renderbuffer_setpen(TickitRenderBuffer *rb, TickitPen *pen)
+{
+  TickitPen *prevpen = NULL;
+
+  if(rb->stack && rb->stack->pen)
+    prevpen = rb->stack->pen;
+
+  if(!pen && !prevpen) {
+    if(rb->pen)
+      tickit_pen_destroy(rb->pen);
+    rb->pen = NULL;
+  }
+  else {
+    if(!rb->pen)
+      rb->pen = tickit_pen_new();
+    else
+      tickit_pen_clear(rb->pen);
+
+    if(pen)
+      tickit_pen_copy(rb->pen, pen, 1);
+    if(prevpen)
+      tickit_pen_copy(rb->pen, prevpen, 0);
+  }
+}
+
+static void tickit_renderbuffer_reset(TickitRenderBuffer *rb)
+{
+  int line, col;
+
+  for(line = 0; line < rb->lines; line++) {
+    // cont_cell also frees pen
+    for(col = 0; col < rb->cols; col++)
+      _tickit_rb_cont_cell(&rb->cells[line][col], 0);
+
+    rb->cells[line][0].state     = SKIP;
+    rb->cells[line][0].maskdepth = -1;
+    rb->cells[line][0].len       = rb->cols;
+  }
+
+  rb->vc_pos_set = 0;
+
+  rb->xlate_line = 0;
+  rb->xlate_col  = 0;
+
+  tickit_rect_init_sized(&rb->clip, 0, 0, rb->lines, rb->cols);
+
+  if(rb->pen) {
+    tickit_pen_destroy(rb->pen);
+    rb->pen = NULL;
+  }
+
+  if(rb->stack) {
+    _tickit_rb_free_stack(rb->stack);
+    rb->stack = NULL;
+    rb->depth = 0;
+  }
+
+  _tickit_rb_free_texts(rb);
+}
+
+static void tickit_renderbuffer_clear(TickitRenderBuffer *rb, TickitPen *pen)
+{
+  int line;
+
+  for(line = 0; line < rb->lines; line++)
+    tickit_renderbuffer_erase_at(rb, line, 0, rb->cols, pen);
+}
+
+static void tickit_renderbuffer_save(TickitRenderBuffer *rb)
+{
+  TickitRenderBufferStack *stack;
+
+  Newx(stack, 1, struct TickitRenderBufferStack);
+  stack->vc_line    = rb->vc_line;
+  stack->vc_col     = rb->vc_col;
+  stack->xlate_line = rb->xlate_line;
+  stack->xlate_col  = rb->xlate_col;
+  stack->clip       = rb->clip;
+  stack->pen        = rb->pen ? tickit_pen_clone(rb->pen) : NULL;
+  stack->pen_only   = 0;
+
+  stack->prev = rb->stack;
+  rb->stack = stack;
+  rb->depth++;
+}
+
+static void tickit_renderbuffer_savepen(TickitRenderBuffer *rb)
+{
+  TickitRenderBufferStack *stack;
+
+  Newx(stack, 1, struct TickitRenderBufferStack);
+  stack->pen      = rb->pen ? tickit_pen_clone(rb->pen) : NULL;
+  stack->pen_only = 1;
+
+  stack->prev = rb->stack;
+  rb->stack = stack;
+  rb->depth++;
+}
+
+static void tickit_renderbuffer_restore(TickitRenderBuffer *rb)
+{
+  TickitRenderBufferStack *stack;
+
+  stack = rb->stack;
+  rb->stack = stack->prev;
+
+  if(!stack->pen_only) {
+    rb->vc_line    = stack->vc_line;
+    rb->vc_col     = stack->vc_col;
+    rb->xlate_line = stack->xlate_line;
+    rb->xlate_col  = stack->xlate_col;
+    rb->clip       = stack->clip;
+  }
+
+  if(rb->pen)
+    tickit_pen_destroy(rb->pen);
+  rb->pen = stack->pen;
+  // We've now definitely taken ownership of the old stack frame's pen, so
+  //   it doesn't need destroying now
+
+  rb->depth--;
+  {
+    // TODO: this could be done more efficiently by remembering the edges of masking
+    int line, col;
+    for(line = 0; line < rb->lines; line++)
+      for(col = 0; col < rb->cols; col++)
+        if(rb->cells[line][col].maskdepth > rb->depth)
+          rb->cells[line][col].maskdepth = -1;
+  }
+
+  Safefree(stack);
+}
+
+static void tickit_renderbuffer_skip_at(TickitRenderBuffer *rb, int line, int col, int len)
+{
+  TickitRenderBufferCell *cell;
+
+  if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
+    return;
+
+  if(line < 0 || line >= rb->lines)
+    croak("$line out of range");
+  if(col < 0)
+    croak("$col out of range");
+  if(len < 1)
+    croak("$len out of range");
+  if(col + len > rb->cols)
+    croak("$col+$len out of range");
+
+  cell = _tickit_rb_make_span(rb, line, col, len);
+  cell->state = SKIP;
+}
+
+static void tickit_renderbuffer_skip(TickitRenderBuffer *rb, int len)
+{
+  if(!rb->vc_pos_set)
+    croak("Cannot ->skip without a virtual cursor position");
+
+  tickit_renderbuffer_skip_at(rb, rb->vc_line, rb->vc_col, len);
+  rb->vc_col += len;
+}
+
+static void tickit_renderbuffer_skip_to(TickitRenderBuffer *rb, int col)
+{
+  if(!rb->vc_pos_set)
+    croak("Cannot ->skip_to without a virtual cursor position");
+
+  if(rb->vc_col < col)
+    tickit_renderbuffer_skip_at(rb, rb->vc_line, rb->vc_col, col - rb->vc_col);
+
+  rb->vc_col = col;
+}
+
+static int tickit_renderbuffer_text_at(TickitRenderBuffer *rb, int line, int col, char *text, TickitPen *pen)
+{
+  TickitRenderBufferCell *cell;
+  TickitRenderBufferCell *linecells;
+  TickitStringPos endpos;
+  int ret;
+  int len;
+  int startcol;
+
+  tickit_string_count(text, &endpos, NULL);
+  ret = len = endpos.columns;
+
+  if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, &startcol))
+    return ret;
+
+  if(line < 0 || line >= rb->lines)
+    croak("$line out of range");
+  if(col < 0)
+    croak("$col out of range");
+  if(len < 1)
+    croak("$len out of range");
+  if(col + len > rb->cols)
+    croak("$col+$len out of range");
+
+  if(rb->n_texts == rb->size_texts) {
+    rb->size_texts *= 2;
+    Renew(rb->texts, rb->size_texts, char *);
+  }
+
+  rb->texts[rb->n_texts] = savepv(text);
+
+  linecells = rb->cells[line];
+
+  while(len) {
+    while(len && linecells[col].maskdepth > -1) {
+      col++;
+      len--;
+      startcol++;
+    }
+    if(!len)
+      break;
+
+    int spanlen = 0;
+    while(len && linecells[col + spanlen].maskdepth == -1) {
+      spanlen++;
+      len--;
+    }
+    if(!spanlen)
+      break;
+
+    cell = _tickit_rb_make_span(rb, line, col, spanlen);
+    cell->state       = TEXT;
+    cell->pen         = _tickit_rb_merge_pen(rb, pen);
+    cell->v.text.idx  = rb->n_texts;
+    cell->v.text.offs = startcol;
+
+    col      += spanlen;
+    startcol += spanlen;
+  }
+
+  rb->n_texts++;
+
+  return ret;
+}
+
+static int tickit_renderbuffer_text(TickitRenderBuffer *rb, char *text, TickitPen *pen)
+{
+  int len;
+
+  if(!rb->vc_pos_set)
+    croak("Cannot ->text without a virtual cursor position");
+
+  len = tickit_renderbuffer_text_at(rb, rb->vc_line, rb->vc_col, text, pen);
+  rb->vc_col += len;
+
+  return len;
+}
+
+static void tickit_renderbuffer_erase_at(TickitRenderBuffer *rb, int line, int col, int len, TickitPen *pen)
+{
+  TickitRenderBufferCell *cell;
+  TickitRenderBufferCell *linecells;
+
+  if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
+    return;
+
+  if(line < 0 || line >= rb->lines)
+    croak("$line out of range");
+  if(col < 0)
+    croak("$col out of range");
+  if(len < 1)
+    croak("$len out of range");
+  if(col + len > rb->cols)
+    croak("$col+$len out of range");
+
+  linecells = rb->cells[line];
+
+  while(len) {
+    while(len && linecells[col].maskdepth > -1) {
+      col++;
+      len--;
+    }
+    if(!len)
+      break;
+
+    int spanlen = 0;
+    while(len && linecells[col + spanlen].maskdepth == -1) {
+      spanlen++;
+      len--;
+    }
+    if(!spanlen)
+      break;
+
+    cell = _tickit_rb_make_span(rb, line, col, spanlen);
+    cell->state = ERASE;
+    cell->pen   = _tickit_rb_merge_pen(rb, pen);
+
+    col += spanlen;
+  }
+}
+
+static void tickit_renderbuffer_erase(TickitRenderBuffer *rb, int len, TickitPen *pen)
+{
+  if(!rb->vc_pos_set)
+    croak("Cannot ->erase without a virtual cursor position");
+
+  tickit_renderbuffer_erase_at(rb, rb->vc_line, rb->vc_col, len, pen);
+  rb->vc_col += len;
+}
+
+static void tickit_renderbuffer_erase_to(TickitRenderBuffer *rb, int col, TickitPen *pen)
+{
+  if(!rb->vc_pos_set)
+    croak("Cannot ->erase_to without a virtual cursor position");
+
+  if(rb->vc_col < col)
+    tickit_renderbuffer_erase_at(rb, rb->vc_line, rb->vc_col, col - rb->vc_col, pen);
+
+  rb->vc_col = col;
+}
+
+static void tickit_renderbuffer_eraserect(TickitRenderBuffer *rb, TickitRect *rect, TickitPen *pen)
+{
+  int line;
+
+  for(line = rect->top; line < tickit_rect_bottom(rect); line++)
+    tickit_renderbuffer_erase_at(rb, line, rect->left, rect->cols, pen);
+}
+
+static void tickit_renderbuffer_char_at(TickitRenderBuffer *rb, int line, int col, long codepoint, TickitPen *pen)
+{
+  TickitRenderBufferCell *cell;
+  int len = 1;
+
+  if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
+    return;
+
+  if(line < 0 || line >= rb->lines)
+    croak("$line out of range");
+  if(col < 0)
+    croak("$col out of range");
+  if(len < 1)
+    croak("$len out of range");
+  if(col + len > rb->cols)
+    croak("$col+$len out of range");
+
+  if(rb->cells[line][col].maskdepth > -1)
+    return;
+
+  cell = _tickit_rb_make_span(rb, line, col, len);
+  cell->state           = CHAR;
+  cell->pen             = _tickit_rb_merge_pen(rb, pen);
+  cell->v.chr.codepoint = codepoint;
+}
+
+static void _tickit_rb_linecell(TickitRenderBuffer *rb, int line, int col, int bits, TickitPen *pen)
+{
+  TickitRenderBufferCell *cell;
+  int len = 1;
+
+  if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
+    return;
+
+  if(line < 0 || line >= rb->lines)
+    croak("$line out of range");
+  if(col < 0)
+    croak("$col out of range");
+  if(len < 1)
+    croak("$len out of range");
+  if(col + len > rb->cols)
+    croak("$col+$len out of range");
+
+  if(rb->cells[line][col].maskdepth > -1)
+    return;
+
+  TickitPen *cellpen = _tickit_rb_merge_pen(rb, pen);
+
+  cell = &rb->cells[line][col];
+  if(cell->state != LINE) {
+    _tickit_rb_make_span(rb, line, col, len);
+    cell->state       = LINE;
+    cell->len         = 1;
+    cell->pen         = cellpen;
+    cell->v.line.mask = 0;
+  }
+  else if(!tickit_pen_equiv(cell->pen, cellpen)) {
+    warn("Pen collision for line cell (%d,%d)", line, col);
+    tickit_pen_destroy(cell->pen);
+    cell->pen   = cellpen;
+  }
+  else
+    tickit_pen_destroy(cellpen);
+
+  cell->v.line.mask |= bits;
+}
+
+static void tickit_renderbuffer_hline_at(TickitRenderBuffer *rb, int line, int startcol, int endcol,
+    int style, TickitPen *pen, int caps)
+{
+  int east = style << EAST_SHIFT;
+  int west = style << WEST_SHIFT;
+  int col;
+
+  pen = _tickit_rb_merge_pen(rb, pen);
+
+  _tickit_rb_linecell(rb, line, startcol, east | (caps & CAP_START ? west : 0), pen);
+  for(col = startcol + 1; col <= endcol - 1; col++)
+    _tickit_rb_linecell(rb, line, col, east | west, pen);
+  _tickit_rb_linecell(rb, line, endcol, (caps & CAP_END ? east : 0) | west, pen);
+}
+
+static void tickit_renderbuffer_vline_at(TickitRenderBuffer *rb, int startline, int endline, int col,
+    int style, TickitPen *pen, int caps)
+{
+  int north = style << NORTH_SHIFT;
+  int south = style << SOUTH_SHIFT;
+  int line;
+
+  pen = _tickit_rb_merge_pen(rb, pen);
+
+  _tickit_rb_linecell(rb, startline, col, south | (caps & CAP_START ? north : 0), pen);
+  for(line = startline + 1; line <= endline - 1; line++)
+    _tickit_rb_linecell(rb, line, col, south | north, pen);
+  _tickit_rb_linecell(rb, endline, col, (caps & CAP_END ? south : 0) | north, pen);
+}
+
 typedef TickitStringPos *Tickit__StringPos;
 
 static Tickit__StringPos new_stringpos(SV **svp)
@@ -610,6 +1180,10 @@ static void setup_constants(void)
   DO_CONSTANT(TICKIT_TERM_MOUSEMODE_CLICK)
   DO_CONSTANT(TICKIT_TERM_MOUSEMODE_DRAG)
   DO_CONSTANT(TICKIT_TERM_MOUSEMODE_MOVE)
+
+  DO_CONSTANT(TICKIT_MOD_SHIFT)
+  DO_CONSTANT(TICKIT_MOD_ALT)
+  DO_CONSTANT(TICKIT_MOD_CTRL)
 }
 
 MODULE = Tickit             PACKAGE = Tickit::Pen
@@ -1067,88 +1641,16 @@ _xs_new(class,lines,cols)
   char *class
   int lines
   int cols
-  INIT:
-    TickitRenderBuffer *rb;
-    int line, col;
   CODE:
-    Newx(RETVAL, 1, TickitRenderBuffer);
-    rb = RETVAL;
-
-    rb->lines = lines;
-    rb->cols  = cols;
-
-    Newx(rb->cells, rb->lines, TickitRenderBufferCell *);
-    for(line = 0; line < rb->lines; line++) {
-      Newx(rb->cells[line], rb->cols, TickitRenderBufferCell);
-
-      rb->cells[line][0].state     = SKIP;
-      rb->cells[line][0].maskdepth = -1;
-      rb->cells[line][0].len       = rb->cols;
-      rb->cells[line][0].pen       = NULL;
-
-      for(col = 1; col < rb->cols; col++) {
-        rb->cells[line][col].state     = CONT;
-        rb->cells[line][col].maskdepth = -1;
-        rb->cells[line][col].len       = 0;
-      }
-    }
-
-    rb->vc_pos_set = 0;
-
-    rb->xlate_line = 0;
-    rb->xlate_col  = 0;
-
-    tickit_rect_init_sized(&rb->clip, 0, 0, rb->lines, rb->cols);
-
-    rb->pen = NULL;
-
-    rb->stack = NULL;
-    rb->depth = 0;
-
-    rb->n_texts = 0;
-    rb->size_texts = 4;
-    Newx(rb->texts, rb->size_texts, char *);
+    RETVAL = tickit_renderbuffer_new(lines, cols);
   OUTPUT:
     RETVAL
 
 void
 DESTROY(self)
   Tickit::RenderBuffer self
-  INIT:
-    TickitRenderBuffer *rb;
-    SV *cellsv;
-    int line, col;
   CODE:
-    rb = self;
-
-    for(line = 0; line < rb->lines; line++) {
-      for(col = 0; col < rb->cols; col++) {
-        TickitRenderBufferCell *cell = &rb->cells[line][col];
-        switch(cell->state) {
-          case TEXT:
-          case ERASE:
-          case LINE:
-          case CHAR:
-            SvREFCNT_dec(cell->pen);
-            break;
-        }
-      }
-      Safefree(rb->cells[line]);
-    }
-
-    Safefree(rb->cells);
-    rb->cells = NULL;
-
-    if(rb->pen)
-      tickit_pen_destroy(rb->pen);
-
-    if(rb->stack)
-      _tickit_rb_free_stack(rb->stack);
-
-    _tickit_rb_free_texts(rb);
-    Safefree(rb->texts);
-
-    Safefree(rb);
+    tickit_renderbuffer_free(self);
 
 int
 lines(self)
@@ -1205,230 +1707,73 @@ translate(self,downward,rightward)
   Tickit::RenderBuffer self
   int downward
   int rightward
-  INIT:
-    TickitRenderBuffer *rb;
   PPCODE:
-    rb = self;
-    rb->xlate_line += downward;
-    rb->xlate_col  += rightward;
+    tickit_renderbuffer_translate(self, downward, rightward);
 
 void
 clip(self,rect)
   Tickit::RenderBuffer self
   Tickit::Rect rect
-  INIT:
-    TickitRenderBuffer *rb;
-    TickitRect other;
   CODE:
-    rb = self;
-
-    other = *rect;
-    other.top  += rb->xlate_line;
-    other.left += rb->xlate_col;
-
-    if(!tickit_rect_intersect(&rb->clip, &rb->clip, &other))
-      rb->clip.lines = 0;
+    tickit_renderbuffer_clip(self, rect);
 
 void
 mask(self,rect)
   Tickit::RenderBuffer self
   Tickit::Rect rect
-  INIT:
-    TickitRenderBuffer *rb;
-    TickitRect hole;
-    int line, col;
   CODE:
-    rb = self;
-
-    hole = *rect;
-    hole.top  += rb->xlate_line;
-    hole.left += rb->xlate_col;
-
-    for(line = hole.top; line < hole.top + hole.lines && line < rb->lines; line++) {
-      for(col = hole.left; col < hole.left + hole.cols && col < rb->cols; col++) {
-        TickitRenderBufferCell *cell = &rb->cells[line][col];
-        if(cell->maskdepth == -1)
-          cell->maskdepth = rb->depth;
-      }
-    }
+    tickit_renderbuffer_mask(self, rect);
 
 void
 goto(self,line,col)
   Tickit::RenderBuffer self
   SV *line
   SV *col
-  INIT:
-    TickitRenderBuffer *rb;
   CODE:
-    rb = self;
-
-    if(SvIsNumeric(line) && SvIsNumeric(col)) {
-      rb->vc_pos_set = 1;
-      rb->vc_line = SvIV(line);
-      rb->vc_col  = SvIV(col);
-    }
+    if(SvIsNumeric(line) && SvIsNumeric(col))
+      tickit_renderbuffer_goto(self, SvIV(line), SvIV(col));
     else
-      rb->vc_pos_set = 0;
-
-SV *
-_xs_merge_pen(self,direct_pen)
-  Tickit::RenderBuffer self
-  Tickit::Pen direct_pen
-  INIT:
-    TickitRenderBuffer *rb;
-  CODE:
-    rb = self;
-
-    RETVAL = newSVpen(_tickit_rb_merge_pen(rb, direct_pen ? direct_pen->pen : NULL), NULL);
-  OUTPUT:
-    RETVAL
+      tickit_renderbuffer_ungoto(self);
 
 void
 setpen(self,pen)
   Tickit::RenderBuffer self
   Tickit::Pen pen
-  INIT:
-    TickitRenderBuffer *rb;
-    TickitPen *prevpen = NULL;
-    TickitPenAttr a;
   CODE:
-    rb = self;
-
-    if(rb->stack && rb->stack->pen)
-      prevpen = rb->stack->pen;
-
-    if(!pen && !prevpen) {
-      if(rb->pen)
-        tickit_pen_destroy(rb->pen);
-      rb->pen = NULL;
-    }
-    else {
-      if(!rb->pen)
-        rb->pen = tickit_pen_new();
-      else
-        tickit_pen_clear(rb->pen);
-
-      if(pen)
-        tickit_pen_copy(rb->pen, pen->pen, 1);
-      if(prevpen)
-        tickit_pen_copy(rb->pen, prevpen, 0);
-    }
+    tickit_renderbuffer_setpen(self, pen ? pen->pen : NULL);
 
 void
 reset(self)
   Tickit::RenderBuffer self
-  INIT:
-    TickitRenderBuffer *rb;
-    int line, col;
   CODE:
-    rb = self;
+    tickit_renderbuffer_reset(self);
 
-    for(line = 0; line < rb->lines; line++) {
-      // cont_cell also frees pen
-      for(col = 0; col < rb->cols; col++)
-        _tickit_rb_cont_cell(&rb->cells[line][col], 0);
-
-      rb->cells[line][0].state     = SKIP;
-      rb->cells[line][0].maskdepth = -1;
-      rb->cells[line][0].len       = rb->cols;
-    }
-
-    rb->vc_pos_set = 0;
-
-    rb->xlate_line = 0;
-    rb->xlate_col  = 0;
-
-    tickit_rect_init_sized(&rb->clip, 0, 0, rb->lines, rb->cols);
-
-    if(rb->pen) {
-      tickit_pen_destroy(rb->pen);
-      rb->pen = NULL;
-    }
-
-    if(rb->stack) {
-      _tickit_rb_free_stack(rb->stack);
-      rb->stack = NULL;
-      rb->depth = 0;
-    }
-
-    _tickit_rb_free_texts(rb);
+void
+clear(self,pen=NULL)
+  Tickit::RenderBuffer self
+  Tickit::Pen pen
+  CODE:
+    tickit_renderbuffer_clear(self, pen ? pen->pen : NULL);
 
 void
 save(self)
   Tickit::RenderBuffer self
-  INIT:
-    TickitRenderBuffer *rb;
-    TickitRenderBufferStack *stack;
   CODE:
-    rb = self;
-
-    Newx(stack, 1, struct TickitRenderBufferStack);
-    stack->vc_line    = rb->vc_line;
-    stack->vc_col     = rb->vc_col;
-    stack->xlate_line = rb->xlate_line;
-    stack->xlate_col  = rb->xlate_col;
-    stack->clip       = rb->clip;
-    stack->pen        = rb->pen ? tickit_pen_clone(rb->pen) : NULL;
-    stack->pen_only   = 0;
-
-    stack->prev = rb->stack;
-    rb->stack = stack;
-    rb->depth++;
+    tickit_renderbuffer_save(self);
 
 void
 savepen(self)
   Tickit::RenderBuffer self
-  INIT:
-    TickitRenderBuffer *rb;
-    TickitRenderBufferStack *stack;
   CODE:
-    rb = self;
-
-    Newx(stack, 1, struct TickitRenderBufferStack);
-    stack->pen      = rb->pen ? tickit_pen_clone(rb->pen) : NULL;
-    stack->pen_only = 1;
-
-    stack->prev = rb->stack;
-    rb->stack = stack;
-    rb->depth++;
+    tickit_renderbuffer_savepen(self);
 
 void
 restore(self)
   Tickit::RenderBuffer self
   INIT:
     TickitRenderBuffer *rb;
-    TickitRenderBufferStack *stack;
   CODE:
-    rb = self;
-
-    stack = rb->stack;
-    rb->stack = stack->prev;
-
-    if(!stack->pen_only) {
-      rb->vc_line    = stack->vc_line;
-      rb->vc_col     = stack->vc_col;
-      rb->xlate_line = stack->xlate_line;
-      rb->xlate_col  = stack->xlate_col;
-      rb->clip       = stack->clip;
-    }
-
-    if(rb->pen)
-      tickit_pen_destroy(rb->pen);
-    rb->pen = stack->pen;
-    // We've now definitely taken ownership of the old stack frame's pen, so
-    //   it doesn't need destroying now
-
-    rb->depth--;
-    {
-      // TODO: this could be done more efficiently by remembering the edges of masking
-      int line, col;
-      for(line = 0; line < rb->lines; line++)
-        for(col = 0; col < rb->cols; col++)
-          if(rb->cells[line][col].maskdepth > rb->depth)
-            rb->cells[line][col].maskdepth = -1;
-    }
-
-    Safefree(stack);
+    tickit_renderbuffer_restore(self);
 
 SV *
 _xs_getcell(self,line,col)
@@ -1446,7 +1791,7 @@ _xs_getcell(self,line,col)
       croak("$col out of range");
 
     RETVAL = newSV(0);
-    sv_setref_iv(RETVAL, "Tickit::RenderBuffer::Cell", (IV)(&rb->cells[line][col]));
+    sv_setref_iv(RETVAL, "Tickit::RenderBuffer::_XSCell", (IV)(&rb->cells[line][col]));
   OUTPUT:
     RETVAL
 
@@ -1485,26 +1830,22 @@ skip_at(self,line,col,len)
   int line
   int col
   int len
-  INIT:
-    TickitRenderBuffer *rb;
-    TickitRenderBufferCell *cell;
   CODE:
-    rb = self;
+    tickit_renderbuffer_skip_at(self, line, col, len);
 
-    if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
-      XSRETURN_UNDEF;
+void
+skip(self,len)
+  Tickit::RenderBuffer self
+  int len
+  CODE:
+    tickit_renderbuffer_skip(self, len);
 
-    if(line < 0 || line >= rb->lines)
-      croak("$line out of range");
-    if(col < 0)
-      croak("$col out of range");
-    if(len < 1)
-      croak("$len out of range");
-    if(col + len > rb->cols)
-      croak("$col+$len out of range");
-
-    cell = _tickit_rb_make_span(rb, line, col, len);
-    cell->state = SKIP;
+void
+skip_to(self,col)
+  Tickit::RenderBuffer self
+  int col
+  CODE:
+    tickit_renderbuffer_skip_to(self, col);
 
 int
 text_at(self,line,col,text,pen=NULL)
@@ -1513,72 +1854,18 @@ text_at(self,line,col,text,pen=NULL)
   int col
   SV *text
   Tickit::Pen pen
-  INIT:
-    TickitRenderBuffer *rb;
-    TickitRenderBufferCell *cell;
-    TickitRenderBufferCell *linecells;
-    TickitStringPos endpos;
-    int len;
-    int startcol;
-    char *textbytes;
   CODE:
-    rb = self;
+    RETVAL = tickit_renderbuffer_text_at(self, line, col, SvPVutf8_nolen(text), pen ? pen->pen : NULL);
+  OUTPUT:
+    RETVAL
 
-    textbytes = SvPVutf8_nolen(text);
-
-    tickit_string_count(textbytes, &endpos, NULL);
-    RETVAL = len = endpos.columns;
-
-    if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, &startcol))
-      goto done;
-
-    if(line < 0 || line >= rb->lines)
-      croak("$line out of range");
-    if(col < 0)
-      croak("$col out of range");
-    if(len < 1)
-      croak("$len out of range");
-    if(col + len > rb->cols)
-      croak("$col+$len out of range");
-
-    if(rb->n_texts == rb->size_texts) {
-      rb->size_texts *= 2;
-      Renew(rb->texts, rb->size_texts, char *);
-    }
-
-    rb->texts[rb->n_texts] = savepv(textbytes);
-
-    linecells = rb->cells[line];
-
-    while(len) {
-      while(len && linecells[col].maskdepth > -1) {
-        col++;
-        len--;
-        startcol++;
-      }
-      if(!len)
-        break;
-
-      int spanlen = 0;
-      while(len && linecells[col + spanlen].maskdepth == -1) {
-        spanlen++;
-        len--;
-      }
-      if(!spanlen)
-        break;
-
-      cell = _tickit_rb_make_span(rb, line, col, spanlen);
-      cell->state       = TEXT;
-      cell->pen         = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
-      cell->v.text.idx  = rb->n_texts;
-      cell->v.text.offs = startcol;
-
-      col      += spanlen;
-      startcol += spanlen;
-    }
-
-    rb->n_texts++;
-done:
+int
+text(self,text,pen=NULL)
+  Tickit::RenderBuffer self
+  SV *text
+  Tickit::Pen pen
+  CODE:
+    RETVAL = tickit_renderbuffer_text(self, SvPVutf8_nolen(text), pen ? pen->pen : NULL);
   OUTPUT:
     RETVAL
 
@@ -1589,98 +1876,32 @@ erase_at(self,line,col,len,pen=NULL)
   int col
   int len
   Tickit::Pen pen
-  INIT:
-    TickitRenderBuffer *rb;
-    TickitRenderBufferCell *cell;
-    TickitRenderBufferCell *linecells;
   CODE:
-    rb = self;
-
-    if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
-      XSRETURN_UNDEF;
-
-    if(line < 0 || line >= rb->lines)
-      croak("$line out of range");
-    if(col < 0)
-      croak("$col out of range");
-    if(len < 1)
-      croak("$len out of range");
-    if(col + len > rb->cols)
-      croak("$col+$len out of range");
-
-    linecells = rb->cells[line];
-
-    while(len) {
-      while(len && linecells[col].maskdepth > -1) {
-        col++;
-        len--;
-      }
-      if(!len)
-        break;
-
-      int spanlen = 0;
-      while(len && linecells[col + spanlen].maskdepth == -1) {
-        spanlen++;
-        len--;
-      }
-      if(!spanlen)
-        break;
-
-      cell = _tickit_rb_make_span(rb, line, col, spanlen);
-      cell->state = ERASE;
-      cell->pen   = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
-
-      col += spanlen;
-    }
+    tickit_renderbuffer_erase_at(self, line, col, len, pen ? pen->pen : NULL);
 
 void
-linecell(self,line,col,bits,pen=NULL)
+erase(self,len,pen=NULL)
   Tickit::RenderBuffer self
-  int line
-  int col
-  int bits
+  int len
   Tickit::Pen pen
-  INIT:
-    TickitRenderBuffer *rb;
-    TickitRenderBufferCell *cell;
-    int len = 1;
   CODE:
-    rb = self;
+    tickit_renderbuffer_erase(self, len, pen ? pen->pen : NULL);
 
-    if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
-      XSRETURN_UNDEF;
+void
+erase_to(self,col,pen=NULL)
+  Tickit::RenderBuffer self
+  int col
+  Tickit::Pen pen
+  CODE:
+    tickit_renderbuffer_erase_to(self, col, pen ? pen->pen : NULL);
 
-    if(line < 0 || line >= rb->lines)
-      croak("$line out of range");
-    if(col < 0)
-      croak("$col out of range");
-    if(len < 1)
-      croak("$len out of range");
-    if(col + len > rb->cols)
-      croak("$col+$len out of range");
-
-    if(rb->cells[line][col].maskdepth > -1)
-      XSRETURN_UNDEF;
-
-    TickitPen *cellpen = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
-
-    cell = &rb->cells[line][col];
-    if(cell->state != LINE) {
-      _tickit_rb_make_span(rb, line, col, len);
-      cell->state       = LINE;
-      cell->len         = 1;
-      cell->pen         = cellpen;
-      cell->v.line.mask = 0;
-    }
-    else if(!tickit_pen_equiv(cell->pen, cellpen)) {
-      warn("Pen collision for line cell (%d,%d)", line, col);
-      tickit_pen_destroy(cell->pen);
-      cell->pen   = cellpen;
-    }
-    else
-      tickit_pen_destroy(cellpen);
-
-    cell->v.line.mask |= bits;
+void
+eraserect(self,rect,pen=NULL)
+  Tickit::RenderBuffer self
+  Tickit::Rect rect
+  Tickit::Pen pen
+  CODE:
+    tickit_renderbuffer_eraserect(self, rect, pen ? pen->pen : NULL);
 
 void
 char_at(self,line,col,codepoint,pen=NULL)
@@ -1689,34 +1910,36 @@ char_at(self,line,col,codepoint,pen=NULL)
   int col
   int codepoint
   Tickit::Pen pen
-  INIT:
-    TickitRenderBuffer *rb;
-    TickitRenderBufferCell *cell;
-    int len = 1;
   CODE:
-    rb = self;
+    tickit_renderbuffer_char_at(self, line, col, codepoint, pen ? pen->pen : NULL);
 
-    if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
-      XSRETURN_UNDEF;
+void
+hline_at(self,line,startcol,endcol,style,pen=NULL,caps=0)
+  Tickit::RenderBuffer self
+  int line
+  int startcol
+  int endcol
+  int style
+  Tickit::Pen pen
+  int caps
+  CODE:
+    tickit_renderbuffer_hline_at(self, line, startcol, endcol, style,
+      pen ? pen->pen : NULL, caps);
 
-    if(line < 0 || line >= rb->lines)
-      croak("$line out of range");
-    if(col < 0)
-      croak("$col out of range");
-    if(len < 1)
-      croak("$len out of range");
-    if(col + len > rb->cols)
-      croak("$col+$len out of range");
+void
+vline_at(self,startline,endline,col,style,pen=NULL,caps=0)
+  Tickit::RenderBuffer self
+  int startline
+  int endline
+  int col
+  int style
+  Tickit::Pen pen
+  int caps
+  CODE:
+    tickit_renderbuffer_vline_at(self, startline, endline, col, style,
+      pen ? pen->pen : NULL, caps);
 
-    if(rb->cells[line][col].maskdepth > -1)
-      XSRETURN_UNDEF;
-
-    cell = _tickit_rb_make_span(rb, line, col, len);
-    cell->state           = CHAR;
-    cell->pen             = _tickit_rb_merge_pen(rb, pen ? pen->pen : NULL);
-    cell->v.chr.codepoint = codepoint;
-
-MODULE = Tickit             PACKAGE = Tickit::RenderBuffer::Cell
+MODULE = Tickit             PACKAGE = Tickit::RenderBuffer::_XSCell
 
 int
 state(self)
@@ -1738,6 +1961,19 @@ len(self)
     cell = (void *)SvIV(SvRV(self));
     if(cell->state == CONT)
       croak("Cannot call ->len on a CONT cell");
+    RETVAL = cell->len;
+  OUTPUT:
+    RETVAL
+
+int
+startcol(self)
+  SV *self
+  INIT:
+    TickitRenderBufferCell *cell;
+  CODE:
+    cell = (void *)SvIV(SvRV(self));
+    if(cell->state != CONT)
+      croak("Cannot call ->startcol on a non-CONT cell");
     RETVAL = cell->len;
   OUTPUT:
     RETVAL

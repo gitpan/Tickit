@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -42,6 +42,16 @@ provided methods is derived. Instances in that class are then constructed.
 See the C<EXAMPLES> section below.
 
 =head1 STYLE
+
+The following style tags are used on all widget classes that use Style:
+
+=over 4
+
+=item :focus
+
+Set when this widget has the input focus
+
+=back
 
 The following style actions are used:
 
@@ -566,18 +576,17 @@ sub window_gained
    }
 
    $window->set_on_focus( sub {
-      my ( $win, $focus ) = @_;
-      $self->set_style_tag( focus => $focus );
+      $self->_on_win_focus( @_ );
    } ) if $self->can( "_widget_style_type" );
 
-   if( my $code = $self->can( "on_key" ) or $self->KEYPRESSES_FROM_STYLE ) {
-      $window->set_on_key( sub {
+   if( $self->can( "on_key" ) or $self->KEYPRESSES_FROM_STYLE ) {
+      $window->set_on_key( with_ev => sub {
          shift;
-         my ( $key ) = @_;
+         my ( $ev ) = @_;
 
          {
             # Space comes as " " but we'd prefer to use "Space" in styles
-            my $keystr = $key->str eq " " ? "Space" : $key->str;
+            my $keystr = $ev->str eq " " ? "Space" : $ev->str;
 
             my $action;
             $action = $self->get_style_values( "<$keystr>" ) if $self->KEYPRESSES_FROM_STYLE;
@@ -589,16 +598,25 @@ sub window_gained
             my $code = $self->can( "key_$action" );
             return 1 if $code and $code->( $self, @_ );
          }
+         my $code = $self->can( "on_key" );
          return 1 if $code and $code->( $self, @_ );
       } );
    }
 
-   $window->set_on_mouse( sub {
+   $window->set_on_mouse( with_ev => sub {
       shift;
-      my ( $event ) = @_;
-      $self->take_focus if $self->CAN_FOCUS and $event->button == 1 and $event->type eq "press";
+      my ( $ev ) = @_;
+      $self->take_focus if $self->CAN_FOCUS and $ev->button == 1 and $ev->type eq "press";
       $self->on_mouse( @_ ) if $self->can( "on_mouse" );
    } );
+}
+
+sub _on_win_focus
+{
+   my $self = shift;
+   my ( $win, $focus ) = @_;
+
+   $self->set_style_tag( focus => $focus );
 }
 
 sub key_focus_next_after
@@ -894,19 +912,19 @@ Optional. Called by C<set_window> when a window has been set for this widget.
 Optional. Called by C<set_window> when C<undef> has been set as the window for
 this widget. The old window object is passed in.
 
-=head2 $handled = $widget->on_key( ... )
+=head2 $handled = $widget->on_key( $ev )
 
 Optional. If provided, this method will be set as the C<on_key> callback for
 any window set on the widget. By providing this method a subclass can
-implement widgets that respond to user input. It receives the same arguments
-as the underlying window C<on_key> event.
+implement widgets that respond to user input. It receives the same event
+arguments structure as the underlying window C<on_key> event.
 
-=head2 $handled = $widget->on_mouse( ... )
+=head2 $handled = $widget->on_mouse( $ev )
 
 Optional. If provided, this method will be set as the C<on_mouse> callback for
 any window set on the widget. By providing this method a subclass can
-implement widgets that respond to user input. If receives the same arguments
-as the underlying window C<on_mouse> event.
+implement widgets that respond to user input. If receives the same event
+arguments structure as the underlying window C<on_mouse> event.
 
 =head2 $widget->on_style_changed_values( %values )
 
@@ -945,18 +963,6 @@ notated by a literal space character in brackets, for neatness of the style
 information.
 
 =cut
-
-=head1 STYLE
-
-The following style tags are used on all widget classes that use Style:
-
-=over 4
-
-=item :focus
-
-Set when this widget has the input focus
-
-=back
 
 =head1 EXAMPLES
 

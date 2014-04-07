@@ -9,24 +9,27 @@ use Test::Refcount;
 
 use Tickit::Test;
 
-# Since we need real Windows in the widgets, it's easier just to use some HBoxes
-# We haven't strictly tested this yet, but never mind...
-use Tickit::Widget::HBox;
+# Since we need real Windows in the widgets, it's easier just to use an HBoxx
+# as a container. We haven't strictly tested this yet, but never mind...
 
 my ( $term, $win ) = mk_term_and_window;
 
-my @f_widgets = map { my $w = TestWidget->new; $w->{CAN_FOCUS} = 1; $w } 0 .. 1;
+my @f_widgets = map { my $w = TestWidget->new; $w->{CAN_FOCUS} = 1; $w } 0 .. 2;
 my @n_widgets = map { TestWidget->new } 0 .. 3;
 
 # first/after/before/last on a single container
 {
-   my $container = Tickit::Widget::HBox->new;
+   my $container = TestContainer->new;
    $container->set_window( $win );
 
    $container->add( $_ ) for $n_widgets[0], $f_widgets[0], $n_widgets[1], $f_widgets[1];
 
+   is( $container->pen->getattr( 'fg' ), undef, '$container pen fg is undef before focus child' );
+
    $container->focus_next( first => undef );
    ok( $f_widgets[0]->window->is_focused, '$f_widgets[0] has focus after "first" linear' );
+
+   is( $container->pen->getattr( 'fg' ), 1, '$container pen fg is 1 after focus child' );
 
    $container->focus_next( after => $f_widgets[0] );
    ok( $f_widgets[1]->window->is_focused, '$f_widgets[1] has focus after "after" linear' );
@@ -113,6 +116,44 @@ my @n_widgets = map { TestWidget->new } 0 .. 3;
    $root->set_window( undef );
 }
 
+# hidden children
+{
+   my $root = Tickit::Widget::HBox->new;
+   $root->add( $_ ) for @f_widgets;
+
+   $root->set_window( $win );
+
+   # Cheating
+   $f_widgets[1]->window->hide;
+
+   $root->focus_next( after => $f_widgets[0] );
+   ok( !$f_widgets[1]->window->is_focused, '$f_widgets[1] does not have focus after "after" skips it' );
+   ok(  $f_widgets[2]->window->is_focused, '$f_widgets[2] has focus after "after" skipped [1]' );
+
+   $root->set_window( undef );
+}
+
+# Special method
+{
+   my $root = Tickit::Widget::HBox->new;
+   $root->add( $_ ) for @f_widgets;
+
+   $root->set_window( $win );
+
+   # More cheating
+   no warnings 'once';
+   local *Tickit::Widget::HBox::children_for_focus = sub {
+      shift;
+      return $f_widgets[1], $f_widgets[2];
+   };
+
+   $root->focus_next( first => undef );
+   ok( !$f_widgets[0]->window->is_focused, '$f_widgets[0] does not have focus with special method return' );
+   ok(  $f_widgets[1]->window->is_focused, '$f_widgets[1] has focus with special method return' );
+
+   $root->set_window( undef );
+}
+
 # Tab / Shift-Tab key handling
 {
    my $container = Tickit::Widget::HBox->new;
@@ -144,3 +185,15 @@ sub cols  { 5 }
 sub CAN_FOCUS { shift->{CAN_FOCUS} }
 
 use constant KEYPRESSES_FROM_STYLE => 1;
+
+package TestContainer;
+
+use base qw( Tickit::Widget::HBox );
+
+use constant DEFAULT_PEN_FROM_STYLE => 1;
+
+use Tickit::Style -copy;
+BEGIN {
+   style_definition ":focus-child" =>
+      fg => 1;
+}

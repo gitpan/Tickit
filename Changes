@@ -1,6 +1,33 @@
 Revision history for Changes
 
-0.43    2013/04/01 16:29:58
+0.44    2014/04/07 02:03:37
+        [CHANGES]
+         * Deprecation warnings for pre-0.42-style Window expose/key/mouse
+           event handlers
+         * Provide $ev->mod_is_{shift,ctrl,alt} shortcut tests
+         * Added $rb->linebox_at()
+         * Allow ContainerWidgets to provide a method to return only those
+           children it wants to focus search on
+         * Added Tickit::Debug logging
+         * Added focus_child_notify Window ability and :focus-child
+           ContainerWidget style tag
+         * Use a single RenderBuffer for the entire window/widget tree
+           rendering
+         * Added $rb->get_cell accessor for inspecting cell state
+        
+        [BUGFIXES]
+         * Ensure that focus searching ability only considers children with
+           visible windows
+         * Ensure that $rb->mask won't crash with over-sized or negative-
+           offset mask rects
+         * Clip $win->scroll rect to the actual window bounds
+         * Correct explanation of tagged vs. untagges style in docs
+         * Fix $win->scrollrect when moving chunks a distance larger than
+           their own size
+         * Fix $rb->DESTROY with content to not print warnings of unreferenced
+           scalars
+
+0.43    2014/04/01 16:29:58
         [CHANGES]
          * Default TICKIT_CHILD_WINDOWS_LATER on; with env. var to disable it
          * Allow optional $pen argument to $term->{print,clear,erasech}

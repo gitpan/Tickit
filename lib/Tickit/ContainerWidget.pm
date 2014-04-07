@@ -7,16 +7,16 @@ package Tickit::ContainerWidget;
 
 use strict;
 use warnings;
+use 5.010; # //
 use feature qw( switch );
 use base qw( Tickit::Widget );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Carp;
 
 use Scalar::Util qw( refaddr );
-use List::MoreUtils qw( firstidx );
 
 =head1 NAME
 
@@ -32,6 +32,18 @@ other widgets
 This class acts as an abstract base class for widgets that contain at leaast
 one other widget object. It provides storage for a hash of "options"
 associated with each child widget.
+
+=head1 STYLE
+
+The following style tags are used:
+
+=over 4
+
+=item :focus-child
+
+Set whenever a child widget within the container has the input focus.
+
+=back
 
 =cut
 
@@ -149,6 +161,14 @@ sub children_changed
    $self->resized;
 }
 
+sub window_gained
+{
+   my $self = shift;
+   $self->SUPER::window_gained( @_ );
+
+   $self->window->set_focus_child_notify( 1 );
+}
+
 sub window_lost
 {
    my $self = shift;
@@ -156,6 +176,14 @@ sub window_lost
    $_->set_window( undef ) for $self->children;
 
    $self->SUPER::window_lost( @_ );
+}
+
+sub _on_win_focus
+{
+   my $self = shift;
+   $self->SUPER::_on_win_focus( @_ );
+
+   $self->set_style_tag( "focus-child" => $_[1] ) if $_[2];
 }
 
 =head2 $child = $widget->find_child( $how, $other, %args )
@@ -203,7 +231,8 @@ sub find_child
    my $self = shift;
    my ( $how, $other, %args ) = @_;
 
-   my @children = $self->children;
+   my $children = $args{children} // "children";
+   my @children = $self->$children;
    if( my $where = $args{where} ) {
       @children = grep { defined $other and $_ == $other or $where->() } @children;
    }
@@ -230,7 +259,8 @@ sub find_child
 }
 
 use constant CONTAINER_OR_FOCUSABLE => sub {
-   $_->isa( "Tickit::ContainerWidget" ) or $_->CAN_FOCUS
+   $_->isa( "Tickit::ContainerWidget" ) or
+      $_->window && $_->window->is_visible && $_->CAN_FOCUS
 };
 
 =head2 $widget->focus_next( $how, $other )
@@ -287,8 +317,13 @@ sub focus_next
 
    my $next;
 
+   my $children = $self->can( "children_for_focus" ) || "children";
+
    while(1) {
-      $next = $self->find_child( $how, $other, where => CONTAINER_OR_FOCUSABLE );
+      $next = $self->find_child( $how, $other,
+         where => CONTAINER_OR_FOCUSABLE,
+         children => $children,
+      );
       last if $next and $next->CAN_FOCUS;
 
       # Either we found a container (recurse into it),
@@ -328,12 +363,6 @@ sub focus_next
       }
    }
 
-   # if( !$next and my $parent = $self->parent ) {
-   #    return undef if $how eq "first" || $how eq "last";
-
-   #    return $parent->focus_next( $how, $self );
-   # }
-
    $next->take_focus;
    return 1;
 }
@@ -350,12 +379,16 @@ This method is used by C<window_lost> to remove the windows from all the child
 widgets automatically, and by C<find_child> to obtain a child relative to
 another given one.
 
-=head2 $widget->render( %args )
+=head2 @children = $widget->children_for_focus
 
-Optional. An empty C<render> method is provided for the case where the widget
-is purely a layout container that does not directly draw to its window. If the
-container requires drawing, this method may be overridden. Since the default
-implementation is empty, there is no need for a subclass to C<SUPER> call it.
+Optional. If implemented, this method is called to obtain a list of child
+widgets to perform a child search on when changing focus using the
+C<focus_next> method. If it is not implemented, the regular C<children> method
+is called instead.
+
+Normally this method shouldn't be used, but it may be useful on container
+widgets that also display "helper" widgets that should not be considered as
+part of the main focus set. This method can then exclude them.
 
 =head2 $widget->children_changed
 

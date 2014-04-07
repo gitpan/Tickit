@@ -10,7 +10,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Carp;
 use Scalar::Util qw( refaddr );
@@ -21,6 +21,8 @@ require Tickit;
 use Tickit::Utils qw( textwidth );
 use Tickit::Rect;
 use Tickit::Pen 0.31;
+
+use Struct::Dumb qw( readonly_struct );
 
 # Exported API constants
 use Exporter 'import';
@@ -285,24 +287,12 @@ rectangle, and clears the stack of saved state.
 
 =cut
 
-# Methods to alter cell states
-
 =head2 $rb->clear( $pen )
 
 Resets every cell in the buffer to an erased state. 
 A shortcut to calling C<erase_at> for every line.
 
 =cut
-
-sub clear
-{
-   my $self = shift;
-   my ( $pen ) = @_;
-
-   foreach my $line ( 0 .. $self->lines - 1 ) {
-      $self->erase_at( $line, 0, $self->cols, $pen );
-   }
-}
 
 =head2 $rb->goto( $line, $col )
 
@@ -344,16 +334,6 @@ updates the position.
 
 =cut
 
-sub skip
-{
-   my $self = shift;
-   my ( $len ) = @_;
-   defined $self->line or croak "Cannot ->skip without a virtual cursor position";
-   $self->skip_at( $self->line, $self->col, $len );
-   # $self->{col} += $len;
-   $self->goto( $self->line, $self->col + $len );
-}
-
 =head2 $rb->skip_to( $col )
 
 Sets the range of cells from the virtual cursor position until before the
@@ -363,20 +343,6 @@ If the position is already past this column then the cursor is moved backwards
 and no buffer changes are made.
 
 =cut
-
-sub skip_to
-{
-   my $self = shift;
-   my ( $col ) = @_;
-   defined $self->line or croak "Cannot ->skip_to without a virtual cursor position";
-
-   if( $self->col < $col ) {
-      $self->skip_at( $self->line, $self->col, $col - $self->col );
-   }
-
-   # $self->{col} = $col;
-   $self->goto( $self->line, $col );
-}
 
 =head2 $cols = $rb->text_at( $line, $col, $text, $pen )
 
@@ -398,17 +364,6 @@ than was actually printed).
 
 =cut
 
-sub text
-{
-   my $self = shift;
-   my ( $text, $pen ) = @_;
-   defined $self->line or croak "Cannot ->text without a virtual cursor position";
-   my $len = $self->text_at( $self->line, $self->col, $text, $pen );
-   # $self->{col} += $len;
-   $self->goto( $self->line, $self->col + $len );
-   return $len;
-}
-
 =head2 $rb->erase_at( $line, $col, $len, $pen )
 
 Sets the range of cells given to erase with the given pen.
@@ -422,16 +377,6 @@ pen, and updates the position.
 
 =cut
 
-sub erase
-{
-   my $self = shift;
-   my ( $len, $pen ) = @_;
-   defined $self->line or croak "Cannot ->erase without a virtual cursor position";
-   $self->erase_at( $self->line, $self->col, $len, $pen );
-   # $self->{col} += $len;
-   $self->goto( $self->line, $self->col + $len );
-}
-
 =head2 $rb->erase_to( $col, $pen )
 
 Sets the range of cells from the virtual cursor position until before the
@@ -443,35 +388,11 @@ and no buffer changes are made.
 
 =cut
 
-sub erase_to
-{
-   my $self = shift;
-   my ( $col, $pen ) = @_;
-   defined $self->line or croak "Cannot ->erase_to without a virtual cursor position";
-
-   if( $self->col < $col ) {
-      $self->erase_at( $self->line, $self->col, $col - $self->col, $pen );
-   }
-
-   # $self->{col} = $col;
-   $self->goto( $self->line, $col );
-}
-
 =head2 $rb->eraserect( $rect, $pen )
 
 Sets the range of cells given by the rectangle to erase with the given pen.
 
 =cut
-
-sub eraserect
-{
-   my $self = shift;
-   my ( $rect, $pen ) = @_;
-
-   foreach my $line ( $rect->linerange ) {
-      $self->erase_at( $line, $rect->left, $rect->cols, $pen );
-   }
-}
 
 =head1 LINE DRAWING
 
@@ -642,24 +563,6 @@ given line style, with the given pen.
 
 =cut
 
-sub hline_at
-{
-   my $self = shift;
-   my ( $line, $startcol, $endcol, $style, $pen, $caps ) = @_;
-   $pen = $self->_xs_merge_pen( $pen );
-   $caps ||= 0;
-
-   # TODO: _xs_make_span first for efficiency
-   my $east = $style << EAST_SHIFT;
-   my $west = $style << WEST_SHIFT;
-
-   $self->linecell( $line, $startcol, $east | ($caps & CAP_START ? $west : 0), $pen );
-   foreach my $col ( $startcol+1 .. $endcol-1 ) {
-      $self->linecell( $line, $col, $east | $west, $pen );
-   }
-   $self->linecell( $line, $endcol, $west | ($caps & CAP_END ? $east : 0), $pen );
-}
-
 =head2 $rb->vline_at( $startline, $endline, $col, $style, $pen, $caps )
 
 Draws a vertical line between the centres of the given lines (both are
@@ -667,21 +570,23 @@ inclusive), in the given line style, with the given pen.
 
 =cut
 
-sub vline_at
+=head2 $rb->linebox_at( $startline, $endline, $startcol, $endcol, $style, $pen )
+
+A convenient shortcut to calling two C<hline_at> and two C<vline_at> in order
+to draw a rectangular box.
+
+=cut
+
+sub linebox_at
 {
    my $self = shift;
-   my ( $startline, $endline, $col, $style, $pen, $caps ) = @_;
-   $pen = $self->_xs_merge_pen( $pen );
-   $caps ||= 0;
+   my ( $startline, $endline, $startcol, $endcol, $style, $pen ) = @_;
 
-   my $south = $style << SOUTH_SHIFT;
-   my $north = $style << NORTH_SHIFT;
+   $self->hline_at( $startline, $startcol, $endcol, $style, $pen );
+   $self->hline_at( $endline,   $startcol, $endcol, $style, $pen );
 
-   $self->linecell( $startline, $col, $south | ($caps & CAP_START ? $north : 0), $pen );
-   foreach my $line ( $startline+1 .. $endline-1 ) {
-      $self->linecell( $line, $col, $north | $south, $pen );
-   }
-   $self->linecell( $endline, $col, $north | ($caps & CAP_END ? $south : 0), $pen );
+   $self->vline_at( $startline, $endline, $startcol, $style, $pen );
+   $self->vline_at( $startline, $endline, $endcol,   $style, $pen );
 }
 
 =head2 $rb->char_at( $line, $col, $codepoint, $pen )
@@ -695,6 +600,83 @@ single-column wide C<text_at> calls. It will also be more efficient in the C
 library rewrite.
 
 =cut
+
+=head2 $cell = $rb->get_cell( $line, $col )
+
+Returns a structure containing the content stored in the given cell. The
+C<$cell> structure responds to the following methods:
+
+=over 4
+
+=item $cell->char
+
+On a skipped cell, returns C<undef>. On a text or char cell, returns the
+unicode codepoint number. On a line or erased cell, returns 0.
+
+=item $cell->linemask
+
+On a line cell, returns a representation of the line segments in the cell.
+This is a sub-structure with four fields; C<north>, C<south>, C<east>, C<west>
+to represent the four cell borders; the value of each is either zero, or one
+of the C<LINE_> constants.
+
+On any other kind of cell, returns C<undef>.
+
+=item $cell->pen
+
+Returns the C<Tickit::Pen> for non-skipped cells, or C<undef> for skipped
+cells.
+
+=back
+
+=cut
+
+readonly_struct Cell => [qw( char linemask pen )];
+readonly_struct LineMask => [qw( north south east west )];
+
+sub get_cell
+{
+   my $self = shift;
+   my ( $line, $col ) = @_;
+
+   my $offs = 0;
+   my $xscell;
+   while(1) {
+      $xscell = $self->_xs_getcell( $line, $col );
+      last unless $xscell->state == CONT;
+
+      my $startcol = $xscell->startcol;
+      $offs = $col - $startcol;
+      $col = $startcol;
+   }
+
+   given( $xscell->state ) {
+      when( SKIP ) {
+         return Cell( undef, undef, undef );
+      }
+      when( TEXT ) {
+         my $text = $self->_xs_get_text_substr( $xscell->textidx, $xscell->textoffs + $offs, 1 );
+         return Cell( ord $text, undef, $xscell->pen );
+      }
+      when( CHAR ) {
+         return Cell( $xscell->codepoint, undef, $xscell->pen );
+      }
+      when( ERASE ) {
+         return Cell( 0, undef, $xscell->pen );
+      }
+      when( LINE ) {
+         my $bits = $xscell->linemask;
+         my $mask = LineMask(
+            ( $bits & NORTH ) >> NORTH_SHIFT,
+            ( $bits & SOUTH ) >> SOUTH_SHIFT,
+            ( $bits & EAST  ) >> EAST_SHIFT,
+            ( $bits & WEST  ) >> WEST_SHIFT,
+         );
+         return Cell( 0, $mask, $xscell->pen );
+      }
+      # No CONT
+   }
+}
 
 =head2 $rb->flush_to_window( $win )
 

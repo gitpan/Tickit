@@ -23,7 +23,10 @@ my $win = mk_window;
          qr/^Constructing a legacy ->render LegacyRenderWidget at /,
          'Constructing a ->render Widget yields a warning');
 
-   $widget->set_window( $win );
+   {
+      local $SIG{__WARN__} = sub {};
+      $widget->set_window( $win );
+   }
 
    flush_tickit;
 

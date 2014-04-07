@@ -5,7 +5,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Tickit::Utils qw( textwidth substrwidth );
 

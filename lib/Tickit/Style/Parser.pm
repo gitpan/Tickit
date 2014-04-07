@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Parser::MGC );
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Struct::Dumb;
 

@@ -10,13 +10,14 @@ use warnings;
 use base qw( Tickit::ContainerWidget );
 use Tickit::RenderBuffer;
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Carp;
 
 use Tickit::Utils qw( distribute );
 
 use List::Util qw( sum );
+use List::MoreUtils qw( firstidx );
 
 =head1 NAME
 

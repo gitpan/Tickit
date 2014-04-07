@@ -15,7 +15,7 @@ use Tickit::Pen;
 
    isa_ok( $pen, "Tickit::Pen", '$pen isa Tickit::Pen' );
 
-   is( "$pen", "Tickit::Pen::Immutable={fg=3}", '"$pen"' );
+   is( "$pen", "Tickit::Pen::Immutable{fg=3}", '"$pen"' );
 
    is_deeply( { $pen->getattrs }, { fg => 3 }, '$pen attrs' );
 
@@ -43,7 +43,7 @@ my $observer = bless {}, "PenObserver";
 {
    my $pen = Tickit::Pen::Mutable->new;
 
-   is( "$pen", "Tickit::Pen::Mutable={}", '"$pen" empty' );
+   is( "$pen", "Tickit::Pen::Mutable{}", '"$pen" empty' );
 
    my $id = [];
    is_oneref( $id, 'Pen $id has refcount 1 before ->add_on_changed' );
@@ -65,7 +65,7 @@ my $observer = bless {}, "PenObserver";
    ok( $pen->hasattr( 'fg' ), '$pen now has fg' );
    is( $pen->getattr( 'fg' ), 3, '$pen fg after chattr' );
 
-   is( "$pen", "Tickit::Pen::Mutable={fg=3}", '"$pen" after chattr' );
+   is( "$pen", "Tickit::Pen::Mutable{fg=3}", '"$pen" after chattr' );
 
    is_deeply( { $pen->as_mutable->getattrs }, { $pen->getattrs }, '$pen->as_mutable attrs' );
 

@@ -24,6 +24,7 @@ include/tickit.h
 lib/Tickit.pm
 lib/Tickit.xs
 lib/Tickit/ContainerWidget.pm
+lib/Tickit/Debug.pm
 lib/Tickit/OneLineWidget.pm
 lib/Tickit/Pen.pm
 lib/Tickit/Rect.pm

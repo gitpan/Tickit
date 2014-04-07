@@ -149,4 +149,17 @@ my $mask = Tickit::Rect->new(
               '@methods for text_at after mask over translate' );
 }
 
+# mask out of limits doesn't segv
+{
+   $rb->save;
+
+   # Too big
+   $rb->mask( Tickit::Rect->new( top => 0, left => 0, lines => 50, cols => 200 ) );
+
+   # Negative
+   $rb->mask( Tickit::Rect->new( top => -10, left => -20, lines => 5, cols => 20 ) );
+
+   $rb->restore;
+}
+
 done_testing;

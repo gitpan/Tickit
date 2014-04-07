@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Carp;
 
@@ -153,9 +153,9 @@ stylesheet does not precisely determine the foreground colour:
  WidgetClass:tag2 { fg: "green"; }
 
 While it is not specified which tagged definition takes precedence, and
-therefore whether it shall be red or blue, it is specified that both of the
+therefore whether it shall be blue or green, it is specified that both of the
 tagged definitions take precedence over the untagged definition, so the colour
-will not be green.
+will not be red.
 
 =head1 SUBCLASSING
 
@@ -266,7 +266,7 @@ sub style_definition
    my ( $tags, %definition ) = @_;
 
    my %tags;
-   $tags{$1}++ while $tags =~ s/:([A-Z0-9_]+)//i;
+   $tags{$1}++ while $tags =~ s/:([A-Z0-9_-]+)//i;
 
    die "Expected '\$tags' to be 'base' or a set of :tag names" unless $tags eq "base" or $tags eq "";
 
@@ -447,7 +447,7 @@ sub add
    my ( $key, $value ) = @_;
 
    my %tags;
-   $tags{$1}++ while $key =~ s/:([A-Z0-9_]+)//i;
+   $tags{$1}++ while $key =~ s/:([A-Z0-9_-]+)//i;
 
    $self->merge_with_tags( \%tags, { $key => $value } );
 }

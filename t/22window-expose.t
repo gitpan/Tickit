@@ -152,6 +152,23 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
                  [BLANK(11), TEXT("The text")] ],
                'Display after Window expose with output' );
 
+   $expose_cb = sub {
+      my ( $rb, $rect ) = @_;
+      $rb->text_at( $_, 0, "Line $_" ) for $rect->linerange;
+   };
+
+   $win->expose( Tickit::Rect->new( top => 0, left => 0, lines => 1, cols => $win->cols ) );
+   $win->expose( Tickit::Rect->new( top => 2, left => 0, lines => 1, cols => $win->cols ) );
+   flush_tickit;
+
+   is_termlog( [ GOTO(3,10),
+                 SETPEN,
+                 PRINT("Line 0"),
+                 GOTO(5,10),
+                 SETPEN,
+                 PRINT("Line 2") ],
+               'Termlog after Window expose twice' );
+
    $win->set_on_expose( undef );
    $win->clear;
    flush_tickit;

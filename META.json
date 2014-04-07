@@ -48,111 +48,114 @@
    "provides" : {
       "Tickit" : {
          "file" : "lib/Tickit.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::ContainerWidget" : {
          "file" : "lib/Tickit/ContainerWidget.pm",
-         "version" : "0.43"
+         "version" : "0.44"
+      },
+      "Tickit::Debug" : {
+         "file" : "lib/Tickit/Debug.pm"
       },
       "Tickit::OneLineWidget" : {
          "file" : "lib/Tickit/OneLineWidget.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Pen" : {
          "file" : "lib/Tickit/Pen.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Pen::Immutable" : {
          "file" : "lib/Tickit/Pen.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Pen::Mutable" : {
          "file" : "lib/Tickit/Pen.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Rect" : {
          "file" : "lib/Tickit/Rect.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::RectSet" : {
          "file" : "lib/Tickit/RectSet.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::RenderBuffer" : {
          "file" : "lib/Tickit/RenderBuffer.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::SingleChildWidget" : {
          "file" : "lib/Tickit/SingleChildWidget.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::StringPos" : {
          "file" : "lib/Tickit/StringPos.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Style" : {
          "file" : "lib/Tickit/Style.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Style::Parser" : {
          "file" : "lib/Tickit/Style/Parser.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Term" : {
          "file" : "lib/Tickit/Term.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Test" : {
          "file" : "lib/Tickit/Test.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Test::MockTerm" : {
          "file" : "lib/Tickit/Test/MockTerm.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Utils" : {
          "file" : "lib/Tickit/Utils.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Widget" : {
          "file" : "lib/Tickit/Widget.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Widget::Box" : {
          "file" : "lib/Tickit/Widget/Box.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Widget::HBox" : {
          "file" : "lib/Tickit/Widget/HBox.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Widget::LinearBox" : {
          "file" : "lib/Tickit/Widget/LinearBox.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Widget::Static" : {
          "file" : "lib/Tickit/Widget/Static.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Widget::VBox" : {
          "file" : "lib/Tickit/Widget/VBox.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::WidgetRole" : {
          "file" : "lib/Tickit/WidgetRole.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::WidgetRole::Alignable" : {
          "file" : "lib/Tickit/WidgetRole/Alignable.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::WidgetRole::Penable" : {
          "file" : "lib/Tickit/WidgetRole/Penable.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       },
       "Tickit::Window" : {
          "file" : "lib/Tickit/Window.pm",
-         "version" : "0.43"
+         "version" : "0.44"
       }
    },
    "release_status" : "stable",
@@ -161,5 +164,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.43"
+   "version" : "0.44"
 }

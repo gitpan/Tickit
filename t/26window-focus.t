@@ -150,4 +150,39 @@ is_termlog( [ GOTO(7,17), ],
    flush_tickit;
 }
 
+{
+   my $subwin = $win->make_sub( 1, 1, 2, 2 );
+
+   my @events;
+   $win->set_on_focus( sub {
+      push @events, [ win => $_[1] ? "in" : "out", $_[2] ];
+   } );
+   $subwin->set_on_focus( sub {
+      push @events, [ sub => $_[1] ? "in" : "out" ];
+   } );
+   $win->set_focus_child_notify( 1 );
+   flush_tickit;
+
+   $subwin->focus( 0, 0 );
+
+   is_deeply( \@events,
+              [ [ win => "in", $subwin ], [ sub => "in" ] ],
+              'Parent and child window both informed of focus in with focus_child_notify' );
+
+   my $otherwin = $rootwin->make_sub( 0, 0, 1, 1 );
+   flush_tickit;
+
+   undef @events;
+
+   $otherwin->focus( 0, 0 );
+
+   is_deeply( \@events,
+              [ [ sub => "out" ], [ win => "out", $subwin ] ],
+              'Child and parent window both informed of focus out with focus_child_notify' );
+
+   $subwin->close;
+   $otherwin->close;
+   flush_tickit;
+}
+
 done_testing;

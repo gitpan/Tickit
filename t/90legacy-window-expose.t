@@ -14,6 +14,7 @@ my $win = mk_window;
 # Test that the Window direct drawing methods all still work inside a legacy
 # expose without RB event.
 
+$SIG{__WARN__} = sub {};
 $win->set_on_expose( sub { # no with_rb
    my ( $win, $rect ) = @_;
 

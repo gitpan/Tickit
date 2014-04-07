@@ -126,6 +126,22 @@ $win->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
    undef @exposed_rects;
 }
 
+# scrollrect further than area just exposes
+{
+   $win->scrollrect( Tickit::Rect->new( top => 2, left => 0, lines => 3, cols => 80 ),
+                     5, 0 );
+   flush_tickit;
+
+   is_termlog( [],
+               'Termlog empty after scrollrect further than area' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 2, left => 0, lines => 3, cols => 80 ) ],
+              'Exposed area after ->scrollrect further than area' );
+
+   undef @exposed_rects;
+}
+
 # scroll_with_children up
 {
    my $child = $win->make_sub( 0, 70, 1, 10 );

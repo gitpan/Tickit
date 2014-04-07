@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011-2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2014 -- leonerd@leonerd.org.uk
 
 package Tickit::Rect;
 
@@ -10,7 +10,7 @@ use warnings;
 
 use Carp;
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 # Load the XS code
 require Tickit;
@@ -157,10 +157,16 @@ Returns true if C<$other> and C<$rect> intersect at all, even if they overlap.
 
 =cut
 
+sub sprintf
+{
+   my $self = shift;
+   return sprintf "[(%d,%d)..(%d,%d)]", $self->left, $self->top, $self->right, $self->bottom;
+}
+
 use overload
    '""' => sub {
       my $self = shift;
-      sprintf "Tickit::Rect[(%d,%d)..(%d,%d)]", $self->left, $self->top, $self->right, $self->bottom;
+      return ref($self) . $self->sprintf;
    },
    bool => sub { 1 };
 

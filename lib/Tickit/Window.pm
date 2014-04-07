@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Carp;
 
@@ -21,6 +21,8 @@ use Tickit::Rect;
 use Tickit::RectSet;
 use Tickit::RenderBuffer;
 use Tickit::Utils qw( string_countmore );
+
+use Tickit::Debug;
 
 use constant WEAKEN_CHILDREN => 1;
 use constant CHILD_WINDOWS_LATER => $ENV{TICKIT_CHILD_WINDOWS_LATER} // 1;
@@ -171,7 +173,21 @@ sub _on_later
 
       $self->term->setctl_int( cursorvis => 0 );
 
-      $self->_do_expose( $_ ) for @rects;
+      my $rb = Tickit::RenderBuffer->new(
+         lines => $self->lines,
+         cols  => $self->cols,
+      );
+
+      foreach my $rect ( @rects ) {
+         $rb->save;
+         $rb->clip( $rect );
+
+         $self->_do_expose( $rect, $rb );
+
+         $rb->restore;
+      }
+
+      $rb->flush_to_term( $self->term );
 
       $self->{needs_restore}++;
    }
@@ -238,6 +254,8 @@ sub _do_change_children
    if( $how eq "insert" ) {
       my ( $sub, $index ) = @_;
 
+      Tickit::Debug->log( Wh => "Window %s adds %s", $self->sprintf, $sub->sprintf ) if DEBUG;
+
       $index = @$children if $index == -1;
       splice @$children, $index, 0, ( $sub );
       weaken $children->[$index] if WEAKEN_CHILDREN;
@@ -248,6 +266,8 @@ sub _do_change_children
          $i++, next if defined $children->[$i] and $children->[$i] != $child;
          splice @$children, $i, 1, ();
       }
+
+      Tickit::Debug->log( Wh => "Window %s removes %s", $self->sprintf, $child->sprintf ) if DEBUG;
 
       if( $self->{focused_child} and $self->{focused_child} == $child ) {
          undef $self->{focused_child};
@@ -430,6 +450,8 @@ sub _reorder_child
 
    # Remove it
    splice @$children, $idx, 1, ();
+
+   Tickit::Debug->log( Wh => "Window %s re-orders %s to %s", $self->sprintf, $child->sprintf, $where ) if DEBUG;
 
    if( $where eq "front" ) {
       unshift @$children, $child;
@@ -656,7 +678,7 @@ window and an event structure.
 
  $handled = $on_key->( $win, $event )
 
-C<$event> is an object supporting methods called C<type>, C<str> and C<mod>.
+C<$event> is an event structure object supporting C<type>, C<str> and C<mod>.
 C<type> will be C<"text"> for normal unmodified Unicode, or C<"key"> for
 special keys or modified Unicode. C<str> will be the UTF-8 string for C<text>
 events, or the textual description of the key as rendered by L<Term::TermKey>
@@ -687,7 +709,7 @@ arguments rather than as a structure.
 
  $handled = $on_key->( $win, $type, $str, $mod )
 
-This form is now discouraged, and may be removed in a later version.
+This form is now deprecated, and will be removed in a later version.
 
 =cut
 
@@ -700,6 +722,7 @@ sub set_on_key
       shift;
    }
    else {
+      carp "Deprecated use of Window->set_on_key without ev" if defined $_[0];
       $self->{on_key_with_ev} = 0;
    }
 
@@ -752,12 +775,11 @@ structure.
 
  $handled = $on_mouse->( $win, $event )
 
-C<$event> is an object supporting methods called C<type>, C<button>, C<line>,
-C<col> and C<mod>. C<type> will contain the event name. C<button> will contain
-the button number, though it may not be present for C<release> events. C<line>
-and C<col> are 0-based. C<mod> is a bitmask of modifier state. Behaviour of
-events involving more than one mouse button is not well-specified by
-terminals.
+C<$event> is an event structure object supporting C<type>, C<button>, C<line>,
+C<col> and C<mod>.
+
+Behaviour of events involving more than one mouse button is
+not well-specified by terminals.
 
 The following event names may be observed:
 
@@ -795,6 +817,11 @@ the mouse release event happened.
 
 A mouse button was released after being pressed
 
+=item wheel
+
+The mouse wheel was moved. C<button> will indicate the wheel direction as a
+string C<up> or C<down>.
+
 =back
 
 The invoked code should return a true value if it considers the mouse event
@@ -813,7 +840,7 @@ arguments rather than as a structure.
 
  $handled = $on_mouse->( $win, $type, $button, $line, $col, $mod )
 
-This form is now discouraged, and may be removed in a later version.
+This form is now deprecated, and will be removed in a later version.
 
 =cut
 
@@ -826,6 +853,7 @@ sub set_on_mouse
       shift;
    }
    else {
+      carp "Deprecated use of Window->set_on_mouse without ev" if defined $_[0];
       $self->{on_mouse_with_ev} = 0;
    }
 
@@ -896,7 +924,7 @@ methods themselves.
 
  $on_expose->( $win, $rect )
 
-This form is now discouraged, and may be removed in a later version.
+This form is now deprecated, and will be removed in a later version.
 
 =cut
 
@@ -909,29 +937,28 @@ sub set_on_expose
       shift;
    }
    else {
+      carp "Deprecated use of Window->set_on_expose without rb" if defined $_[0];
       $self->{expose_with_rb} = 0;
    }
 
    ( $self->{on_expose} ) = @_;
 }
 
+our $INDENT = "";
 sub _do_expose
 {
    my $self = shift;
-   my ( $rect ) = @_;
+   my ( $rect, $rb ) = @_;
+
+   $rb->setpen( $self->pen );
+
+   Tickit::Debug->log( Wx => "${INDENT}Expose %s %s", $self->sprintf, $rect->sprintf ) if DEBUG;
+   local $INDENT = "| $INDENT";
 
    if( my $on_expose = $self->{on_expose} ) {
-      my $rb = Tickit::RenderBuffer->new(
-         lines => $self->lines,
-         cols  => $self->cols,
-      );
-      $rb->setpen( $self->pen );
-
-      local $self->{exposure_rb} = $rb;
-
       $rb->save;
 
-      $rb->clip( $rect );
+      local $self->{exposure_rb} = $rb;
 
       if( $self->{expose_with_rb} ) {
          $on_expose->( $self, $rb, $rect );
@@ -941,17 +968,22 @@ sub _do_expose
       }
 
       $rb->restore;
-
-      undef $self->{exposure_rb};
-      $rb->flush_to_window( $self );
    }
 
-   my $children = $self->{child_windows} or return;
+   foreach my $win ( $self->subwindows ) {
+      next unless $win->is_visible;
 
-   foreach my $win ( sort { $a->top <=> $b->top || $a->left <=> $b->left } grep { defined } @$children ) {
-      next unless my $winrect = $rect->intersect( $win->rect );
-      next unless $win->{visible};
-      $win->_do_expose( $winrect->translate( -$win->top, -$win->left ) );
+      if( my $winrect = $rect->intersect( $win->rect ) ) {
+         $rb->save;
+
+         $rb->clip( $winrect );
+         $rb->translate( $win->top, $win->left );
+         $win->_do_expose( $winrect->translate( -$win->top, -$win->left ), $rb );
+
+         $rb->restore;
+      }
+
+      $rb->mask( $win->rect );
    }
 }
 
@@ -991,6 +1023,8 @@ sub expose
 
    return if $self->{damage}->contains( $rect );
 
+   Tickit::Debug->log( Wd => "Damage root %s", $rect->sprintf ) if DEBUG;
+
    $self->{damage}->add( $rect );
 
    $self->{needs_expose} = 1;
@@ -1006,12 +1040,40 @@ Set the callback to invoke whenever the window gains or loses focus.
 Will be passed a boolean value, true if the focus was just gained, false if
 the focus was just lost.
 
+If the C<focus_child_notify> behavior is enabled, this callback is also
+invoked for changes of focus on descendent windows. In this case, it is
+passed an additional argument, being the immediate child window in which the
+focus chain has now changed (which may or may not be the focused window
+directly; it could itself be another ancestor).
+
+ $on_refocus->( $win, $has_focus, $child )
+
+When a window gains focus, any of its ancestors that have
+C<focus_child_notify> enabled will be informed first, from the outermost
+inwards, before the window itself. When one loses focus, it is notified
+first, and then its parents from the innermost outwards.
+
 =cut
 
 sub set_on_focus
 {
    my $self = shift;
    ( $self->{on_focus} ) = @_;
+}
+
+=head2 $win->set_focus_child_notify( $notify )
+
+If set to a true value, the C<on_focus> event handler will also be invoked
+when descendent windows gain or lose focus, in addition to when it gains or
+loses focus itself. Defaults to false; meaning the C<on_focus> handler only
+receives notifications about the window itself.
+
+=cut
+
+sub set_focus_child_notify
+{
+   my $self = shift;
+   ( $self->{focus_child_notify} ) = @_;
 }
 
 =head2 $win->set_expose_after_scroll( $expose_after_scroll )
@@ -1638,7 +1700,7 @@ sub _scrollrectset
 
    my $term = $win->term;
 
-   $term->setpen( bg => $pen->getattr( 'bg' ) );
+   my $done_pen;
 
    my $ret = 1;
    foreach my $rect ( $rectset->rects ) {
@@ -1651,7 +1713,7 @@ sub _scrollrectset
       my $origrect = $rect->translate( -$origwin->abs_top, -$origwin->abs_left );
 
       if( abs($downward) >= $lines or abs($rightward) >= $cols ) {
-         $origwin->expose( $rect ) if $expose_after_scroll;
+         $origwin->expose( $origrect ) if $expose_after_scroll;
          next;
       }
 
@@ -1668,6 +1730,12 @@ sub _scrollrectset
          $damageset->add( $_ ) for @outside;
          $damageset->add( $inside->translate( -$downward, -$rightward ) ) if $inside;
       }
+
+      Tickit::Debug->log( Wsr => "Term scrollrect %s by %+d,%+d",
+         sub { Tickit::Rect->new( top => $top, left => $left, lines => $lines, cols => $cols )->sprintf }, $rightward, $downward ) if DEBUG;
+
+      $done_pen or
+         $term->setpen( bg => $pen->getattr( 'bg' ) ), $done_pen++;
 
       if( not $term->scrollrect( $top, $left, $lines, $cols, $downward, $rightward ) ) {
          $ret = 0;
@@ -1732,6 +1800,12 @@ sub scrollrect
       );
    }
    my ( $downward, $rightward, @args ) = @_;
+
+   # Clip
+   $rect = $rect->intersect( $self->selfrect )
+      or return 0;
+
+   Tickit::Debug->log( Ws => "Scroll %s %s by %+d,%+d", $self->sprintf, $rect->sprintf, $rightward, $downward ) if DEBUG;
 
    my $pen = ( @args == 1 ) ? $args[0]->as_mutable : Tickit::Pen::Mutable->new( @args );
 
@@ -1884,6 +1958,9 @@ sub _focus_gained
       $self->{focused} = 1;
       $self->{on_focus}->( $self, 1 ) if $self->{on_focus};
    }
+   elsif( $self->{focus_child_notify} ) {
+      $self->{on_focus}->( $self, 1, $child ) if $self->{on_focus};
+   }
 
    $self->{focused_child} = $child;
    weaken $self->{focused_child} if WEAKEN_CHILDREN;
@@ -1895,6 +1972,7 @@ sub _focus_lost
 
    if( my $focused_child = $self->{focused_child} ) {
       $focused_child->_focus_lost;
+      $self->{on_focus}->( $self, 0, $focused_child ) if $self->{on_focus} && $self->{focus_child_notify};
    }
 
    if( $self->{focused} ) {
@@ -2004,12 +2082,16 @@ sub _needs_flush
    $self->{flush_queued}++;
 }
 
+sub sprintf
+{
+   my $self = shift;
+   return sprintf "[%dx%d abs@%d,%d]", $self->cols, $self->lines, $self->abs_left, $self->abs_top;
+}
+
 use overload
    '""' => sub {
       my $self = shift;
-      return sprintf "%s[%dx%d abs@%d,%d]",
-         ref $self,
-         $self->cols, $self->lines, $self->abs_left, $self->abs_top;
+      return ref($self) . $self->sprintf,
    },
    '0+' => sub {
       my $self = shift;
@@ -2020,6 +2102,42 @@ use overload
 
 package # hide from indexer
    Tickit::Window::Event;
+
+=head1 EVENT STRUCTURE
+
+Objects in this class are passed to C<on_key> and C<on_mouse> handlers, to
+give details of the keyboard or mouse event that happened.
+
+=head2 $ev->type
+
+A string giving the event type name. The valid values here will differ
+depending on whether it is a keyboard or mouse event.
+
+=head2 $ev->str
+
+A string representing the base key and its modifiers. Modifiers are given as
+an optional prefix; any of C<M-> for Alt (Meta), C<C-> for Control, or C<S->
+for Shift (in that order), followed by the base key. For UTF-8 text this will
+be a single character. For non-Unicode special keys this will be the name of
+the key.
+
+=head2 $ev->line
+
+=head2 $ev->col
+
+The position for mouse events, 0-based.
+
+=head2 $ev->button
+
+The button number for non-wheel mouse events, or the mouse wheel direction as
+a string (one fo C<up> or C<down>). Note that for C<release> type events, the
+mouse button may not be reliable; not all terminals can report it.
+
+=head2 $ev->mod
+
+A bitmask of modifier state. Valid for both keyboard and mouse events.
+
+=cut
 
 use Carp;
 
@@ -2034,11 +2152,28 @@ foreach my $key (qw( type str mod button line col )) {
    *$key = sub { exists $_[0]{$key} ? $_[0]{$key} : croak "Event has no '$key' field" }
 }
 
+=head2 $ev->mod_is_alt
+
+=head2 $ev->mod_is_ctrl
+
+=head2 $ev->mod_is_shift
+
+Convenient shortcuts to tests on the C<mod> bitmask to test if each of the
+modifiers is set.
+
+=cut
+
+sub mod_is_alt   { shift->mod & Tickit::Term::MOD_ALT }
+sub mod_is_ctrl  { shift->mod & Tickit::Term::MOD_CTRL }
+sub mod_is_shift { shift->mod & Tickit::Term::MOD_SHIFT }
+
 # This horrible overload is just short-term for back-compat so we can pass
 # the event structure itself as the first method argument, to code that still
 # expects to find the event type name there
 use overload
-   '""' => "type",
+   '""' => sub {
+      carp "Deprecated use of '\$ev' to mean ->type";
+      shift->type },
    fallback => 1;
 
 =head1 AUTHOR

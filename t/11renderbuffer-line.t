@@ -78,6 +78,12 @@ foreach my $op (qw( term win )) {
    $rb->hline_at( 10, 5, 15, LINE_SINGLE );
    $rb->vline_at( 5, 15, 10, LINE_SINGLE );
 
+   my $cell = $rb->get_cell( 6, 10 );
+   is( $cell->linemask->north, LINE_SINGLE, '$cell->linemask->north at 6,10' );
+   is( $cell->linemask->south, LINE_SINGLE, '$cell->linemask->south at 6,10' );
+   is( $cell->linemask->east,  0,           '$cell->linemask->east at 6,10' );
+   is( $cell->linemask->west,  0,           '$cell->linemask->west at 6,10' );
+
    $rb->flush_to_window( $win );
    is_deeply( \@methods,
               [
@@ -108,27 +114,35 @@ foreach my $op (qw( term win )) {
    $rb->flush_to_window( $win );
    is_deeply( \@methods,
               [
-                 [ goto => 10, 10 ],
-                 [ print => "┌─┬─┐", {} ],
-                 [ goto => 11, 10 ],
-                 [ print => "│", {} ],
-                 [ goto => 11, 12 ],
-                 [ print => "│", {} ],
-                 [ goto => 11, 14 ],
-                 [ print => "│", {} ],
-                 [ goto => 12, 10 ],
-                 [ print => "├─┼─┤", {} ],
-                 [ goto => 13, 10 ],
-                 [ print => "│", {} ],
-                 [ goto => 13, 12 ],
-                 [ print => "│", {} ],
-                 [ goto => 13, 14 ],
-                 [ print => "│", {} ],
-                 [ goto => 14, 10 ],
-                 [ print => "└─┴─┘", {} ],
+                 [ goto => 10, 10 ], [ print => "┌─┬─┐", {} ],
+                 [ goto => 11, 10 ], [ print => "│", {} ],
+                    [ goto => 11, 12 ], [ print => "│", {} ],
+                    [ goto => 11, 14 ], [ print => "│", {} ],
+                 [ goto => 12, 10 ], [ print => "├─┼─┤", {} ],
+                 [ goto => 13, 10 ], [ print => "│", {} ],
+                    [ goto => 13, 12 ], [ print => "│", {} ],
+                    [ goto => 13, 14 ], [ print => "│", {} ],
+                 [ goto => 14, 10 ], [ print => "└─┴─┘", {} ],
               ],
               'RC renders line merging' );
    undef @methods;
+}
+
+# Linebox
+{
+   $rb->linebox_at( 3, 6, 3, 6, LINE_SINGLE, $pen );
+
+   $rb->flush_to_window( $win );
+   is_deeply( \@methods,
+              [
+                 [ goto => 3, 3 ], [ print => "┌──┐", {} ],
+                 [ goto => 4, 3 ], [ print => "│", {} ],
+                    [ goto => 4, 6 ], [ print => "│", {} ],
+                 [ goto => 5, 3 ], [ print => "│", {} ],
+                    [ goto => 5, 6 ], [ print => "│", {} ],
+                 [ goto => 6, 3 ], [ print => "└──┘", {} ],
+              ],
+              'RC renders linebox_at' );
 }
 
 done_testing;

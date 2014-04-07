@@ -14,16 +14,31 @@ my $win = $rootwin->make_sub( 3, 10, 4, 20 );
 $win->focus( 0, 0 );
 flush_tickit;
 
+my $keyev;
 my @key_events;
 $win->set_on_key( with_ev => sub {
-   my ( $self, $ev ) = @_;
-   push @key_events, [ $ev->type => $ev->str ];
+   ( undef, $keyev ) = @_;
+   push @key_events, [ $keyev->type => $keyev->str ];
    return 1;
 } );
 
 presskey( text => "A" );
 
 is_deeply( \@key_events, [ [ text => "A" ] ], 'on_key A' );
+
+ok( !$keyev->mod_is_shift, 'A key is not shift' );
+ok( !$keyev->mod_is_ctrl,  'A key is not ctrl' );
+ok( !$keyev->mod_is_alt,   'A key is not alt' );
+
+undef @key_events;
+
+presskey( key => "C-a", 4 );
+
+is_deeply( \@key_events, [ [ key => "C-a" ] ], 'on_key C-a' );
+
+ok( !$keyev->mod_is_shift, 'C-a key is not shift' );
+ok(  $keyev->mod_is_ctrl,  'C-a key is ctrl' );
+ok( !$keyev->mod_is_alt,   'C-a key is not alt' );
 
 my @mouse_events;
 $win->set_on_mouse( with_ev => sub {

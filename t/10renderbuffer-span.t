@@ -35,6 +35,11 @@ is( $rb->cols,  20, '$rb->cols' );
 
    is_termlog( [],
                'Empty RC renders nothing to term' );
+
+   my $cell = $rb->get_cell( 0, 0 );
+
+   ok( $cell, 'get_cell returns a cell' );
+   is( $cell->char, undef, '$cell->char is undef' );
 }
 
 # Absolute spans
@@ -52,6 +57,15 @@ foreach my $op (qw( term win )) {
    # Combined pens
    $rb->text_at( 4, 1, "third span", $pen );
    $rb->erase_at( 5, 1, 7, $pen );
+
+   my $cell = $rb->get_cell( 0, 1 );
+   is( chr $cell->char, "t", '$cell->char at 0,1' );
+   ok( $cell->pen->equiv( $pen ), '$cell->pen at 0,1' )
+      or diag( "Got pen ".$cell->pen.", expected ".$pen );
+
+   is( chr $rb->get_cell( 0, 2 )->char, "e", '$cell->char at 0,2' );
+
+   is( $rb->get_cell( 1, 1 )->char, 0, '$cell->char at 1,1' );
 
    if( $op eq "term" ) {
       $rb->flush_to_term( $term );
@@ -211,6 +225,23 @@ foreach my $op (qw( term win )) {
    $rb->setpen( undef );
 }
 
+# VC Clipping
+{
+   $rb->goto( -2, 0 ); $rb->text( "above" );
+   $rb->goto( 0, -3 ); $rb->text( "left" );
+   $rb->goto( 1, 18 ); $rb->text( "right" );
+   $rb->goto( 11, 0 ); $rb->text( "below" );
+
+   $rb->flush_to_window( $win );
+   is_deeply( \@methods,
+              [
+                 [ goto => 0,  0 ], [ print => "t", {} ],
+                 [ goto => 1, 18 ], [ print => "ri", {} ],
+              ],
+              'RC clipping at virtual-cursor' );
+   undef @methods;
+}
+
 # VC skipping
 {
    my $pen = Tickit::Pen->new;
@@ -242,6 +273,10 @@ foreach my $op (qw( term win )) {
    $rb->text_at( 0, 0, "at 0,0", Tickit::Pen->new );
 
    $rb->goto( 1, 0 );
+
+   is( $rb->line, 1, '$rb->line after translate' );
+   is( $rb->col,  0, '$rb->col after translate' );
+
    $rb->text( "at 1,0", Tickit::Pen->new );
 
    $rb->flush_to_window( $win );
