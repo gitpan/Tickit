@@ -20,7 +20,10 @@ examples/hello-world.pl
 examples/HelloWorldWidget-1.pm
 examples/HelloWorldWidget-2.pm
 examples/testonewidget.pl
+include/tickit-termdrv.h
 include/tickit.h
+lib/linechars.inc
+lib/linechars.inc.PL
 lib/Tickit.pm
 lib/Tickit.xs
 lib/Tickit/ContainerWidget.pm
@@ -82,6 +85,7 @@ t/12renderbuffer-char.t
 t/13renderbuffer-clip.t
 t/14renderbuffer-stack.t
 t/15renderbuffer-mask.t
+t/19renderbuffer-to-window.t
 t/20rootwin.t
 t/21window.t
 t/22window-expose.t
@@ -108,5 +112,4 @@ t/81tickit-input.t
 t/90legacy-window-expose.t
 t/91legacy-widget-render.t
 t/99pod.t
-t/TestWindow.pm
 typemap

@@ -4,12 +4,14 @@ use strict;
 use warnings;
 
 use Test::More;
-use t::TestWindow qw( $win @methods );
+use Tickit::Test;
 
 use Tickit::RenderBuffer;
 
 use Tickit::Pen;
 use Tickit::Rect;
+
+my $term = mk_term;
 
 my $rb = Tickit::RenderBuffer->new(
    lines => 10,
@@ -38,15 +40,9 @@ my $pen = Tickit::Pen->new;
 
    $rb->text( "some text", $pen );
 
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [
-                 [ goto => 2, 2 ],
-                 [ print => "some text", {} ],
-              ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(2,2), SETPEN(), PRINT("some text") ],
               'Stack saves/restores virtual cursor position' );
-   undef @methods;
 }
 
 # clipping
@@ -64,19 +60,11 @@ my $pen = Tickit::Pen->new;
 
    $rb->text_at( 2, 0, "2222222222", $pen );
 
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [
-                 [ goto => 0, 0 ],
-                 [ print => "0000000000", {} ],
-                 [ goto => 1, 2 ],
-                 [ print => "11111111", {} ],
-                 [ goto => 2, 0 ],
-                 [ print => "2222222222", {} ],
-              ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(0,0), SETPEN(), PRINT("0000000000"),
+                 GOTO(1,2), SETPEN(), PRINT("11111111"),
+                 GOTO(2,0), SETPEN(), PRINT("2222222222") ],
               'Stack saves/restores clipping region' );
-   undef @methods;
 }
 
 # pen
@@ -105,18 +93,13 @@ my $pen = Tickit::Pen->new;
    }
    $rb->restore;
 
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [
-                 [ goto => 3, 0 ],
-                 [ print => "123", { bg => 1 } ],
-                 [ print => "456", { bg => 1, fg => 4 } ],
-                 [ print => "789", { bg => -1 } ],
-                 [ print => "ABC", { bg => 1 } ],
-              ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(3,0),
+                 SETPEN(bg=>1), PRINT("123"),
+                 SETPEN(bg=>1,fg=>4), PRINT("456"),
+                 SETPEN(), PRINT("789"),
+                 SETPEN(bg=>1), PRINT("ABC") ],
               'Stack saves/restores render pen' );
-   undef @methods;
 
    $rb->save;
    {
@@ -138,17 +121,12 @@ my $pen = Tickit::Pen->new;
    }
    $rb->restore;
 
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [
-                 [ goto => 4, 0 ],
-                 [ print => "123", { rv => 1  } ],
-                 [ print => "456", { rv => '' } ],
-                 [ print => "789", { rv => 1  } ],
-              ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(4,0),
+                 SETPEN(rv=>1), PRINT("123"),
+                 SETPEN(), PRINT("456"),
+                 SETPEN(rv=>1), PRINT("789") ],
               'Stack saves/restores allows zeroing pen attributes' );
-   undef @methods;
 }
 
 # translation
@@ -165,19 +143,11 @@ my $pen = Tickit::Pen->new;
 
    $rb->text_at( 2, 2, "C", $pen );
 
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [
-                 [ goto => 0, 0 ],
-                 [ print => "A", {} ],
-                 [ goto => 2, 2 ],
-                 [ print => "C", {} ],
-                 [ goto => 3, 3 ],
-                 [ print => "B", {} ],
-              ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(0,0), SETPEN(), PRINT("A"),
+                 GOTO(2,2), SETPEN(), PRINT("C"),
+                 GOTO(3,3), SETPEN(), PRINT("B") ],
               'Stack saves/restores translation offset' );
-   undef @methods;
 }
 
 done_testing;

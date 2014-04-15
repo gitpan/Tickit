@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 BEGIN {
-   our $VERSION = '0.44';
+   our $VERSION = '0.45';
 }
 
 use Carp;

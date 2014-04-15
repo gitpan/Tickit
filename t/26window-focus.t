@@ -9,7 +9,7 @@ use Tickit::Test;
 
 my ( $term, $rootwin ) = mk_term_and_window;
 
-ok( !$term->{cursorvis}, 'Cursor not yet visible initially' );
+ok( !$term->cursorvis, 'Cursor not yet visible initially' );
 
 my $win = $rootwin->make_sub( 3, 10, 4, 20 );
 flush_tickit;
@@ -37,7 +37,7 @@ flush_tickit;
 is_termlog( [ GOTO(3,10), ],
             'Termlog initially' );
 
-ok( $term->{cursorvis}, 'Cursor is visible after window focus' );
+ok( $term->cursorvis, 'Cursor is visible after window focus' );
 
 $win->reposition( 5, 15 );
 flush_tickit;
@@ -51,12 +51,12 @@ flush_tickit;
 is_termlog( [ GOTO(7,17), ],
             'Termlog after ->cursor_at moves cursor' );
 
-$win->cursor_shape( "under" );
+$win->cursor_shape( 2 );
 flush_tickit;
 
 is_termlog( [ GOTO(7,17), ],
             'Termlog after ->cursor_shape' );
-is( $term->{cursorshape}, "under", 'Cursor shape after ->cursor_shape' );
+is( $term->cursorshape, 2, 'Cursor shape after ->cursor_shape' );
 
 $win->cursor_visible( 0 );
 flush_tickit;
@@ -64,14 +64,14 @@ flush_tickit;
 is_termlog( [ ],
             'Termlog empty after ->cursor_visible 0' );
 
-ok( !$term->{cursorvis}, 'Cursor is invisible after ->cursor_visible 0' );
+ok( !$term->cursorvis, 'Cursor is invisible after ->cursor_visible 0' );
 
 $win->cursor_visible( 1 );
 
 $win->hide;
 flush_tickit;
 
-ok( !$term->{cursorvis}, 'Cursor is invisible after focus window hide' );
+ok( !$term->cursorvis, 'Cursor is invisible after focus window hide' );
 
 is_termlog( [ ],
             'Termlog empty after focus window hide' );
@@ -79,7 +79,7 @@ is_termlog( [ ],
 $win->show;
 flush_tickit;
 
-ok( $term->{cursorvis}, 'Cursor is visible after focus window show' );
+ok( $term->cursorvis, 'Cursor is visible after focus window show' );
 
 is_termlog( [ GOTO(7,17), ],
             'Termlog after focus window show' );

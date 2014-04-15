@@ -94,6 +94,25 @@ void tickit_term_free(TickitTerm *tt);
 
 TickitTerm *tickit_term_new_for_termtype(const char *termtype)
 {
+  for(int i = 0; driver_probes[i]; i++) {
+    TickitTermDriver *driver = (*driver_probes[i]->new)(termtype);
+    if(!driver)
+      continue;
+
+    TickitTerm *tt = tickit_term_new_for_driver(driver);
+
+    if(tt)
+      tt->termtype = strdup(termtype);
+
+    return tt;
+  }
+
+  errno = ENOENT;
+  return NULL;
+}
+
+TickitTerm *tickit_term_new_for_driver(TickitTermDriver *ttd)
+{
   TickitTerm *tt = malloc(sizeof(TickitTerm));
   if(!tt)
     return NULL;
@@ -119,26 +138,18 @@ TickitTerm *tickit_term_new_for_termtype(const char *termtype)
 
   tt->hooks = NULL;
 
-  for(int i = 0; driver_probes[i]; i++) {
-    TickitTermDriver *driver = (*driver_probes[i]->new)(tt, termtype);
-    if(!driver)
-      continue;
-
-    tt->driver = driver;
-    break;
-  }
-
-  if(!tt->driver) {
-    errno = ENOENT;
-    goto abort_free;
-  }
-
   /* Initially empty because we don't necessarily know the initial state
    * of the terminal
    */
   tt->pen = tickit_pen_new();
 
-  tt->termtype = strdup(termtype);
+  tt->termtype = NULL;
+
+  tt->driver = ttd;
+  tt->driver->tt = tt;
+
+  if(tt->driver->vtable->attach)
+    (*tt->driver->vtable->attach)(tt->driver, tt);
 
   tickit_term_getctl_int(tt, TICKIT_TERMCTL_COLORS, &tt->colors);
 
@@ -146,10 +157,6 @@ TickitTerm *tickit_term_new_for_termtype(const char *termtype)
   tt->state = UNSTARTED;
 
   return tt;
-
-abort_free:
-  free(tt);
-  return NULL;
 }
 
 void tickit_term_free(TickitTerm *tt)
@@ -184,6 +191,11 @@ void tickit_term_destroy(TickitTerm *tt)
 const char *tickit_term_get_termtype(TickitTerm *tt)
 {
   return tt->termtype;
+}
+
+TickitTermDriver *tickit_term_get_driver(TickitTerm *tt)
+{
+  return tt->driver;
 }
 
 static void *get_tmpbuffer(TickitTerm *tt, size_t len)
@@ -579,7 +591,12 @@ void tickit_termdrv_write_strf(TickitTermDriver *ttd, const char *fmt, ...)
 
 void tickit_term_print(TickitTerm *tt, const char *str)
 {
-  (*tt->driver->vtable->print)(tt->driver, str);
+  (*tt->driver->vtable->print)(tt->driver, str, strlen(str));
+}
+
+void tickit_term_printn(TickitTerm *tt, const char *str, size_t len)
+{
+  (*tt->driver->vtable->print)(tt->driver, str, len);
 }
 
 void tickit_term_printf(TickitTerm *tt, const char *fmt, ...)
@@ -595,10 +612,10 @@ void tickit_term_vprintf(TickitTerm *tt, const char *fmt, va_list args)
   va_list args2;
   va_copy(args2, args);
 
-  size_t len = vsnprintf(NULL, 0, fmt, args) + 1;
-  char *buf = get_tmpbuffer(tt, len);
-  vsnprintf(buf, len, fmt, args2);
-  (*tt->driver->vtable->print)(tt->driver, buf);
+  size_t len = vsnprintf(NULL, 0, fmt, args);
+  char *buf = get_tmpbuffer(tt, len + 1);
+  vsnprintf(buf, len + 1, fmt, args2);
+  (*tt->driver->vtable->print)(tt->driver, buf, len);
 
   va_end(args2);
 }
@@ -615,7 +632,13 @@ void tickit_term_move(TickitTerm *tt, int downward, int rightward)
 
 int tickit_term_scrollrect(TickitTerm *tt, int top, int left, int lines, int cols, int downward, int rightward)
 {
-  return (*tt->driver->vtable->scrollrect)(tt->driver, top, left, lines, cols, downward, rightward);
+  TickitRect rect = {
+    .top   = top,
+    .left  = left,
+    .lines = lines,
+    .cols  = cols,
+  };
+  return (*tt->driver->vtable->scrollrect)(tt->driver, &rect, downward, rightward);
 }
 
 static int convert_colour(int index, int colours)

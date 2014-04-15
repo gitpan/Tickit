@@ -4,12 +4,14 @@ use strict;
 use warnings;
 
 use Test::More;
-use t::TestWindow qw( $win @methods );
+use Tickit::Test;
 
 use Tickit::RenderBuffer;
 
 use Tickit::Pen;
 use Tickit::Rect;
+
+my $term = mk_term;
 
 my $rb = Tickit::RenderBuffer->new(
    lines => 10,
@@ -25,45 +27,27 @@ my $rb = Tickit::RenderBuffer->new(
    $rb->text_at( 4, -3, "[LLLLLLLL]", $pen );
    $rb->text_at( 5, 15, "[RRRRRRRR]", $pen );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 4, 0 ],
-                 [ print => "LLLLLL]", {} ],
-                 [ goto => 5, 15 ],
-                 [ print => "[RRRR", {} ],
-              ],
-              'RC text rendering with clipping' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(4,0), SETPEN(), PRINT("LLLLLL]"),
+                 GOTO(5,15), SETPEN(), PRINT("[RRRR") ],
+              'RenderBuffer text rendering with clipping' );
 
    $rb->erase_at( -1, 5, 10, Tickit::Pen->new( fg => 1 ) );
    $rb->erase_at( 11, 5, 10, Tickit::Pen->new( fg => 2 ) );
    $rb->erase_at( 4, -3, 10, Tickit::Pen->new( fg => 3 ) );
    $rb->erase_at( 5, 15, 10, Tickit::Pen->new( fg => 4 ) );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 4, 0 ],
-                 [ erasech => 7, undef, { fg => 3 } ],
-                 [ goto => 5, 15 ],
-                 [ erasech => 5, undef, { fg => 4 } ],
-              ],
-              'RC text rendering with clipping' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(4,0), SETPEN(fg=>3), ERASECH(7),
+                 GOTO(5,15), SETPEN(fg=>4), ERASECH(5) ],
+              'RenderBuffer text rendering with clipping' );
 
    $rb->goto( 2, 18 );
    $rb->text( $_, $pen ) for qw( A B C D E );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 2, 18 ],
-                 [ print => "A", {} ],
-                 [ print => "B", {} ],
-              ],
-              'RC text at VC with clipping' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(2,18), SETPEN(), PRINT("A"), SETPEN(), PRINT("B") ],
+              'RenderBuffer text at VC with clipping' );
 }
 
 # Clipping to rect
@@ -82,16 +66,10 @@ my $rb = Tickit::RenderBuffer->new(
    $rb->text_at( 4, -3, "[LLLLLLLL]", $pen );
    $rb->text_at( 5, 15, "[RRRRRRRR]", $pen );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 4, 2 ],
-                 [ print => "LLLL]", {} ],
-                 [ goto => 5, 15 ],
-                 [ print => "[RR", {} ],
-              ],
-              'RC text rendering with clipping' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(4,2), SETPEN(), PRINT("LLLL]"),
+                 GOTO(5,15), SETPEN(), PRINT("[RR") ],
+              'RenderBuffer text rendering with clipping' );
 
    $rb->clip( Tickit::Rect->new(
          top => 2,
@@ -105,16 +83,10 @@ my $rb = Tickit::RenderBuffer->new(
    $rb->erase_at( 4, -3, 10, Tickit::Pen->new( fg => 3 ) );
    $rb->erase_at( 5, 15, 10, Tickit::Pen->new( fg => 4 ) );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 4, 2 ],
-                 [ erasech => 5, undef, { fg => 3 } ],
-                 [ goto => 5, 15 ],
-                 [ erasech => 3, undef, { fg => 4 } ],
-              ],
-              'RC text rendering with clipping' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(4,2), SETPEN(fg=>3), ERASECH(5),
+                 GOTO(5,15), SETPEN(fg=>4), ERASECH(3) ],
+              'RenderBuffer text rendering with clipping' );
 }
 
 # clipping with translation
@@ -130,18 +102,11 @@ my $rb = Tickit::RenderBuffer->new(
 
    $rb->text_at( $_, 0, "$_"x10, Tickit::Pen->new ) for 0 .. 8;
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 5, 7 ],
-                 [ print => "22222", {} ],
-                 [ goto => 6, 7 ],
-                 [ print => "33333", {} ],
-                 [ goto => 7, 7 ],
-                 [ print => "44444", {} ],
-              ],
-              'RC clipping rectangle translated' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(5,7), SETPEN(), PRINT("22222"),
+                 GOTO(6,7), SETPEN(), PRINT("33333"),
+                 GOTO(7,7), SETPEN(), PRINT("44444") ],
+              'RenderBuffer clipping rectangle translated' );
 }
 
 done_testing;

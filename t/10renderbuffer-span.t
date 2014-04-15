@@ -2,10 +2,10 @@
 
 use strict;
 use warnings;
+use utf8;
 
 use Test::More;
 use Tickit::Test;
-use t::TestWindow qw( $win @methods );
 
 use Tickit::RenderBuffer;
 
@@ -25,16 +25,9 @@ is( $rb->cols,  20, '$rb->cols' );
 
 # Initially empty
 {
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [],
-              'Empty RC renders nothing to window' );
-
    $rb->flush_to_term( $term );
-
    is_termlog( [],
-               'Empty RC renders nothing to term' );
+               'Empty RenderBuffer renders nothing to term' );
 
    my $cell = $rb->get_cell( 0, 0 );
 
@@ -43,7 +36,7 @@ is( $rb->cols,  20, '$rb->cols' );
 }
 
 # Absolute spans
-foreach my $op (qw( term win )) {
+{
    # Direct pen
    my $pen = Tickit::Pen->new( fg => 1 );
    $rb->text_at( 0, 1, "text span", $pen );
@@ -67,45 +60,30 @@ foreach my $op (qw( term win )) {
 
    is( $rb->get_cell( 1, 1 )->char, 0, '$cell->char at 1,1' );
 
-   if( $op eq "term" ) {
-      $rb->flush_to_term( $term );
-
-      is_termlog( [ GOTO(0,1), SETPEN(fg=>1), PRINT("text span"),
-                    GOTO(1,1), SETPEN(fg=>1), ERASECH(5,undef),
-                    GOTO(2,1), SETPEN(bg=>2), PRINT("another span"),
-                    GOTO(3,1), SETPEN(bg=>2), ERASECH(10,undef),
-                    GOTO(4,1), SETPEN(fg=>1,bg=>2), PRINT("third span"),
-                    GOTO(5,1), SETPEN(fg=>1,bg=>2), ERASECH(7,undef) ],
-                  'RC renders text to terminal' );
-   }
-   if( $op eq "win" ) {
-      $rb->flush_to_window( $win );
-
-      is_deeply( \@methods,
-                 [
-                    [ goto => 0, 1 ], [ print => "text span", { fg => 1 } ],
-                    [ goto => 1, 1 ], [ erasech => 5, undef, { fg => 1 } ],
-                    [ goto => 2, 1 ], [ print => "another span", { bg => 2 } ],
-                    [ goto => 3, 1 ], [ erasech => 10, undef, { bg => 2 } ],
-                    [ goto => 4, 1 ], [ print => "third span", { fg => 1, bg => 2 } ],
-                    [ goto => 5, 1 ], [ erasech => 7, undef, { fg => 1, bg => 2 } ],
-                 ],
-                 'RC renders text to window' );
-      undef @methods;
-   }
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(0,1), SETPEN(fg=>1), PRINT("text span"),
+                 GOTO(1,1), SETPEN(fg=>1), ERASECH(5,undef),
+                 GOTO(2,1), SETPEN(bg=>2), PRINT("another span"),
+                 GOTO(3,1), SETPEN(bg=>2), ERASECH(10,undef),
+                 GOTO(4,1), SETPEN(fg=>1,bg=>2), PRINT("third span"),
+                 GOTO(5,1), SETPEN(fg=>1,bg=>2), ERASECH(7,undef) ],
+               'RenderBuffer renders text to terminal' );
 
    # cheating
    $rb->setpen( undef );
 
-   if( $op eq "term" ) {
-      $rb->flush_to_term( $term );
-      is_termlog( [], 'RC now empty after render to terminal' );
-   }
-   if( $op eq "win" ) {
-      $rb->flush_to_window( $win );
-      is_deeply( \@methods, [], 'RC now empty after render to window' );
-      undef @methods;
-   }
+   $rb->flush_to_term( $term );
+   is_termlog( [], 'RenderBuffer now empty after render to terminal' );
+}
+
+# UTF-8 handling
+{
+   my $cols = $rb->text_at( 6, 0, "somé text ĉi tie" );
+   is( $cols, 16, '$cols from ->text_at UTF-8' );
+
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(6,0), SETPEN(), PRINT("somé text ĉi tie") ],
+               'RenderBuffer renders UTF-8 text' );
 }
 
 # Span splitting
@@ -131,16 +109,12 @@ foreach my $op (qw( term win )) {
 
    $rb->text_at( 4, 4, "", $pen ); # empty text should do nothing
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 0, 0 ], [ print => "aaa", {} ], [ print => "AA", { b => 1 } ], [ print => "aaa", {} ],
-                 [ goto => 1, 0 ], [ print => "BBBBBBBB", { b => 1 } ],
-                 [ goto => 2, 0 ], [ print => "ccc", {} ], [ print => "CCCCC", { b => 1 } ],
-                 [ goto => 3, 0 ], [ print => "DDDDD", { b => 1 } ], [ print => "ddd", {} ],
-              ],
-              'RC spans can be split' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(0,0), SETPEN(), PRINT("aaa"), SETPEN(b=>1), PRINT("AA"), SETPEN(), PRINT("aaa"),
+                 GOTO(1,0), SETPEN(b=>1), PRINT("BBBBBBBB"),
+                 GOTO(2,0), SETPEN(), PRINT("ccc"), SETPEN(b=>1), PRINT("CCCCC"),
+                 GOTO(3,0), SETPEN(b=>1), PRINT("DDDDD"), SETPEN(), PRINT("ddd") ],
+              'RenderBuffer spans can be split' );
 }
 
 {
@@ -148,22 +122,18 @@ foreach my $op (qw( term win )) {
    $rb->text_at( 0, 0, "abcdefghijkl", $pen );
    $rb->text_at( 0, $_, "-", $pen ) for 2, 4, 6, 8;
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 0, 0 ],
-                 [ print => "ab", {} ],
-                 [ print => "-", {} ], # c
-                 [ print => "d", {} ],
-                 [ print => "-", {} ], # e
-                 [ print => "f", {} ],
-                 [ print => "-", {} ], # g
-                 [ print => "h", {} ],
-                 [ print => "-", {} ], # i
-                 [ print => "jkl", {} ],
-              ],
-              'RC renders overwritten text split chunks' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(0,0),
+                 SETPEN(), PRINT("ab"),
+                 SETPEN(), PRINT("-"), # c
+                 SETPEN(), PRINT("d"),
+                 SETPEN(), PRINT("-"), # e,
+                 SETPEN(), PRINT("f"),
+                 SETPEN(), PRINT("-"), # g
+                 SETPEN(), PRINT("h"),
+                 SETPEN(), PRINT("-"), # i
+                 SETPEN(), PRINT("jkl") ],
+              'RenderBuffer renders overwritten text split chunks' );
 }
 
 # Absolute skipping
@@ -175,20 +145,12 @@ foreach my $op (qw( term win )) {
    $rb->erase_at( 7, 5, 15, $pen );
    $rb->skip_at( 7, 10, 2 );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 6, 1 ],
-                 [ print => "This will", {} ],
-                 [ goto => 6, 14 ],
-                 [ print => "skippe", {} ],
-                 [ goto => 7, 5 ],
-                 [ erasech => 5, undef, {} ],
-                 [ goto => 7, 12 ],
-                 [ erasech => 8, undef, {} ],
-              ],
-              'RC skipping' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(6, 1), SETPEN(), PRINT("This will"),
+                 GOTO(6,14), SETPEN(), PRINT("skippe"),
+                 GOTO(7, 5), SETPEN(), ERASECH(5),
+                 GOTO(7,12), SETPEN(), ERASECH(8) ],
+              'RenderBuffer skipping' );
 }
 
 # VC spans
@@ -207,19 +169,15 @@ foreach my $op (qw( term win )) {
    $rb->goto( 4, 2 ); $rb->text( "third span", $pen );
    $rb->goto( 5, 2 ); $rb->erase( 7, $pen );
 
-   $rb->flush_to_window( $win );
+   $rb->flush_to_term( $term );
 
-   is_deeply( \@methods,
-              [
-                 [ goto => 0, 2 ], [ print => "text span", { fg => 3 } ],
-                 [ goto => 1, 2 ], [ erasech => 5, undef, { fg => 3 } ],
-                 [ goto => 2, 2 ], [ print => "another span", { bg => 4 } ],
-                 [ goto => 3, 2 ], [ erasech => 10, undef, { bg => 4 } ],
-                 [ goto => 4, 2 ], [ print => "third span", { fg => 3, bg => 4 } ],
-                 [ goto => 5, 2 ], [ erasech => 7, undef, { fg => 3, bg => 4 } ],
-              ],
-              'RC renders text' );
-   undef @methods;
+   is_termlog( [ GOTO(0,2), SETPEN(fg=>3), PRINT("text span"),
+                 GOTO(1,2), SETPEN(fg=>3), ERASECH(5),
+                 GOTO(2,2), SETPEN(bg=>4), PRINT("another span"),
+                 GOTO(3,2), SETPEN(bg=>4), ERASECH(10),
+                 GOTO(4,2), SETPEN(fg=>3,bg=>4), PRINT("third span"),
+                 GOTO(5,2), SETPEN(fg=>3,bg=>4), ERASECH(7) ],
+              'RenderBuffer renders text' );
 
    # cheating
    $rb->setpen( undef );
@@ -232,14 +190,10 @@ foreach my $op (qw( term win )) {
    $rb->goto( 1, 18 ); $rb->text( "right" );
    $rb->goto( 11, 0 ); $rb->text( "below" );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 0,  0 ], [ print => "t", {} ],
-                 [ goto => 1, 18 ], [ print => "ri", {} ],
-              ],
-              'RC clipping at virtual-cursor' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(0, 0), SETPEN(), PRINT("t"),
+                 GOTO(1,18), SETPEN(), PRINT("ri") ],
+              'RenderBuffer clipping at virtual-cursor' );
 }
 
 # VC skipping
@@ -252,18 +206,11 @@ foreach my $op (qw( term win )) {
    $rb->skip_to( 14 );
    $rb->text( "14", $pen );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 8, 0 ],
-                 [ print => "Some", {} ],
-                 [ goto => 8, 6 ],
-                 [ print => "more", {} ],
-                 [ goto => 8, 14 ],
-                 [ print => "14", {} ],
-              ],
-              'RC skipping at virtual-cursor' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(8, 0), SETPEN(), PRINT("Some"),
+                 GOTO(8, 6), SETPEN(), PRINT("more"),
+                 GOTO(8,14), SETPEN(), PRINT("14") ],
+              'RenderBuffer skipping at virtual-cursor' );
 }
 
 # Translation
@@ -279,46 +226,28 @@ foreach my $op (qw( term win )) {
 
    $rb->text( "at 1,0", Tickit::Pen->new );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 3, 5 ],
-                 [ print => "at 0,0", {} ],
-                 [ goto => 4, 5 ],
-                 [ print => "at 1,0", {} ],
-              ],
-              'RC renders text with translation' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(3,5), SETPEN(), PRINT("at 0,0"),
+                 GOTO(4,5), SETPEN(), PRINT("at 1,0") ],
+              'RenderBuffer renders text with translation' );
 }
 
 # ->eraserect
 {
    $rb->eraserect( Tickit::Rect->new( top => 2, left => 3, lines => 5, cols => 8 ) );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                ( map {
-                   [ goto => $_, 3 ],
-                   [ erasech => 8, undef, {} ] } 2 .. 6 )
-              ],
-              'RC renders eraserect' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ map { GOTO($_,3), SETPEN(), ERASECH(8) } 2 .. 6 ],
+              'RenderBuffer renders eraserect' );
 }
 
 # Clear
 {
    $rb->clear( Tickit::Pen->new( bg => 3 ) );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-               ( map {
-                 [ goto => $_, 0 ],
-                 [ erasech => 20, undef, { bg => 3 } ] } 0 .. 9 )
-              ],
-              'RC renders clear' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ map { GOTO($_,0), SETPEN(bg=>3), ERASECH(20) } 0 .. 9 ],
+              'RenderBuffer renders clear' );
 }
 
 done_testing;

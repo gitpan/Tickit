@@ -5,12 +5,14 @@ use warnings;
 use utf8;
 
 use Test::More;
-use t::TestWindow qw( $win @methods );
+use Tickit::Test;
 
 use Tickit::RenderBuffer qw( LINE_SINGLE );
 
 use Tickit::Pen;
 use Tickit::Rect;
+
+my $term = mk_term;
 
 my $rb = Tickit::RenderBuffer->new(
    lines => 10,
@@ -38,17 +40,12 @@ my $mask = Tickit::Rect->new(
 
    $rb->restore;
 
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [
-                 [ goto => 3,  2 ], [ print => "ABC", {} ],
-                 [ goto => 5, 11 ], [ print => "MN", {} ],
-                 [ goto => 6,  2 ], [ print => "OPQ", {} ],
-                    [ goto => 6, 11 ], [ print => "XYZ", {} ],
-              ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(3, 2), SETPEN(), PRINT("ABC"),
+                 GOTO(5,11), SETPEN(), PRINT("MN"),
+                 GOTO(6, 2), SETPEN(), PRINT("OPQ"),
+                    GOTO(6,11), SETPEN(), PRINT("XYZ") ],
               '@methods for text over mask' );
-   undef @methods;
 }
 
 # mask over erase
@@ -64,17 +61,12 @@ my $mask = Tickit::Rect->new(
 
    $rb->restore;
 
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [
-                 [ goto => 3,  2 ], [ erasech => 3, undef, {} ],
-                 [ goto => 5, 11 ], [ erasech => 2, undef, {} ],
-                 [ goto => 6,  2 ], [ erasech => 3, undef, {} ],
-                    [ goto => 6, 11 ], [ erasech => 3, undef, {} ],
-              ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(3, 2), SETPEN(), ERASECH(3),
+                 GOTO(5,11), SETPEN(), ERASECH(2),
+                 GOTO(6, 2), SETPEN(), ERASECH(3),
+                    GOTO(6,11), SETPEN(), ERASECH(3) ],
               '@methods for erase over mask' );
-   undef @methods;
 }
 
 # mask over lines
@@ -90,17 +82,12 @@ my $mask = Tickit::Rect->new(
 
    $rb->restore;
 
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [
-                 [ goto => 3,  2 ], [ print => "╶──", {} ],
-                 [ goto => 5, 11 ], [ print => "──╴", {} ],
-                 [ goto => 6,  2 ], [ print => "╶──", {} ],
-                    [ goto => 6, 11 ], [ print => "───╴", {} ],
-              ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(3, 2), SETPEN(), PRINT("╶──"),
+                 GOTO(5,11), SETPEN(), PRINT("──╴"),
+                 GOTO(6, 2), SETPEN(), PRINT("╶──"),
+                    GOTO(6,11), SETPEN(), PRINT("───╴") ],
               '@methods for erase over mask' );
-   undef @methods;
 }
 
 # restore removes masks
@@ -116,16 +103,11 @@ my $mask = Tickit::Rect->new(
 
    $rb->text_at( 4, 0, "B"x20 );
 
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [
-                 [ goto => 3,  0 ], [ print => "AAAAA", {} ],
-                    [ goto => 3, 11 ], [ print => "AAAAAAAAA", {} ],
-                 [ goto => 4,  0 ], [ print => "BBBBBBBBBBBBBBBBBBBB", {} ],
-              ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(3, 0), SETPEN(), PRINT("AAAAA"),
+                    GOTO(3,11), SETPEN(), PRINT("AAAAAAAAA"),
+                 GOTO(4, 0), SETPEN(), PRINT("BBBBBBBBBBBBBBBBBBBB") ],
               '@methods for text_at after save/mask/remove' );
-   undef @methods;
 }
 
 # translate over mask
@@ -137,13 +119,10 @@ my $mask = Tickit::Rect->new(
    { $rb->save; $rb->translate( 2, 0 ); $rb->text_at( 0, 0, "C" ); $rb->restore }
    { $rb->save; $rb->translate( 2, 2 ); $rb->text_at( 0, 0, "D" ); $rb->restore }
 
-   $rb->flush_to_window( $win );
-
-   is_deeply( \@methods,
-              [
-                 [ goto => 0, 0 ], [ print => "A", {} ],
-                 [ goto => 0, 2 ], [ print => "B", {} ],
-                 [ goto => 2, 0 ], [ print => "C", {} ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(0,0), SETPEN(), PRINT("A"),
+                 GOTO(0,2), SETPEN(), PRINT("B"),
+                 GOTO(2,0), SETPEN(), PRINT("C"),
                  # D was masked
               ],
               '@methods for text_at after mask over translate' );

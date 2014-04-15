@@ -8,11 +8,14 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Carp;
 
 our @ALL_ATTRS = qw( fg bg b u i rv strike af );
+
+our @BOOL_ATTRS = qw( b u i rv strike );
+our @INT_ATTRS  = qw( fg bg af );
 
 # Load the XS code
 require Tickit;
@@ -326,14 +329,14 @@ use overload '==' => sub { refaddr($_[0]) == refaddr($_[1]) };
 package Tickit::Pen::Immutable;
 use base qw( Tickit::Pen );
 use constant mutable => 0;
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 sub as_immutable { return $_[0] }
 
 package Tickit::Pen::Mutable;
 use base qw( Tickit::Pen );
 use constant mutable => 1;
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 # Adds further methods in XS
 

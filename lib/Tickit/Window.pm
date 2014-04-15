@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Carp;
 
@@ -24,7 +24,7 @@ use Tickit::Utils qw( string_countmore );
 
 use Tickit::Debug;
 
-use constant WEAKEN_CHILDREN => 1;
+use constant WEAKEN_CHILDREN => $ENV{TICKIT_CHILD_WINDOWS_WEAKEN} // 1;
 use constant CHILD_WINDOWS_LATER => $ENV{TICKIT_CHILD_WINDOWS_LATER} // 1;
 
 =head1 NAME
@@ -91,8 +91,8 @@ child window list is only mutated after the event processing has finished, by
 using a L<Tickit> C<later> block. As this behaviour is relatively new, it may
 result in bugs in legacy code that isn't expecting it. For now, it can be
 disabled by setting the environment variable C<TICKIT_CHILD_WINDOWS_LATER> to
-a false value; though this is a temporary measure and will be removed in a
-subsequent version.
+a false value; though this is now deprecated, and will be removed in a later
+version.
 
  $ TICKIT_CHILD_WINDOWS_LATER=0 perl my-program.pl
 
@@ -1017,6 +1017,8 @@ sub expose
       $rect = $self->selfrect;
    }
 
+   return unless $self->{visible};
+
    if( my $parent = $self->parent ) {
       return $parent->expose( $rect->translate( $self->top, $self->left ) );
    }
@@ -1276,6 +1278,8 @@ sub getpenattrs
 {
    my $self = shift;
 
+   carp "Use of \$win->getpenattrs is deprecated; see ->pen->getattrs instead";
+
    return $self->{pen}->getattrs;
 }
 
@@ -1333,6 +1337,7 @@ This method is now deprecated and should not be used; instead use
 sub get_effective_penattrs
 {
    my $self = shift;
+   carp "Use of \$win->get_effective_penattrs is deprecated; see ->get_effective_pen->getattrs instead";
    return $self->get_effective_pen->getattrs;
 }
 
@@ -1404,6 +1409,10 @@ the left or right are clipped as appropriate. The virtual position of the
 cursor is still tracked even if it is not visibly displayed on the actual
 terminal.
 
+Direct drawing to the window is now entirely deprecated; widgets and
+applications should instead use the render buffer passed to the C<on_expose>
+event.
+
 =cut
 
 sub goto
@@ -1451,6 +1460,10 @@ C<Tickit::Pen> instance, or directly in the given hash, if one is provided.
 Returns a L<Tickit::StringPos> object giving the total count of string
 printed, including in obscured sections covered by other windows, or clipped
 by window boundaries.
+
+Direct drawing to the window is now entirely deprecated; widgets and
+applications should instead use the render buffer passed to the C<on_expose>
+event.
 
 =cut
 
@@ -1543,6 +1556,10 @@ Returns a L<Tickit::StringPos> object giving the total count of string
 printed, including in obscured sections covered by other windows, or clipped
 by window boundaries. Only the C<columns> field will be valid; the others will
 be C<-1>.
+
+Direct drawing to the window is now entirely deprecated; widgets and
+applications should instead use the render buffer passed to the C<on_expose>
+event.
 
 =cut
 

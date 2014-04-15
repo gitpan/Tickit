@@ -90,18 +90,16 @@ identical( $win->term, $term, '$win->term returns $term' );
                      0, 1 );
 
    is_termlog( [ SETBG(undef),
-                 GOTO(20,0),
-                 DELETECH(1) ],
-               'Termlog after scrollrect DCH emulation' );
+                 SCROLLRECT(20,0,1,80, 0,1) ],
+               'Termlog after scrollrect rightward' );
 
    $win->scrollrect( Tickit::Rect->new( top => 21, left => 10, lines => 1, cols => 70 ),
                      0, -1 );
    flush_tickit;
 
    is_termlog( [ SETBG(undef),
-                 GOTO(21,10),
-                 INSERTCH(1) ],
-               'Termlog after scrollrect ICH emulation' );
+                 SCROLLRECT(21,10,1,70, 0,-1) ],
+               'Termlog after scrollrect leftward not fullwidth' );
 }
 
 # Scrolling region exposure

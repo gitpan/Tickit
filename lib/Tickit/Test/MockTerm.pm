@@ -5,7 +5,9 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
+
+use base qw( Tickit::Term );
 
 use Tickit::Utils qw( textwidth substrwidth );
 
@@ -14,16 +16,12 @@ sub new
    my $class = shift;
    my %args = @_;
 
-   my $self = bless {
-      lines => $args{lines} || 25,
-      cols  => $args{cols}  || 80,
-      pen   => { map { $_ => undef } @Tickit::Pen::ALL_ATTRS },
-   }, $class;
+   my $self = $class->_new_mocking( $args{lines} || 25, $args{cols} || 80 );
 
    $self->clear;
 
    # Clear the method log
-   $self->methodlog;
+   $self->get_methodlog;
 
    return $self;
 }
@@ -35,37 +33,12 @@ sub flush { }
 # We're already ready
 sub await_started { }
 
-sub bind_event
-{
-   my $self = shift;
-   my ( $ev, $code ) = @_;
-
-   given( $ev ) {
-      when( "resize" ) {
-         $self->{on_resize} = $code;
-      }
-      when( "key" ) {
-         $self->{on_key} = $code;
-      }
-      when( "mouse" ) {
-         $self->{on_mouse} = $code;
-      }
-      default { die "TODO: implement bind_event $ev" }
-   }
-}
-
-sub is_changed
-{
-   my $self = shift;
-   return $self->{changed};
-}
-
 sub get_display_text
 {
    my $self = shift;
    my ( $line, $col, $width ) = @_;
 
-   return join "", map { $_->[0] } @{ $self->{cells}[$line] }[$col .. $col + $width - 1];
+   return join "", map { $_->[0] } @{ $self->cells->[$line] }[$col .. $col + $width - 1];
 }
 
 sub get_display_pen
@@ -73,7 +46,7 @@ sub get_display_pen
    my $self = shift;
    my ( $line, $col ) = @_;
 
-   my $cell = $self->{cells}[$line][$col];
+   my $cell = $self->cells->[$line][$col];
    my %pen = @{$cell}[1..$#$cell];
    defined $pen{$_} or delete $pen{$_} for keys %pen;
    return \%pen;
@@ -83,24 +56,24 @@ sub get_position
 {
    my $self = shift;
 
-   return ( $self->{line}, $self->{col} );
+   return ( $self->line, $self->col );
 }
 
 sub _push_methodlog
 {
    my $self = shift;
-   push @{ $self->{methodlog} }, [ @_ ];
+   push @{ $self->methodlog }, [ @_ ];
 }
 
-sub methodlog
+sub get_methodlog
 {
    my $self = shift;
 
    $self->showlog if $ENV{DEBUG_MOCKTERM_LOG};
 
-   my @log = @{ $self->{methodlog} ||= [] };
-   undef @{ $self->{methodlog} };
-   $self->{changed} = 0;
+   my @log = @{ $self->methodlog };
+   undef @{ $self->methodlog };
+   $self->_set_changed(0);
 
    return @log;
 }
@@ -109,8 +82,8 @@ sub showlog
 {
    my $self = shift;
 
-   foreach my $l ( @{ $self->{methodlog} } ) {
-      if( $l->[0] eq "chpen" ) {
+   foreach my $l ( @{ $self->methodlog } ) {
+      if( $l->[0] eq "setpen" ) {
          my $pen = $l->[1];
          printf "# SETPEN(%s)\n", join( ", ", map { defined $pen->{$_} ? "$_ => $pen->{$_}" : () } sort keys %$pen );
       }
@@ -125,108 +98,19 @@ sub resize
    my $self = shift;
    my ( $newlines, $newcols ) = @_;
 
-   if( $newlines > $self->{lines} ) {
-      $self->_clearcells( $_, 0, $newcols ) for $self->{lines} .. $newlines - 1;
+   if( $newlines > $self->lines ) {
+      $self->_clearcells( $_, 0, $newcols ) for $self->lines .. $newlines - 1;
    }
 
-   if( $newcols > $self->{cols} ) {
-      $self->_clearcells( $_, $self->{cols}, $newcols - $self->{cols} ) for 0 .. $self->{lines} - 1;
+   if( $newcols > $self->cols ) {
+      $self->_clearcells( $_, $self->cols, $newcols - $self->cols ) for 0 .. $self->lines - 1;
    }
 
    # TODO: handle shrinking
 
-   if( $newlines != $self->{lines} or $newcols != $self->{cols} ) {
-      $self->{lines} = $newlines;
-      $self->{cols}  = $newcols;
-
-      $self->{on_resize}->( $self, resize => {
-         lines => $newlines,
-         cols  => $newcols,
-      } ) if $self->{on_resize};
+   if( $newlines != $self->lines or $newcols != $self->cols ) {
+      $self->set_size( $newlines, $newcols );
    }
-}
-
-sub set_size
-{
-   # ignore
-}
-
-sub lines { $_[0]->{lines} }
-sub cols  { $_[0]->{cols} }
-
-sub _clearcells
-{
-   my $self = shift;
-   my ( $line, $col, $count ) = @_;
-
-   local $_;
-   $self->{cells}[$line][$_] = [ " ", %{ $self->{pen} } ] for $col .. $col+$count-1;
-}
-
-sub _clearline
-{
-   my $self = shift;
-   my ( $line ) = @_;
-   $self->_clearcells( $line, 0, $self->cols );
-}
-
-sub clear
-{
-   my $self = shift;
-   my ( $pen ) = @_;
-
-   $self->setpen( $pen ) if $pen;
-
-   $self->_push_methodlog( clear => );
-
-   local $_;
-   $self->_clearline( $_ ) for 0 .. $self->lines-1;
-
-   $self->{changed}++;
-}
-
-sub erasech
-{
-   my $self = shift;
-   my ( $count, $moveend, $pen ) = @_;
-
-   $self->setpen( $pen ) if $pen;
-
-   $self->_push_methodlog( erasech => $count, $moveend || 0 );
-
-   $self->_clearcells( $self->{line}, $self->{col}, $count );
-   $self->{col} += $count if $moveend;
-
-   $self->{changed}++;
-}
-
-sub goto
-{
-   my $self = shift;
-   ( $self->{line}, $self->{col} ) = @_;
-
-   $self->_push_methodlog( goto => @_ );
-
-   $self->{changed}++;
-}
-
-sub print
-{
-   my $self = shift;
-   my ( $text, $pen ) = @_;
-
-   $self->setpen( $pen ) if $pen;
-
-   $self->_push_methodlog( print => $text );
-
-   my $cols = textwidth $text;
-   foreach my $col ( 0 .. $cols-1 ) {
-      my $char = substrwidth $text, $col, 1;
-      $self->{cells}[$self->{line}][$self->{col}] = [ $char, %{ $self->{pen} } ];
-      $self->{col}++;
-   }
-
-   $self->{changed}++;
 }
 
 sub scrollrect
@@ -237,118 +121,58 @@ sub scrollrect
    return 1 if !$downward and !$rightward;
 
    if( $left == 0 and $cols == $self->cols and $rightward == 0 ) {
-      $self->_scroll_lines( $top, $top + $lines - 1, $downward );
+      $self->_push_methodlog( scrollrect => $top, $left, $lines, $cols, $downward, $rightward );
+
+      my $bottom = $top + $lines;
+      my $cells = $self->cells;
+
+      if( $downward > 0 ) {
+         splice @$cells, $top, $downward, ();
+         splice @$cells, $bottom - $downward, 0, (undef) x $downward;
+
+         $self->_clearcells( $_, 0, $self->cols ) for $bottom - $downward .. $bottom - 1;
+      }
+      elsif( $downward < 0 ) {
+         my $upward = -$downward;
+
+         splice @$cells, $bottom - $upward, $upward, ();
+         splice @$cells, $top, 0, (undef) x $upward;
+
+         $self->_clearcells( $_, 0, $self->cols ) for $top .. $top + $upward - 1;
+      }
+
+      $self->_set_changed(1);
       return 1;
    }
 
-   if( $left + $cols == $self->cols and $downward == 0 ) {
+   my $right = $left + $cols;
+   if( $right == $self->cols and $downward == 0 ) {
+      $self->_push_methodlog( scrollrect => $top, $left, $lines, $cols, $downward, $rightward );
+
       foreach my $line ( $top .. $top + $lines - 1 ) {
-         $self->goto( $line, $left );
-         $rightward > 0 ? $self->_deletech(  $rightward )
-                        : $self->_insertch( -$rightward );
+         my $linecells = $self->cells->[$line];
+
+         if( $rightward > 0 ) {
+            splice @$linecells, $left, $rightward, ();
+            splice @$linecells, $right - $rightward, 0, (undef) x $rightward;
+
+            $self->_clearcells( $line, $self->cols - $rightward, $rightward );
+         }
+         else {
+            my $leftward = -$rightward;
+
+            splice @$linecells, $left, 0, (undef) x $leftward;
+            splice @$linecells, $self->cols; # truncate
+
+            $self->_clearcells( $line, $left, $leftward );
+         }
       }
+      $self->_set_changed(1);
+
       return 1;
    }
 
    return 0;
-}
-
-sub _scroll_lines
-{
-   my $self = shift;
-   my ( $top, $bottom, $downward ) = @_;
-
-   # Logic is simpler if $bottom is the first line -beyond- the scroll region
-   $bottom++;
-
-   $self->_push_methodlog( scrollrect => $top, 0, $bottom - $top, $self->cols, $downward, 0 );
-
-   my $cells = $self->{cells};
-
-   if( $downward > 0 ) {
-      splice @$cells, $top, $downward, ();
-
-      splice @$cells, $bottom - $downward, 0, ( undef ) x $downward;
-      $self->_clearline( $_ ) for $bottom - $downward .. $bottom - 1;
-   }
-   elsif( $downward < 0 ) {
-      my $upward = -$downward;
-
-      splice @$cells, $bottom - $upward, $upward, ();
-
-      splice @$cells, $top, 0, ( undef ) x $upward;
-      $self->_clearline( $_ ) for $top .. $top + $upward - 1;
-   }
-
-   $self->{changed}++;
-
-   return 1;
-}
-
-sub _insertch
-{
-   my $self = shift;
-   my ( $count ) = @_;
-
-   $self->_push_methodlog( insertch => $count );
-
-   splice @{ $self->{cells}[$self->{line}] }, $self->{col}, 0, (undef) x $count;
-   $self->_clearcells( $self->{line}, $self->{col}, $count );
-
-   splice @{ $self->{cells}[$self->{line}] }, $self->cols; # truncate
-
-   $self->{changed}++;
-}
-
-sub _deletech
-{
-   my $self = shift;
-   my ( $count ) = @_;
-
-   $self->_push_methodlog( deletech => $count );
-
-   splice @{ $self->{cells}[$self->{line}] }, $self->{col}, $count, ();
-
-   $self->_clearcells( $self->{line}, $self->cols - $count, $count );
-
-   $self->{changed}++;
-}
-
-# For testing purposes we'll store this in a hash instead
-sub chpen
-{
-   my $self = shift;
-   my %attrs = ( @_ == 1 ) ? shift->getattrs : @_;
-
-   $self->{pen}{$_} = $attrs{$_} for keys %attrs;
-
-   $self->_push_methodlog( chpen => \%attrs );
-}
-
-sub setpen
-{
-   my $self = shift;
-   my %attrs = ( @_ == 1 ) ? shift->getattrs : @_;
-   $self->chpen( map { $_ => $attrs{$_} } @Tickit::Pen::ALL_ATTRS );
-}
-
-sub setctl_int
-{
-   my $self = shift;
-   my ( $ctl, $value ) = @_;
-
-   if( $ctl eq "cursorvis" ) {
-      $self->{cursorvis} = $value;
-   }
-   elsif( $ctl eq "cursorshape" ) {
-      $self->{cursorshape} = $value;
-   }
-   elsif( grep { $_ eq $ctl } qw( altscreen mouse ) ) {
-      # ignore
-   }
-   else {
-      warn "Tickit::Test::MockTerm ignoring setctl_int $ctl";
-   }
 }
 
 0x55AA;

@@ -8,7 +8,9 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
+
+use Carp;
 
 use Exporter 'import';
 
@@ -137,7 +139,7 @@ sub mk_window
    $tickit->setup_term;
 
    # Clear the method log from ->setup_term
-   $term->methodlog;
+   $term->get_methodlog;
 
    return $win;
 }
@@ -192,7 +194,7 @@ Useful to clear up non-tested events before running a test.
 
 sub drain_termlog
 {
-   $term->methodlog;
+   $term->get_methodlog;
 }
 
 =head2 resize_term( $lines, $cols )
@@ -256,7 +258,16 @@ test scripts.
 sub _pen2string
 {
    my $pen = shift;
-   return "{" . join( ",", map { defined $pen->{$_} ? "$_=" . ($pen->{$_} || 0) : "!$_" } sort keys %$pen ) . "}";
+   my %attrs = $pen ? %$pen : ();
+
+   # Normalise requests to reset to default as undef
+   defined $attrs{$_} and $attrs{$_} == -1 and undef $attrs{$_} for @Tickit::Pen::INT_ATTRS;
+   !$attrs{$_}                             and undef $attrs{$_} for @Tickit::Pen::BOOL_ATTRS;
+
+   # Remove undefs
+   defined $attrs{$_} or delete $attrs{$_} for keys %attrs;
+
+   return "{" . join( ",", map { defined $attrs{$_} ? "$_=" . ($attrs{$_} || 0) : "!$_" } sort keys %attrs ) . "}";
 }
 
 =head2 is_termlog( [ @log ], $name )
@@ -291,7 +302,7 @@ sub _step_to_text
 
    my ( $op, @args ) = @$step;
 
-   if( $op eq "chpen" ) {
+   if( $op eq "setpen" ) {
       return "$op(" . _pen2string( $args[0] ) . ")";
    }
    else {
@@ -317,9 +328,9 @@ sub _steps_ok
 
       my $want_line = shift @$want_log;
 
-      if( $want_line and $want_line->[0] eq "chpen_bg" and
-          $got_line  and $got_line->[0] eq "chpen" ) {
-         $got_line = [ chpen_bg => $got_line->[1]->{bg} ];
+      if( $want_line and $want_line->[0] eq "setpen_bg" and
+          $got_line  and $got_line->[0] eq "setpen" ) {
+         $got_line = [ setpen_bg => $got_line->[1]->{bg} ];
       }
 
       $_ = _step_to_text($_) for $want_line, $got_line;
@@ -347,7 +358,7 @@ sub is_termlog
 
    my $tb = Test::Builder->new;
 
-   my @got_log = $term->methodlog;
+   my @got_log = $term->get_methodlog;
 
    if( ref $log eq "ARRAY" ) {
       local $Test::Builder::Level = $Test::Builder::Level + 1;
@@ -572,8 +583,6 @@ to C<is_termlog>.
  CLEAR
  GOTO($line,$col)
  ERASECH($count,$move_to_end)
- INSERTCH($count)
- DELETECH($count)
  SCROLLRECT($top,$left,$lines,$cols,$downward,$rightward)
  PRINT($string)
  SETPEN(%attrs)
@@ -584,12 +593,16 @@ to C<is_termlog>.
 sub CLEAR      { [ clear => ] }
 sub GOTO       { [ goto => $_[0], $_[1] ] }
 sub ERASECH    { [ erasech => $_[0], $_[1] || 0 ] }
-sub INSERTCH   { [ insertch => $_[0] ] }
-sub DELETECH   { [ deletech => $_[0] ] }
 sub SCROLLRECT { [ scrollrect => @_[0..5] ] }
 sub PRINT      { [ print => $_[0] ] }
-sub SETPEN     { [ chpen => { DEFAULTPEN, @_ } ] }
-sub SETBG      { [ chpen_bg => $_[0] ] }
+sub SETPEN     { [ setpen => { DEFAULTPEN, @_ } ] }
+sub SETBG      { [ setpen_bg => $_[0] ] }
+
+# Deprecated, will never match now
+sub INSERTCH   { carp "INSERTCH() is no longer used by MockTerm";
+                 [ insertch => $_[0] ] }
+sub DELETECH   { carp "DELETECH() is no longer used by MockTerm";
+                 [ deletech => $_[0] ] }
 
 =head1 AUTHOR
 

@@ -10,7 +10,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Carp;
 use Scalar::Util qw( refaddr );
@@ -508,54 +508,6 @@ use constant {
    WEST_SHIFT   => 6,
 };
 
-my @linechars;
-{
-   local $_;
-   while( <DATA> ) {
-      chomp;
-      my ( $char, $spec ) = split( m/\s+=>\s+/, $_, 2 );
-
-      my $mask = 0;
-      $mask |= __PACKAGE__->$_ for $spec =~ m/([A-Z_]+)/g;
-
-      $linechars[$mask] = $char;
-   }
-
-   close DATA;
-
-   # Fill in the gaps
-   foreach my $mask ( 1 .. 255 ) {
-      next if defined $linechars[$mask];
-
-      # Try with SINGLE instead of THICK, so mask away 0xAA
-      if( my $char = $linechars[$mask & 0xAA] ) {
-         $linechars[$mask] = $char;
-         next;
-      }
-
-      # The only ones left now are awkward mixes of single/double
-      # Turn DOUBLE into SINGLE
-      my $singlemask = $mask;
-      foreach my $dir (qw( NORTH EAST SOUTH WEST )) {
-         my $dirmask = __PACKAGE__->$dir;
-         my $dirshift = __PACKAGE__->${\"${dir}_SHIFT"};
-
-         my $dirsingle = LINE_SINGLE << $dirshift;
-         my $dirdouble = LINE_DOUBLE << $dirshift;
-
-         $singlemask = ( $singlemask & ~$dirmask ) | $dirsingle
-            if ( $singlemask & $dirmask ) == $dirdouble;
-      }
-
-      if( my $char = $linechars[$singlemask] ) {
-         $linechars[$mask] = $char;
-         next;
-      }
-
-      die sprintf "TODO: Couldn't find a linechar for %02x\n", $mask;
-   }
-}
-
 =head2 $rb->hline_at( $line, $startcol, $endcol, $style, $pen, $caps )
 
 Draws a horizontal line between the given columns (both are inclusive), in the
@@ -683,6 +635,11 @@ sub get_cell
 Renders the stored content to the given L<Tickit::Window>. After this, the
 buffer will be cleared and reset back to initial state.
 
+Flushing to the window is now deprecated. Widgets should render to the
+renderbuffer given to their C<render_to_rb> method. Applications that wish to
+perform lower-level drawing without Widgets or Windows should construct a
+renderbuffer and use the C<flush_to_term> method.
+
 =head2 $rb->flush_to_term( $term )
 
 Renders the stored content to the given L<Tickit::Term>. After this, the
@@ -744,7 +701,7 @@ sub _flush
                my $pen = $cell->pen;
                my $chars = "";
                do {
-                  $chars .= $linechars[$cell->linemask];
+                  $chars .= $cell->linechar;
                   $col++;
                   $phycol += $cell->len;
                } while( $col < $self->cols and
@@ -779,115 +736,3 @@ Paul Evans <leonerd@leonerd.org.uk>
 =cut
 
 0x55AA;
-
-use utf8;
-__DATA__
-─ => WEST_SINGLE | EAST_SINGLE
-━ => WEST_THICK | EAST_THICK
-│ => NORTH_SINGLE | SOUTH_SINGLE
-┃ => NORTH_THICK | SOUTH_THICK
-┌ => SOUTH_SINGLE | EAST_SINGLE
-┍ => SOUTH_SINGLE | EAST_THICK
-┎ => SOUTH_THICK | EAST_SINGLE
-┏ => SOUTH_THICK | EAST_THICK
-┐ => SOUTH_SINGLE | WEST_SINGLE
-┑ => SOUTH_SINGLE | WEST_THICK
-┒ => SOUTH_THICK | WEST_SINGLE
-┓ => SOUTH_THICK | WEST_THICK
-└ => NORTH_SINGLE | EAST_SINGLE
-┕ => NORTH_SINGLE | EAST_THICK
-┖ => NORTH_THICK | EAST_SINGLE
-┗ => NORTH_THICK | EAST_THICK
-┘ => NORTH_SINGLE | WEST_SINGLE
-┙ => NORTH_SINGLE | WEST_THICK
-┚ => NORTH_THICK | WEST_SINGLE
-┛ => NORTH_THICK | WEST_THICK
-├ => NORTH_SINGLE | EAST_SINGLE | SOUTH_SINGLE
-┝ => NORTH_SINGLE | SOUTH_SINGLE | EAST_THICK
-┞ => NORTH_THICK | EAST_SINGLE | SOUTH_SINGLE
-┟ => NORTH_SINGLE | EAST_SINGLE | SOUTH_THICK
-┠ => NORTH_THICK | EAST_SINGLE | SOUTH_THICK
-┡ => NORTH_THICK | EAST_THICK | SOUTH_SINGLE
-┢ => NORTH_SINGLE | EAST_THICK | SOUTH_THICK
-┣ => NORTH_THICK | EAST_THICK | SOUTH_THICK
-┤ => NORTH_SINGLE | WEST_SINGLE | SOUTH_SINGLE
-┥ => NORTH_SINGLE | SOUTH_SINGLE | WEST_THICK
-┦ => WEST_SINGLE | NORTH_THICK | SOUTH_SINGLE
-┧ => NORTH_SINGLE | WEST_SINGLE | SOUTH_THICK
-┨ => WEST_SINGLE | NORTH_THICK | SOUTH_THICK
-┩ => WEST_THICK | NORTH_THICK | SOUTH_SINGLE
-┪ => WEST_THICK | NORTH_SINGLE | SOUTH_THICK
-┫ => WEST_THICK | NORTH_THICK | SOUTH_THICK
-┬ => WEST_SINGLE | SOUTH_SINGLE | EAST_SINGLE
-┭ => WEST_THICK | SOUTH_SINGLE | EAST_SINGLE
-┮ => WEST_SINGLE | SOUTH_SINGLE | EAST_THICK
-┯ => WEST_THICK | SOUTH_SINGLE | EAST_THICK
-┰ => WEST_SINGLE | SOUTH_THICK | EAST_SINGLE
-┱ => WEST_THICK | SOUTH_THICK | EAST_SINGLE
-┲ => WEST_SINGLE | SOUTH_THICK | EAST_THICK
-┳ => WEST_THICK | SOUTH_THICK | EAST_THICK
-┴ => WEST_SINGLE | NORTH_SINGLE | EAST_SINGLE
-┵ => WEST_THICK | NORTH_SINGLE | EAST_SINGLE
-┶ => WEST_SINGLE | NORTH_SINGLE | EAST_THICK
-┷ => WEST_THICK | NORTH_SINGLE | EAST_THICK
-┸ => WEST_SINGLE | NORTH_THICK | EAST_SINGLE
-┹ => WEST_THICK | NORTH_THICK | EAST_SINGLE
-┺ => WEST_SINGLE | NORTH_THICK | EAST_THICK
-┻ => WEST_THICK | NORTH_THICK | EAST_THICK
-┼ => WEST_SINGLE | NORTH_SINGLE | EAST_SINGLE | SOUTH_SINGLE
-┽ => WEST_THICK | NORTH_SINGLE | EAST_SINGLE | SOUTH_SINGLE
-┾ => WEST_SINGLE | NORTH_SINGLE | EAST_THICK | SOUTH_SINGLE
-┿ => WEST_THICK | NORTH_SINGLE | EAST_THICK | SOUTH_SINGLE
-╀ => WEST_SINGLE | NORTH_THICK | EAST_SINGLE | SOUTH_SINGLE
-╁ => WEST_SINGLE | NORTH_SINGLE | EAST_SINGLE | SOUTH_THICK
-╂ => WEST_SINGLE | NORTH_THICK | EAST_SINGLE | SOUTH_THICK
-╃ => WEST_THICK | NORTH_THICK | EAST_SINGLE | SOUTH_SINGLE
-╄ => WEST_SINGLE | NORTH_THICK | EAST_THICK | SOUTH_SINGLE
-╅ => WEST_THICK | NORTH_SINGLE | EAST_SINGLE | SOUTH_THICK
-╆ => WEST_SINGLE | NORTH_SINGLE | EAST_THICK | SOUTH_THICK
-╇ => WEST_THICK | NORTH_THICK | EAST_THICK | SOUTH_SINGLE
-╈ => WEST_THICK | NORTH_SINGLE | EAST_THICK | SOUTH_THICK
-╉ => WEST_THICK | NORTH_THICK | EAST_SINGLE | SOUTH_THICK
-╊ => WEST_SINGLE | NORTH_THICK | EAST_THICK | SOUTH_THICK
-╋ => WEST_THICK | NORTH_THICK | EAST_THICK | SOUTH_THICK
-═ => WEST_DOUBLE | EAST_DOUBLE
-║ => NORTH_DOUBLE | SOUTH_DOUBLE
-╒ => EAST_DOUBLE | SOUTH_SINGLE
-╓ => EAST_SINGLE | SOUTH_DOUBLE
-╔ => SOUTH_DOUBLE | EAST_DOUBLE
-╕ => WEST_DOUBLE | SOUTH_SINGLE
-╖ => WEST_SINGLE | SOUTH_DOUBLE
-╗ => WEST_DOUBLE | SOUTH_DOUBLE
-╘ => NORTH_SINGLE | EAST_DOUBLE
-╙ => NORTH_DOUBLE | EAST_SINGLE
-╚ => NORTH_DOUBLE | EAST_DOUBLE
-╛ => WEST_DOUBLE | NORTH_SINGLE
-╜ => WEST_SINGLE | NORTH_DOUBLE
-╝ => WEST_DOUBLE | NORTH_DOUBLE
-╞ => NORTH_SINGLE | EAST_DOUBLE | SOUTH_SINGLE
-╟ => NORTH_DOUBLE | EAST_SINGLE | SOUTH_DOUBLE
-╠ => NORTH_DOUBLE | EAST_DOUBLE | SOUTH_DOUBLE
-╡ => WEST_DOUBLE | NORTH_SINGLE | SOUTH_SINGLE
-╢ => WEST_SINGLE | NORTH_DOUBLE | SOUTH_DOUBLE
-╣ => WEST_DOUBLE | NORTH_DOUBLE | SOUTH_DOUBLE
-╤ => WEST_DOUBLE | SOUTH_SINGLE | EAST_DOUBLE
-╥ => WEST_SINGLE | SOUTH_DOUBLE | EAST_SINGLE
-╦ => WEST_DOUBLE | SOUTH_DOUBLE | EAST_DOUBLE
-╧ => WEST_DOUBLE | NORTH_SINGLE | EAST_DOUBLE
-╨ => WEST_SINGLE | NORTH_DOUBLE | EAST_SINGLE
-╩ => WEST_DOUBLE | NORTH_DOUBLE | EAST_DOUBLE
-╪ => WEST_DOUBLE | NORTH_SINGLE | EAST_DOUBLE | SOUTH_SINGLE
-╫ => WEST_SINGLE | NORTH_DOUBLE | EAST_SINGLE | SOUTH_DOUBLE
-╬ => WEST_DOUBLE | NORTH_DOUBLE | EAST_DOUBLE | SOUTH_DOUBLE
-╴ => WEST_SINGLE
-╵ => NORTH_SINGLE
-╶ => EAST_SINGLE
-╷ => SOUTH_SINGLE
-╸ => WEST_THICK
-╹ => NORTH_THICK
-╺ => EAST_THICK
-╻ => SOUTH_THICK
-╼ => WEST_SINGLE | EAST_THICK
-╽ => NORTH_SINGLE | SOUTH_THICK
-╾ => WEST_THICK | EAST_SINGLE
-╿ => NORTH_THICK | SOUTH_SINGLE

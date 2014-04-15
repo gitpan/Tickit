@@ -60,12 +60,20 @@ $term->scrollrect( 0,0,2,10, -1,0 );
 is_display( [ "", "1111111111", "2222222222" ],
             'Display after scroll partial 1 up' );
 
+$term->scrollrect( 1,5,1,5, 0,2 );
+is_display( [ "", "11111111  ", "2222222222" ],
+            'Display after scroll right' );
+
+$term->scrollrect( 2,5,1,5, 0,-3 );
+is_display( [ "", "11111111  ", "22222   22" ],
+            'Display after scroll left' );
+
 # Now some test content for mangling
 for my $l ( 0 .. 2 ) { $term->goto( $l, 0 ); $term->print( "ABCDEFGHIJ" ) }
 drain_termlog;
 
 $term->goto( 0, 3 );
-$term->erasech( 5 );
+$term->erasech( 5, undef );
 is_display( [ "ABC     IJ", "ABCDEFGHIJ", "ABCDEFGHIJ" ],
             'Display after ->erasech' );
 

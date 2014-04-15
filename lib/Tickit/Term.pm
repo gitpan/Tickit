@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Carp;
 
@@ -426,6 +426,7 @@ sub mode_altscreen
 {
    my $self = shift;
    my ( $on ) = @_;
+   carp "Use of \$term->mode_altscreen is deprecated; see ->setctl_int instead";
    $self->setctl_int( altscreen => $on );
 }
 
@@ -440,6 +441,7 @@ sub mode_cursorvis
 {
    my $self = shift;
    my ( $on ) = @_;
+   carp "Use of \$term->mode_cursorvis is deprecated; see ->setctl_int instead";
    $self->setctl_int( cursorvis => $on );
 }
 
@@ -454,6 +456,7 @@ sub mode_mouse
 {
    my $self = shift;
    my ( $on ) = @_;
+   carp "Use of \$term->mode_mouse is deprecated; see ->setctl_int instead";
    $self->setctl_int( mouse => $on );
 }
 

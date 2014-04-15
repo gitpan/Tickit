@@ -1,8 +1,13 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef __TICKIT_H__
 #define __TICKIT_H__
 
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 #include <sys/time.h>
 
@@ -78,11 +83,12 @@ typedef enum {
 } TickitPenAttrType;
 
 TickitPen *tickit_pen_new(void);
-TickitPen *tickit_pen_clone(TickitPen *orig);
+TickitPen *tickit_pen_clone(const TickitPen *orig);
 void       tickit_pen_destroy(TickitPen *pen);
 
 int tickit_pen_has_attr(const TickitPen *pen, TickitPenAttr attr);
 int tickit_pen_is_nonempty(const TickitPen *pen);
+int tickit_pen_nondefault_attr(const TickitPen *pen, TickitPenAttr attr);
 int tickit_pen_is_nondefault(const TickitPen *pen);
 
 int  tickit_pen_get_bool_attr(const TickitPen *pen, TickitPenAttr attr);
@@ -204,6 +210,7 @@ int  tickit_term_bind_event(TickitTerm *tt, TickitEventType ev, TickitTermEventF
 void tickit_term_unbind_event_id(TickitTerm *tt, int id);
 
 void tickit_term_print(TickitTerm *tt, const char *str);
+void tickit_term_printn(TickitTerm *tt, const char *str, size_t len);
 void tickit_term_printf(TickitTerm *tt, const char *fmt, ...);
 void tickit_term_vprintf(TickitTerm *tt, const char *fmt, va_list args);
 int  tickit_term_goto(TickitTerm *tt, int line, int col);
@@ -295,4 +302,8 @@ int    tickit_string_mbswidth(const char *str);
 int    tickit_string_byte2col(const char *str, size_t byte);
 size_t tickit_string_col2byte(const char *str, int col);
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif

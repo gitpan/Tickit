@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::ContainerWidget );
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Carp;
 
@@ -101,7 +101,6 @@ sub set_child
    }
 }
 
-# TODO: This probably isn't needed any more and should be deleted soon
 sub add
 {
    my $self = shift;

@@ -6,7 +6,6 @@ use utf8;
 
 use Test::More;
 use Tickit::Test;
-use t::TestWindow qw( $win @methods );
 
 use Tickit::RenderBuffer qw( LINE_SINGLE CAP_START CAP_END CAP_BOTH );
 
@@ -28,47 +27,23 @@ foreach my $op (qw( term win )) {
    $rb->hline_at( 12, 10, 20, LINE_SINGLE, $pen, CAP_END );
    $rb->hline_at( 13, 10, 20, LINE_SINGLE, $pen, CAP_BOTH );
 
-   if( $op eq "term" ) {
-      $rb->flush_to_term( $term );
-      is_termlog( [ GOTO(10,10), SETPEN, PRINT("╶".("─"x9)."╴"),
-                    GOTO(11,10), SETPEN, PRINT(("─"x10)."╴"),
-                    GOTO(12,10), SETPEN, PRINT("╶".("─"x10)),
-                    GOTO(13,10), SETPEN, PRINT(("─"x11)) ],
-                  'RC renders hline_ats to terminal' );
-   }
-   if( $op eq "win" ) {
-      $rb->flush_to_window( $win );
-      is_deeply( \@methods,
-                 [ [ goto => 10, 10 ], [ print => "╶" . ( "─" x 9 ) . "╴", {} ],
-                   [ goto => 11, 10 ], [ print => ( "─" x 10 ) . "╴", {} ],
-                   [ goto => 12, 10 ], [ print => "╶" . ( "─" x 10 ), {} ],
-                   [ goto => 13, 10 ], [ print => ( "─" x 11 ), {} ] ],
-                 'RC renders hline_ats to window' );
-      undef @methods;
-   }
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(10,10), SETPEN, PRINT("╶".("─"x9)."╴"),
+                 GOTO(11,10), SETPEN, PRINT(("─"x10)."╴"),
+                 GOTO(12,10), SETPEN, PRINT("╶".("─"x10)),
+                 GOTO(13,10), SETPEN, PRINT(("─"x11)) ],
+               'RenderBuffer renders hline_ats to terminal' );
 
    $rb->vline_at( 10, 20, 10, LINE_SINGLE, $pen );
    $rb->vline_at( 10, 20, 11, LINE_SINGLE, $pen, CAP_START );
    $rb->vline_at( 10, 20, 12, LINE_SINGLE, $pen, CAP_END );
    $rb->vline_at( 10, 20, 13, LINE_SINGLE, $pen, CAP_BOTH );
 
-   if( $op eq "term" ) {
-      $rb->flush_to_term( $term );
-      is_termlog( [ GOTO(10,10), SETPEN, PRINT("╷│╷│"),
-                    ( map { GOTO($_,10), SETPEN, PRINT("││││") } 11 .. 19 ),
-                    GOTO(20,10), SETPEN, PRINT("╵╵││") ],
-                  'RC renders vline_ats to terminal' );
-   }
-   if( $op eq "win" ) {
-      $rb->flush_to_window( $win );
-      is_deeply( \@methods,
-                 [ [ goto => 10, 10 ], [ print => "╷│╷│", {} ],
-                   ( map { [ goto => $_, 10 ], [ print => "││││", {} ] } 11 .. 19 ),
-                   [ goto => 20, 10 ], [ print => "╵╵││", {} ],
-                 ],
-                 'RC renders vline_ats to window' );
-      undef @methods;
-   }
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(10,10), SETPEN, PRINT("╷│╷│"),
+                 ( map { GOTO($_,10), SETPEN, PRINT("││││") } 11 .. 19 ),
+                 GOTO(20,10), SETPEN, PRINT("╵╵││") ],
+               'RenderBuffer renders vline_ats to terminal' );
 }
 
 # Lines setpen
@@ -84,19 +59,13 @@ foreach my $op (qw( term win )) {
    is( $cell->linemask->east,  0,           '$cell->linemask->east at 6,10' );
    is( $cell->linemask->west,  0,           '$cell->linemask->west at 6,10' );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 5, 10 ], [ print => "╷", { bg => 3 } ],
-               ( map {
-                 [ goto => $_, 10 ], [ print => "│", { bg => 3 } ] } 6 .. 9 ),
-                 [ goto => 10,  5 ], [ print => "╶────┼────╴", { bg => 3 } ],
-               ( map {
-                 [ goto => $_, 10 ], [ print => "│", { bg => 3 } ] } 11 .. 14 ),
-                 [ goto => 15, 10 ], [ print => "╵", { bg => 3 } ],
-              ],
-              'RC renders lines with stored pen' );
-   undef @methods;
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(5,10), SETPEN(bg=>3), PRINT("╷"),
+                 ( map { GOTO($_,10), SETPEN(bg=>3), PRINT("│") } 6 .. 9 ),
+                 GOTO(10,5), SETPEN(bg=>3), PRINT("╶────┼────╴"),
+                 ( map { GOTO($_,10), SETPEN(bg=>3), PRINT("│") } 11 .. 14 ),
+                 GOTO(15,10), SETPEN(bg=>3), PRINT("╵") ],
+              'RenderBuffer renders lines with stored pen' );
 
    # cheating
    $rb->setpen( undef );
@@ -111,38 +80,32 @@ foreach my $op (qw( term win )) {
    $rb->vline_at( 10, 14, 12, LINE_SINGLE, $pen );
    $rb->vline_at( 10, 14, 14, LINE_SINGLE, $pen );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 10, 10 ], [ print => "┌─┬─┐", {} ],
-                 [ goto => 11, 10 ], [ print => "│", {} ],
-                    [ goto => 11, 12 ], [ print => "│", {} ],
-                    [ goto => 11, 14 ], [ print => "│", {} ],
-                 [ goto => 12, 10 ], [ print => "├─┼─┤", {} ],
-                 [ goto => 13, 10 ], [ print => "│", {} ],
-                    [ goto => 13, 12 ], [ print => "│", {} ],
-                    [ goto => 13, 14 ], [ print => "│", {} ],
-                 [ goto => 14, 10 ], [ print => "└─┴─┘", {} ],
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(10,10), SETPEN(), PRINT("┌─┬─┐"),
+                 GOTO(11,10), SETPEN(), PRINT("│"),
+                    GOTO(11,12), SETPEN(), PRINT("│"),
+                    GOTO(11,14), SETPEN(), PRINT("│"),
+                 GOTO(12,10), SETPEN(), PRINT("├─┼─┤"),
+                 GOTO(13,10), SETPEN(), PRINT("│"),
+                    GOTO(13,12), SETPEN(), PRINT("│"),
+                    GOTO(13,14), SETPEN(), PRINT("│"),
+                 GOTO(14,10), SETPEN(), PRINT("└─┴─┘"),
               ],
-              'RC renders line merging' );
-   undef @methods;
+              'RenderBuffer renders line merging' );
 }
 
 # Linebox
 {
    $rb->linebox_at( 3, 6, 3, 6, LINE_SINGLE, $pen );
 
-   $rb->flush_to_window( $win );
-   is_deeply( \@methods,
-              [
-                 [ goto => 3, 3 ], [ print => "┌──┐", {} ],
-                 [ goto => 4, 3 ], [ print => "│", {} ],
-                    [ goto => 4, 6 ], [ print => "│", {} ],
-                 [ goto => 5, 3 ], [ print => "│", {} ],
-                    [ goto => 5, 6 ], [ print => "│", {} ],
-                 [ goto => 6, 3 ], [ print => "└──┘", {} ],
-              ],
-              'RC renders linebox_at' );
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(3,3), SETPEN(), PRINT("┌──┐"),
+                 GOTO(4,3), SETPEN(), PRINT("│"),
+                    GOTO(4,6), SETPEN(), PRINT("│"),
+                 GOTO(5,3), SETPEN(), PRINT("│"),
+                    GOTO(5,6), SETPEN(), PRINT("│"),
+                 GOTO(6,3), SETPEN(), PRINT("└──┘") ],
+              'RenderBuffer renders linebox_at' );
 }
 
 done_testing;

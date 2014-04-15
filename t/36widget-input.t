@@ -24,7 +24,7 @@ $widget->take_focus;
 
 flush_tickit;
 
-ok( $term->{cursorvis}, 'Cursor visible on window' );
+ok( $term->cursorvis, 'Cursor visible on window' );
 
 presskey( text => "A" );
 

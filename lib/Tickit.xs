@@ -10,6 +10,9 @@
 #include "XSUB.h"
 
 #include <tickit.h>
+#include <tickit-termdrv.h>
+
+#include "linechars.inc"
 
 #define streq(a,b) (strcmp(a,b)==0)
 
@@ -346,6 +349,27 @@ static void term_output_fn(TickitTerm *tt, const char *bytes, size_t len, void *
 
   FREETMPS;
   LEAVE;
+}
+
+static SV *newSVterm(TickitTerm *tt, char *package)
+{
+  Tickit__Term self;
+  SV *ret;
+
+  Newx(self, 1, struct Tickit__Term);
+  ret = newSV(0);
+  sv_setref_pv(ret, package, self);
+  self->self = newSVsv(ret);
+  sv_rvweaken(self->self); // Avoid a cycle
+
+  self->tt = tt;
+  self->input_handle  = NULL;
+  self->output_handle = NULL;
+  self->output_func = NULL;
+
+  self->event_ids = newHV();
+
+  return ret;
 }
 
 /* must match .pm file */
@@ -820,6 +844,9 @@ static void tickit_renderbuffer_restore(TickitRenderBuffer *rb)
 {
   TickitRenderBufferStack *stack;
 
+  if(!rb->stack)
+    return;
+
   stack = rb->stack;
   rb->stack = stack->prev;
 
@@ -1185,6 +1212,298 @@ static void setup_constants(void)
   DO_CONSTANT(TICKIT_MOD_ALT)
   DO_CONSTANT(TICKIT_MOD_CTRL)
 }
+
+/**************************
+ * Tickit::Test::MockTerm *
+ **************************/
+
+typedef struct
+{
+  TickitTermDriver super;
+  SV *self;
+
+  AV         *methodlog;
+  AV         *cells;
+  TickitPen  *pen;
+  int         line;
+  int         col;
+  int         changed;
+  int         cursorvis;
+  int         cursorshape;
+} MockTermDriver;
+
+static SV *mockterm_push_pen_attrs_to(MockTermDriver *mtd, AV *cell)
+{
+  HV *penhv = newHV();
+  TickitPenAttr attr;
+
+  for(attr = 0; attr < TICKIT_N_PEN_ATTRS; attr++) {
+    const char *attrname = tickit_pen_attrname(attr);
+    int value;
+    switch(tickit_pen_attrtype(attr)) {
+      case TICKIT_PENTYPE_BOOL:
+        if(tickit_pen_get_bool_attr(mtd->pen, attr) == 0)
+          continue;
+        av_push(cell, newSVpv(attrname, 0));
+        av_push(cell, newSViv(1));
+        break;
+      case TICKIT_PENTYPE_INT:
+        if((value = tickit_pen_get_int_attr(mtd->pen, attr)) == -1)
+          continue;
+        av_push(cell, newSVpv(attrname, 0));
+        av_push(cell, newSViv(value));
+        break;
+      case TICKIT_PENTYPE_COLOUR:
+        if((value = tickit_pen_get_colour_attr(mtd->pen, attr)) == -1)
+          continue;
+        av_push(cell, newSVpv(attrname, 0));
+        av_push(cell, newSViv(value));
+        break;
+    }
+  }
+
+  return newRV_noinc((SV *)penhv);
+}
+
+static void mockterm_destroy(TickitTermDriver *ttd)
+{
+  MockTermDriver *mtd = (MockTermDriver *)ttd;
+
+  SvREFCNT_dec(mtd->self);
+  SvREFCNT_dec(mtd->methodlog);
+  SvREFCNT_dec(mtd->cells);
+  tickit_pen_destroy(mtd->pen);
+
+  Safefree(mtd);
+}
+
+static void mockterm_clear_cells(MockTermDriver *mtd, int line, int startcol, int stopcol)
+{
+  SV *linecells_ref;
+  AV *linecells;
+  int col;
+
+  /* This code is also used to initialise brand new cells in the structure, so
+   * it should be careful to vivify them correctly
+   */
+
+  linecells_ref = *av_fetch(mtd->cells, line, 1);
+  if(!SvOK(linecells_ref))
+    sv_setsv(linecells_ref, newRV_noinc((SV *)newAV()));
+  linecells = (AV *)SvRV(linecells_ref);
+
+  for(col = startcol; col < stopcol; col++) {
+    SV *cell_ref;
+    AV *cell;
+
+    cell_ref = *av_fetch(linecells, col, 1);
+    if(!SvOK(cell_ref))
+      sv_setsv(cell_ref, newRV_noinc((SV *)newAV()));
+
+    cell = (AV *)SvRV(cell_ref);
+
+    av_clear(cell);
+    sv_setpvn(*av_fetch(cell, 0, 1), " ", 1);
+    mockterm_push_pen_attrs_to(mtd, cell);
+  }
+}
+
+static void mockterm_print(TickitTermDriver *ttd, const char *str, size_t len)
+{
+  MockTermDriver *mtd = (MockTermDriver *)ttd;
+  AV *entry = newAV();
+  AV *linecells;
+  SV *pen;
+  TickitStringPos pos, limit;
+
+  av_push(entry, newSVpv("print", 0));
+  av_push(entry, newSVpvn_utf8(str, len, 1));
+
+  av_push(mtd->methodlog, newRV_noinc((SV *)entry));
+
+  tickit_stringpos_zero(&pos);
+  pos.columns = mtd->col;
+
+  linecells = (AV *)SvRV(*av_fetch(mtd->cells, mtd->line, 1));
+
+  tickit_stringpos_limit_columns(&limit, pos.columns);
+
+  while(pos.bytes < len) {
+    TickitStringPos start = pos;
+    AV *cell;
+
+    limit.columns++;
+    tickit_string_countmore(str + start.bytes, &pos, &limit);
+
+    if(pos.columns == start.columns)
+      continue;
+
+    cell = (AV *)SvRV(*av_fetch(linecells, start.columns, 1));
+
+    av_clear(cell);
+    sv_setpvn(*av_fetch(cell, 0, 1), str + start.bytes, pos.bytes - start.bytes);
+    SvUTF8_on(*av_fetch(cell, 0, 0));
+    mockterm_push_pen_attrs_to(mtd, cell);
+
+    // Empty out the other cells for doublewidth
+    for(start.columns++; start.columns < pos.columns; start.columns++) {
+      cell = (AV *)SvRV(*av_fetch(linecells, start.columns, 1));
+
+      av_clear(cell);
+      sv_setpvn(*av_fetch(cell, 0, 1), "", 0);
+      mockterm_push_pen_attrs_to(mtd, cell);
+    }
+  }
+
+  mtd->col = pos.columns;
+
+  mtd->changed = 1;
+}
+
+static int mockterm_goto_abs(TickitTermDriver *ttd, int line, int col)
+{
+  MockTermDriver *mtd = (MockTermDriver *)ttd;
+  AV *entry = newAV();
+
+  av_push(entry, newSVpv("goto", 0));
+  av_push(entry, newSViv(line));
+  av_push(entry, newSViv(col));
+
+  av_push(mtd->methodlog, newRV_noinc((SV *)entry));
+
+  mtd->line = line;
+  mtd->col  = col;
+
+  mtd->changed = 1;
+}
+
+static void mockterm_move_rel(TickitTermDriver *ttd, int downward, int rightward)
+{
+  fprintf(stderr, "TODO: emul move(%+d,%+d)\n", downward, rightward);
+}
+
+static int mockterm_scrollrect(TickitTermDriver *ttd, const TickitRect *rect, int downward, int rightward)
+{
+  fprintf(stderr, "TODO: emul scrollrect([%d,%d]..[%d,%d],%+d,%+d)\n",
+    rect->top, rect->left, tickit_rect_bottom(rect), tickit_rect_right(rect), downward, rightward);
+  return 0;
+}
+
+static void mockterm_erasech(TickitTermDriver *ttd, int count, int moveend)
+{
+  MockTermDriver *mtd = (MockTermDriver *)ttd;
+  AV *entry = newAV();
+
+  av_push(entry, newSVpv("erasech", 0));
+  av_push(entry, newSViv(count));
+  av_push(entry, newSViv(moveend == 1 ? 1 : 0));
+
+  av_push(mtd->methodlog, newRV_noinc((SV *)entry));
+
+  mockterm_clear_cells(mtd, mtd->line, mtd->col, mtd->col + count);
+
+  if(moveend)
+    mtd->col += count;
+
+  mtd->changed = 1;
+}
+
+static void mockterm_clear(TickitTermDriver *ttd)
+{
+  MockTermDriver *mtd = (MockTermDriver *)ttd;
+  AV *entry = newAV();
+  int line;
+
+  int lines, cols;
+  tickit_term_get_size(ttd->tt, &lines, &cols);
+
+  av_push(entry, newSVpv("clear", 0));
+
+  av_push(mtd->methodlog, newRV_noinc((SV *)entry));
+
+  for(line = 0; line < lines; line++)
+    mockterm_clear_cells(mtd, line, 0, cols);
+
+  mtd->changed = 1;
+}
+
+static void mockterm_chpen(TickitTermDriver *ttd, const TickitPen *delta, const TickitPen *final)
+{
+  MockTermDriver *mtd = (MockTermDriver *)ttd;
+  AV *entry = newAV();
+  TickitPenAttr attr;
+  HV *penattrs = newHV();
+
+  tickit_pen_clear(mtd->pen);
+  tickit_pen_copy(mtd->pen, final, 1);
+
+  for(attr = 0; attr < TICKIT_N_PEN_ATTRS; attr++) {
+    const char *attrname = tickit_pen_attrname(attr);
+    int value;
+    if(!tickit_pen_nondefault_attr(final, attr))
+      continue;
+
+    switch(tickit_pen_attrtype(attr)) {
+    case TICKIT_PENTYPE_BOOL:
+      value = tickit_pen_get_bool_attr(final, attr); break;
+    case TICKIT_PENTYPE_INT:
+      value = tickit_pen_get_int_attr(final, attr); break;
+    case TICKIT_PENTYPE_COLOUR:
+      value = tickit_pen_get_colour_attr(final, attr); break;
+    }
+
+    sv_setiv(*hv_fetch(penattrs, attrname, strlen(attrname), 1), value);
+  }
+
+  av_push(entry, newSVpv("setpen", 0));
+  av_push(entry, newRV_noinc((SV *)penattrs));
+
+  av_push(mtd->methodlog, newRV_noinc((SV *)entry));
+}
+
+static int mockterm_getctl_int(TickitTermDriver *ttd, TickitTermCtl ctl, int *value)
+{
+  switch(ctl) {
+    case TICKIT_TERMCTL_COLORS:
+      *value = 256;
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+static int mockterm_setctl_int(TickitTermDriver *ttd, TickitTermCtl ctl, int value)
+{
+  MockTermDriver *mtd = (MockTermDriver *)ttd;
+
+  switch(ctl) {
+    case TICKIT_TERMCTL_CURSORVIS:
+      mtd->cursorvis = !!value; break;
+    case TICKIT_TERMCTL_CURSORSHAPE:
+      mtd->cursorshape = value; break;
+    case TICKIT_TERMCTL_ALTSCREEN:
+    case TICKIT_TERMCTL_MOUSE:
+      break;
+    default:
+      fprintf(stderr, "Tickit::Test::MockTerm ignoring setctl_int %d\n", ctl);
+      return 0;
+  }
+
+  return 1;
+}
+
+static TickitTermDriverVTable mockterm_vtable = {
+  .destroy    = mockterm_destroy,
+  .print      = mockterm_print,
+  .goto_abs   = mockterm_goto_abs,
+  .move_rel   = mockterm_move_rel,
+  .scrollrect = mockterm_scrollrect,
+  .erasech    = mockterm_erasech,
+  .clear      = mockterm_clear,
+  .chpen      = mockterm_chpen,
+  .getctl_int = mockterm_getctl_int,
+  .setctl_int = mockterm_setctl_int,
+};
 
 MODULE = Tickit             PACKAGE = Tickit::Pen
 
@@ -2029,6 +2348,25 @@ linemask(self)
   OUTPUT:
     RETVAL
 
+SV *
+linechar(self)
+  SV *self
+  INIT:
+    TickitRenderBufferCell *cell;
+    char utf8[UTF8_MAXBYTES + 1];
+    char *end;
+  CODE:
+    cell = (void *)SvIV(SvRV(self));
+    if(cell->state != LINE)
+      croak("Cannot call ->linechar on a non-LINE cell");
+    utf8[0] = 0;
+    end = uvchr_to_utf8(utf8, _tickit_rb_linemask_to_char[cell->v.line.mask]);
+    RETVAL = newSV(0);
+    sv_setpvn(RETVAL, utf8, end - utf8);
+    SvUTF8_on(RETVAL);
+  OUTPUT:
+    RETVAL
+
 int
 codepoint(self)
   SV *self
@@ -2145,6 +2483,7 @@ MODULE = Tickit             PACKAGE = Tickit::Term
 
 SV *
 _new(package,termtype)
+  char *package;
   char *termtype;
   INIT:
     Tickit__Term  self;
@@ -2154,19 +2493,7 @@ _new(package,termtype)
     if(!tt)
       XSRETURN_UNDEF;
 
-    Newx(self, 1, struct Tickit__Term);
-    RETVAL = newSV(0);
-    sv_setref_pv(RETVAL, "Tickit::Term", self);
-    self->self = newSVsv(RETVAL);
-    sv_rvweaken(self->self); // Avoid a cycle
-
-    self->tt = tt;
-    self->input_handle  = NULL;
-    self->output_handle = NULL;
-    self->output_func = NULL;
-
-    self->event_ids = newHV();
-
+    RETVAL = newSVterm(tt, package);
   OUTPUT:
     RETVAL
 
@@ -2467,10 +2794,14 @@ print(self,text,pen=NULL)
   Tickit::Term  self
   SV           *text
   Tickit::Pen   pen
+  INIT:
+    char  *utf8;
+    STRLEN len;
   CODE:
     if(pen)
       tickit_term_setpen(self->tt, pen->pen);
-    tickit_term_print(self->tt, SvPVutf8_nolen(text));
+    utf8 = SvPVutf8(text, len);
+    tickit_term_printn(self->tt, utf8, len);
 
 void
 clear(self,pen=NULL)
@@ -2557,6 +2888,118 @@ setctl_str(self,ctl,value)
     RETVAL = tickit_term_setctl_str(self->tt, ctl_e, value);
   OUTPUT:
     RETVAL
+
+MODULE = Tickit::Test::MockTerm    PACKAGE = Tickit::Test::MockTerm
+
+SV *
+_new_mocking(package,lines,cols)
+  char *package
+  int   lines
+  int   cols
+  INIT:
+    Tickit__Term self;
+    TickitTerm   *tt;
+    MockTermDriver *mtd;
+  CODE:
+    Newx(mtd, 1, MockTermDriver);
+    mtd->super.vtable = &mockterm_vtable;
+
+    mtd->methodlog = newAV();
+    mtd->cells     = newAV();
+
+    mtd->pen       = tickit_pen_new();
+
+    mtd->line        = -1;
+    mtd->col         = -1;
+    mtd->changed     = 0;
+    mtd->cursorvis   = 0;
+    mtd->cursorshape = 0;
+
+    tt = tickit_term_new_for_driver(&mtd->super);
+    if(!tt)
+      XSRETURN_UNDEF;
+
+    tickit_term_set_size(tt, lines, cols);
+
+    RETVAL = newSVterm(tt, "Tickit::Test::MockTerm");
+
+    mtd->self = newSVsv(RETVAL);
+    sv_rvweaken(mtd->self); // avoid another
+  OUTPUT:
+    RETVAL
+
+SV *
+methodlog(self)
+  Tickit::Term self
+  ALIAS:
+    methodlog = 0
+    cells     = 1
+  INIT:
+    MockTermDriver *mtd;
+    SV *rv;
+  CODE:
+    mtd = (MockTermDriver *)tickit_term_get_driver(self->tt);
+    switch(ix) {
+      case 0: rv = (SV *)mtd->methodlog; break;
+      case 1: rv = (SV *)mtd->cells;     break;
+    }
+
+    RETVAL = newRV(rv);
+  OUTPUT:
+    RETVAL
+
+void
+_clearcells(self,line,startcol,count)
+  Tickit::Term self
+  int line
+  int startcol
+  int count
+  INIT:
+    MockTermDriver *mtd;
+  CODE:
+    mtd = (MockTermDriver *)tickit_term_get_driver(self->tt);
+    mockterm_clear_cells(mtd, line, startcol, startcol + count);
+
+int
+line(self)
+  Tickit::Term self
+  ALIAS:
+    line        = 0
+    col         = 1
+    is_changed  = 2
+    cursorvis   = 3
+    cursorshape = 4
+  INIT:
+    MockTermDriver *mtd;
+  CODE:
+    mtd = (MockTermDriver *)tickit_term_get_driver(self->tt);
+    switch(ix) {
+      case 0: RETVAL = mtd->line;        break;
+      case 1: RETVAL = mtd->col;         break;
+      case 2: RETVAL = mtd->changed;     break;
+      case 3: RETVAL = mtd->cursorvis;   break;
+      case 4: RETVAL = mtd->cursorshape; break;
+    }
+  OUTPUT:
+    RETVAL
+
+void
+_set_line(self,new)
+  Tickit::Term self
+  int          new
+  ALIAS:
+    _set_line    = 0
+    _set_col     = 1
+    _set_changed = 2
+  INIT:
+    MockTermDriver *mtd;
+  CODE:
+    mtd = (MockTermDriver *)tickit_term_get_driver(self->tt);
+    switch(ix) {
+      case 0: mtd->line    = new; break;
+      case 1: mtd->col     = new; break;
+      case 2: mtd->changed = new; break;
+    }
 
 MODULE = Tickit             PACKAGE = Tickit::Utils
 

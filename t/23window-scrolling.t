@@ -63,8 +63,7 @@ $win->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
    flush_tickit;
 
    is_termlog( [ SETPEN,
-                 # TODO: declare VSSM so we can get a single SCROLLRECT() call
-                 ( map { GOTO($_,0), DELETECH(1) } 5 .. 14 ) ],
+                 SCROLLRECT(5,0,10,80, 0,1) ],
                'Termlog after fullwidth $win->scroll rightward' );
 
    is_deeply( \@exposed_rects,
@@ -80,8 +79,7 @@ $win->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
    flush_tickit;
 
    is_termlog( [ SETPEN,
-                 # TODO: declare VSSM so we can get a single SCROLLRECT() call
-                 ( map { GOTO($_,0), INSERTCH(1) } 5 .. 14 ) ],
+                 SCROLLRECT(5,0,10,80, 0,-1) ],
                'Termlog after fullwidth $win->scroll leftward' );
 
    is_deeply( \@exposed_rects,

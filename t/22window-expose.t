@@ -83,6 +83,13 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
    is( $root_exposed, 5, '$root expose count 5 after $win hide' );
    is( $win_exposed, 4, '$win expose count 5 after $win hide' );
 
+   $win->expose;
+
+   flush_tickit;
+
+   is( $root_exposed, 5, '$root expose count 5 after expose on hidden' );
+   is( $win_exposed, 4, '$win expose count 5 after expose on hidden' );
+
    $win->show;
 
    flush_tickit;

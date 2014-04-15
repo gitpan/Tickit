@@ -103,7 +103,7 @@ my $term = mk_term lines => 3, cols => 10;
 
    test_out( "not ok 1 - Termlog associative" );
    test_fail( +2 );
-   test_diag( 'Expected terminal operation print("Line 0"), got chpen({!af,!b,!bg,!fg,!i,!rv,!strike,!u}) at step 0' );
+   test_diag( 'Expected terminal operation print("Line 0"), got setpen({}) at step 0' );
    is_termlog( { "0,0" => [ PRINT("Line 0") ],
                  "1,0" => [ PRINT("Line 1") ] },
                'Termlog associative' );
