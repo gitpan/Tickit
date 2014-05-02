@@ -21,7 +21,7 @@ my $rb = Tickit::RenderBuffer->new(
 my $pen = Tickit::Pen->new;
 
 # Simple lines explicit pen
-foreach my $op (qw( term win )) {
+{
    $rb->hline_at( 10, 10, 20, LINE_SINGLE, $pen );
    $rb->hline_at( 11, 10, 20, LINE_SINGLE, $pen, CAP_START );
    $rb->hline_at( 12, 10, 20, LINE_SINGLE, $pen, CAP_END );

@@ -57,7 +57,7 @@ use Tickit::StringPos;
    is( $pos->graphemes,  3, '$pos->graphemes is 3 after count "ABC"' );
    is( $pos->columns,    3, '$pos->columns is 3 after count "ABC"' );
 
-   is( string_countmore( "DEF", $pos ), 3, 'string_count("DEF") is 3' );
+   is( string_countmore( "ABCDEF", $pos ), 3, 'string_countmore("ABCDEF") is 3' );
 
    is( $pos->bytes,      6, '$pos->bytes is 6 after countmore "DEF"' );
    is( $pos->codepoints, 6, '$pos->codepoints is 6 after countmore "DEF"' );
@@ -70,13 +70,6 @@ use Tickit::StringPos;
    is( $limit->codepoints, -1, '$limit->codepoints is -1' );
    is( $limit->graphemes,  -1, '$limit->graphemes is -1' );
    is( $limit->columns,    -1, '$limit->columns is -1' );
-
-   is( string_countmore( "ABCDEFGHI", $pos, undef, 6 ), 3, 'string_countmore("ABCDEFGHI") start=6 yields 3' );
-
-   is( $pos->bytes,      9, '$pos->bytes is 9 after countmore with start' );
-   is( $pos->codepoints, 9, '$pos->codepoints is 9 after countmore with start' );
-   is( $pos->graphemes,  9, '$pos->graphemes is 9 after countmore with start' );
-   is( $pos->columns,    9, '$pos->columns is 9 after countmore with start' );
 }
 
 is( textwidth( "" ),            0, 'textwidth empty' );

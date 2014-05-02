@@ -28,8 +28,6 @@ my $mask = Tickit::Rect->new(
 
 # mask over text
 {
-   $rb->save;
-
    $rb->mask( $mask );
 
                        #   MMMMMM
@@ -37,8 +35,6 @@ my $mask = Tickit::Rect->new(
    $rb->text_at( 4, 6,     "HI" );       # inside
    $rb->text_at( 5, 8,       "JKLMN" );  # after
    $rb->text_at( 6, 2, "OPQRSTUVWXYZ" ); # spanning
-
-   $rb->restore;
 
    $rb->flush_to_term( $term );
    is_termlog( [ GOTO(3, 2), SETPEN(), PRINT("ABC"),
@@ -50,16 +46,12 @@ my $mask = Tickit::Rect->new(
 
 # mask over erase
 {
-   $rb->save;
-
    $rb->mask( $mask );
 
    $rb->erase_at( 3, 2,  6 ); # before
    $rb->erase_at( 4, 6,  2 ); # inside
    $rb->erase_at( 5, 8,  5 ); # after
    $rb->erase_at( 6, 2, 12 ); # spanning
-
-   $rb->restore;
 
    $rb->flush_to_term( $term );
    is_termlog( [ GOTO(3, 2), SETPEN(), ERASECH(3),
@@ -71,16 +63,12 @@ my $mask = Tickit::Rect->new(
 
 # mask over lines
 {
-   $rb->save;
-
    $rb->mask( $mask );
 
    $rb->hline_at( 3, 2,  8, LINE_SINGLE );
    $rb->hline_at( 4, 6,  8, LINE_SINGLE );
    $rb->hline_at( 5, 8, 13, LINE_SINGLE );
    $rb->hline_at( 6, 2, 14, LINE_SINGLE );
-
-   $rb->restore;
 
    $rb->flush_to_term( $term );
    is_termlog( [ GOTO(3, 2), SETPEN(), PRINT("╶──"),

@@ -1,5 +1,14 @@
 Revision history for Changes
 
+0.46    2014/05/02 20:16:37
+        [CHANGES]
+         * Move RenderBuffer and MockTerm entirely into libtickit C library
+         * Added $rb->char
+         * Add Tickit::Debug support to RenderBuffer
+
+        [BUGFIXES]
+         * Ensure that $rb->skip/skip_at obey masking regions
+
 0.45    2014/04/15 02:47:45
         [CHANGES]
          * Move RenderBuffer's linemask-to-character conversion code into XS/C

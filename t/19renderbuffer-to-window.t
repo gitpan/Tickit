@@ -93,6 +93,13 @@ my $win = bless [], "TestWindow";
 {
    my $pen = Tickit::Pen->new;
 
+   # Line printing no longer merges neighbouring cells by pen equivalence
+   sub printcells
+   {
+      my ( $text, $pen ) = @_;
+      return map { [ print => $_, $pen ] } split //, $text;
+   }
+
    $rb->hline_at( 10, 10, 20, LINE_SINGLE, $pen );
    $rb->hline_at( 11, 10, 20, LINE_SINGLE, $pen, CAP_START );
    $rb->hline_at( 12, 10, 20, LINE_SINGLE, $pen, CAP_END );
@@ -100,10 +107,10 @@ my $win = bless [], "TestWindow";
 
    $rb->flush_to_window( $win );
    is_deeply( \@methods,
-              [ [ goto => 10, 10 ], [ print => "╶" . ( "─" x 9 ) . "╴", {} ],
-                [ goto => 11, 10 ], [ print => ( "─" x 10 ) . "╴", {} ],
-                [ goto => 12, 10 ], [ print => "╶" . ( "─" x 10 ), {} ],
-                [ goto => 13, 10 ], [ print => ( "─" x 11 ), {} ] ],
+              [ [ goto => 10, 10 ], printcells( "╶" . ( "─" x 9 ) . "╴", {}),
+                [ goto => 11, 10 ], printcells( ( "─" x 10 ) . "╴", {} ),
+                [ goto => 12, 10 ], printcells( "╶" . ( "─" x 10 ), {} ),
+                [ goto => 13, 10 ], printcells( ( "─" x 11 ), {} ) ],
               'RenderBuffer renders hline_ats to window' );
    undef @methods;
 
@@ -114,9 +121,9 @@ my $win = bless [], "TestWindow";
 
    $rb->flush_to_window( $win );
    is_deeply( \@methods,
-              [ [ goto => 10, 10 ], [ print => "╷│╷│", {} ],
-                ( map { [ goto => $_, 10 ], [ print => "││││", {} ] } 11 .. 19 ),
-                [ goto => 20, 10 ], [ print => "╵╵││", {} ],
+              [ [ goto => 10, 10 ], printcells( "╷│╷│", {} ),
+                ( map { [ goto => $_, 10 ], printcells( "││││", {} ) } 11 .. 19 ),
+                [ goto => 20, 10 ], printcells( "╵╵││", {} ),
               ],
               'RenderBuffer renders vline_ats to window' );
    undef @methods;

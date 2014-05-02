@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Carp;
 
@@ -415,49 +415,19 @@ Sets the terminal window icon text, title, or both.
 
 =cut
 
-=head2 $term->mode_altscreen( $on )
-
-Set or clear the DEC Alternate Screen mode. This method is deprecated in
-favour of C<setctl_int>.
-
-=cut
-
 sub mode_altscreen
 {
-   my $self = shift;
-   my ( $on ) = @_;
-   carp "Use of \$term->mode_altscreen is deprecated; see ->setctl_int instead";
-   $self->setctl_int( altscreen => $on );
+   croak "\$term->mode_altscreen should not be used; see ->setctl_int instead";
 }
-
-=head2 $term->mode_cursorvis( $on )
-
-Set or clear the cursor visible mode. This method is deprecated in favour of
-C<setctl_int>.
-
-=cut
 
 sub mode_cursorvis
 {
-   my $self = shift;
-   my ( $on ) = @_;
-   carp "Use of \$term->mode_cursorvis is deprecated; see ->setctl_int instead";
-   $self->setctl_int( cursorvis => $on );
+   croak "\$term->mode_cursorvis should not be used; see ->setctl_int instead";
 }
-
-=head2 $term->mode_mouse( $on )
-
-Set or clear the mouse tracking mode. This method is deprecated in favour of
-C<setctl_int>.
-
-=cut
 
 sub mode_mouse
 {
-   my $self = shift;
-   my ( $on ) = @_;
-   carp "Use of \$term->mode_mouse is deprecated; see ->setctl_int instead";
-   $self->setctl_int( mouse => $on );
+   carp "\$term->mode_mouse should not be used; see ->setctl_int instead";
 }
 
 =head2 $term->input_push_bytes( $bytes )

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( Tickit::WidgetRole );
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Carp;
 croak "Tickit::WidgetRole::Penable is deprecated; use Tickit::Style instead";

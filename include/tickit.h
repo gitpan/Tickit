@@ -83,6 +83,7 @@ typedef enum {
 } TickitPenAttrType;
 
 TickitPen *tickit_pen_new(void);
+TickitPen *tickit_pen_new_attrs(TickitPenAttr attr, ...);
 TickitPen *tickit_pen_clone(const TickitPen *orig);
 void       tickit_pen_destroy(TickitPen *pen);
 
@@ -258,6 +259,10 @@ int tickit_term_setctl_str(TickitTerm *tt, TickitTermCtl ctl, const char *value)
  * String handling utilities
  */
 
+int tickit_string_seqlen(long codepoint);
+/* Does NOT NUL-terminate the buffer */
+size_t tickit_string_putchar(char *str, size_t len, long codepoint);
+
 typedef struct {
   size_t bytes;
   int    codepoints;
@@ -267,11 +272,19 @@ typedef struct {
 
 size_t tickit_string_count(const char *str, TickitStringPos *pos, const TickitStringPos *limit);
 size_t tickit_string_countmore(const char *str, TickitStringPos *pos, const TickitStringPos *limit);
+size_t tickit_string_ncount(const char *str, size_t len, TickitStringPos *pos, const TickitStringPos *limit);
+size_t tickit_string_ncountmore(const char *str, size_t len, TickitStringPos *pos, const TickitStringPos *limit);
 
 // Some convenient mutators for TickitStringPos structs
 
 static inline void tickit_stringpos_zero(TickitStringPos *pos) {
   pos->bytes = pos->codepoints = pos->graphemes = pos->columns = 0;
+}
+
+#define INIT_TICKIT_STRINGPOS_LIMIT_NONE { .bytes = -1, .codepoints = -1, .graphemes = -1, .columns = -1 }
+static inline void tickit_stringpos_limit_none(TickitStringPos *pos)
+{
+  pos->bytes = pos->codepoints = pos->graphemes = pos->columns = -1;
 }
 
 #define INIT_TICKIT_STRINGPOS_LIMIT_BYTES(v) { .bytes = (v), .codepoints = -1, .graphemes = -1, .columns = -1 }
@@ -301,6 +314,93 @@ static inline void tickit_stringpos_limit_columns(TickitStringPos *pos, int colu
 int    tickit_string_mbswidth(const char *str);
 int    tickit_string_byte2col(const char *str, size_t byte);
 size_t tickit_string_col2byte(const char *str, int col);
+
+/*
+ * TickitRenderBuffer
+ */
+
+typedef struct TickitRenderBuffer TickitRenderBuffer;
+
+TickitRenderBuffer *tickit_renderbuffer_new(int lines, int cols);
+void tickit_renderbuffer_destroy(TickitRenderBuffer *rb);
+
+void tickit_renderbuffer_get_size(const TickitRenderBuffer *rb, int *lines, int *cols);
+
+void tickit_renderbuffer_translate(TickitRenderBuffer *rb, int downward, int rightward);
+void tickit_renderbuffer_clip(TickitRenderBuffer *rb, TickitRect *rect);
+void tickit_renderbuffer_mask(TickitRenderBuffer *rb, TickitRect *mask);
+
+int tickit_renderbuffer_has_cursorpos(const TickitRenderBuffer *rb);
+void tickit_renderbuffer_get_cursorpos(const TickitRenderBuffer *rb, int *line, int *col);
+void tickit_renderbuffer_goto(TickitRenderBuffer *rb, int line, int col);
+void tickit_renderbuffer_ungoto(TickitRenderBuffer *rb);
+
+void tickit_renderbuffer_setpen(TickitRenderBuffer *rb, TickitPen *pen);
+
+void tickit_renderbuffer_reset(TickitRenderBuffer *rb);
+
+void tickit_renderbuffer_save(TickitRenderBuffer *rb);
+void tickit_renderbuffer_savepen(TickitRenderBuffer *rb);
+void tickit_renderbuffer_restore(TickitRenderBuffer *rb);
+
+void tickit_renderbuffer_skip_at(TickitRenderBuffer *rb, int line, int col, int len);
+void tickit_renderbuffer_skip(TickitRenderBuffer *rb, int len);
+void tickit_renderbuffer_skip_to(TickitRenderBuffer *rb, int col);
+int tickit_renderbuffer_text_at(TickitRenderBuffer *rb, int line, int col, char *text, TickitPen *pen);
+int tickit_renderbuffer_text(TickitRenderBuffer *rb, char *text, TickitPen *pen);
+void tickit_renderbuffer_erase_at(TickitRenderBuffer *rb, int line, int col, int len, TickitPen *pen);
+void tickit_renderbuffer_erase(TickitRenderBuffer *rb, int len, TickitPen *pen);
+void tickit_renderbuffer_erase_to(TickitRenderBuffer *rb, int col, TickitPen *pen);
+void tickit_renderbuffer_eraserect(TickitRenderBuffer *rb, TickitRect *rect, TickitPen *pen);
+void tickit_renderbuffer_clear(TickitRenderBuffer *rb, TickitPen *pen);
+void tickit_renderbuffer_char_at(TickitRenderBuffer *rb, int line, int col, long codepoint, TickitPen *pen);
+void tickit_renderbuffer_char(TickitRenderBuffer *rb, long codepoint, TickitPen *pen);
+
+typedef enum {
+  TICKIT_LINE_SINGLE = 1,
+  TICKIT_LINE_DOUBLE = 2,
+  TICKIT_LINE_THICK  = 3,
+} TickitLineStyle;
+
+typedef enum {
+  TICKIT_LINECAP_START = 0x01,
+  TICKIT_LINECAP_END   = 0x02,
+  TICKIT_LINECAP_BOTH  = 0x03,
+} TickitLineCaps;
+
+void tickit_renderbuffer_hline_at(TickitRenderBuffer *rb, int line, int startcol, int endcol,
+    TickitLineStyle style, TickitPen *pen, TickitLineCaps caps);
+void tickit_renderbuffer_vline_at(TickitRenderBuffer *rb, int startline, int endline, int col,
+    TickitLineStyle style, TickitPen *pen, TickitLineCaps caps);
+
+void tickit_renderbuffer_flush_to_term(TickitRenderBuffer *rb, TickitTerm *tt);
+
+// This API is still somewhat experimental
+
+typedef struct {
+  char north;
+  char south;
+  char east;
+  char west;
+} TickitRenderBufferLineMask;
+
+int tickit_renderbuffer_get_cell_active(TickitRenderBuffer *rb, int line, int col);
+size_t tickit_renderbuffer_get_cell_text(TickitRenderBuffer *rb, int line, int col, char *buffer, size_t len);
+TickitRenderBufferLineMask tickit_renderbuffer_get_cell_linemask(TickitRenderBuffer *rb, int line, int col);
+
+// returns a direct pointer - do not free or modify
+TickitPen *tickit_renderbuffer_get_cell_pen(TickitRenderBuffer *rb, int line, int col);
+
+struct TickitRenderBufferSpanInfo {
+  int is_active;
+  int n_columns;
+  char *text;
+  size_t len;
+  TickitPen *pen;
+};
+
+// returns the text length or -1 on error
+size_t tickit_renderbuffer_get_span(TickitRenderBuffer *rb, int line, int startcol, struct TickitRenderBufferSpanInfo *info, char *buffer, size_t len);
 
 #endif
 

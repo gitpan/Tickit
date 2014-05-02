@@ -10,7 +10,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Carp;
 use Scalar::Util qw( refaddr );
@@ -41,20 +41,10 @@ use constant {
    CAP_BOTH  => 0x03,
 };
 
-# cell states
-use constant {
-   SKIP  => 0,
-   TEXT  => 1,
-   ERASE => 2,
-   CONT  => 3,
-   LINE  => 4,
-   CHAR  => 5,
-};
 
 =head1 NAME
 
-C<Tickit::RenderBuffer> - efficiently render text and linedrawing on
-L<Tickit> windows
+C<Tickit::RenderBuffer> - efficiently render text and line-drawing
 
 =head1 SYNOPSIS
 
@@ -81,9 +71,9 @@ Z<>
 
 =head1 DESCRIPTION
 
-Provides a buffer of pending rendering operations to apply to a Window. The
-buffer is modified by rendering operations performed by the widget, and
-flushed to the widget's window when complete.
+Provides a buffer of pending rendering operations to apply to the terminal.
+The buffer is modified by rendering operations performed by widgets or other
+code, and flushed to the terminal when complete.
 
 This provides the following advantages:
 
@@ -107,6 +97,12 @@ The buffer supports line-drawing, complete with merging of line segments that
 meet in a character cell. Boxes, grids, and other shapes can be easily formed
 by drawing separate line segments, and the C<RenderBuffer> will handle the
 corners and other junctions formed.
+
+=item *
+
+A single buffer can be passed around all of the windows or widgets to properly
+combine line segments and layering effects, making it possible to create many
+kinds of sub-divided or layered output.
 
 =back
 
@@ -253,7 +249,7 @@ Pops and restores a saved state previously created with C<save>.
 Restricts the clipping rectangle of drawing operations to be no further than
 the limits of the given rectangle. This will apply to subsequent rendering
 operations but does not affect existing content, nor the actual rendering to
-the window.
+the terminal.
 
 Clipping rectangles cumulative; each call further restricts the drawing
 region. To revert back to a larger drawing area, use the C<save> and
@@ -265,7 +261,7 @@ C<restore> stack.
 
 Masks off the given area against any further changes. This will apply to
 subsequent rendering operations but does not affect the existing content, nor
-the actual rendering to the window.
+the actual rendering to the terminal.
 
 Areas within the clipping region may be arbitrarily masked. Masks are scoped
 to the depth of the stack they are applied at; once the C<restore> method is
@@ -321,7 +317,7 @@ C<restore> pair may be useful.
 =head2 $rb->skip_at( $line, $col, $len )
 
 Sets the range of cells given to a skipped state. No content will be drawn
-here, nor will any content existing on the window be erased.
+here, nor will any content existing on the terminal be erased.
 
 Initially, or after calling C<reset>, all cells are set to this state.
 
@@ -475,39 +471,6 @@ calls, without end caps:
 
 =cut
 
-# Various parts of this code borrowed from Tom Molesworth's Tickit::Canvas
-
-# Bitmasks on Cell linemask
-use constant {
-   # Connections to the next cell upwards
-   NORTH        => 0x03,
-   NORTH_SINGLE => 0x01,
-   NORTH_DOUBLE => 0x02,
-   NORTH_THICK  => 0x03,
-   NORTH_SHIFT  => 0,
-
-   # Connections to the next cell to the right
-   EAST         => 0x0C,
-   EAST_SINGLE  => 0x04,
-   EAST_DOUBLE  => 0x08,
-   EAST_THICK   => 0x0C,
-   EAST_SHIFT   => 2,
-
-   # Connections to the next cell downwards
-   SOUTH        => 0x30,
-   SOUTH_SINGLE => 0x10,
-   SOUTH_DOUBLE => 0x20,
-   SOUTH_THICK  => 0x30,
-   SOUTH_SHIFT  => 4,
-
-   # Connections to the next cell to the left
-   WEST         => 0xC0,
-   WEST_SINGLE  => 0x40,
-   WEST_DOUBLE  => 0x80,
-   WEST_THICK   => 0xC0,
-   WEST_SHIFT   => 6,
-};
-
 =head2 $rb->hline_at( $line, $startcol, $endcol, $style, $pen, $caps )
 
 Draws a horizontal line between the given columns (both are inclusive), in the
@@ -546,10 +509,17 @@ sub linebox_at
 Sets the given cell to render the given Unicode character (as given by
 codepoint number, not character string) in the given pen.
 
-While this is also achieveable by the C<text_at> method, this method is
-implemented without storing a text segment, so can be more efficient than many
-single-column wide C<text_at> calls. It will also be more efficient in the C
-library rewrite.
+=cut
+
+=head2 $rb->char( $codepoint, $pen )
+
+Sets the cell at the virtual cursor position to render the given Unicode
+character (as given by codepoint number, not character string) in the given
+pen, and updates the position.
+
+While this is also achieveable by the C<text> and C<text_at> methods, these
+methods are implemented without storing a text segment, so can be more
+efficient than many single-column wide C<text_at> calls.
 
 =cut
 
@@ -591,42 +561,23 @@ sub get_cell
    my $self = shift;
    my ( $line, $col ) = @_;
 
-   my $offs = 0;
-   my $xscell;
-   while(1) {
-      $xscell = $self->_xs_getcell( $line, $col );
-      last unless $xscell->state == CONT;
+   my ( $text, $pen, $north, $south, $east, $west ) = $self->_xs_get_cell( $line, $col );
 
-      my $startcol = $xscell->startcol;
-      $offs = $col - $startcol;
-      $col = $startcol;
+   if( !defined $text ) {
+      # SKIP
+      return Cell( undef, undef, undef );
    }
-
-   given( $xscell->state ) {
-      when( SKIP ) {
-         return Cell( undef, undef, undef );
-      }
-      when( TEXT ) {
-         my $text = $self->_xs_get_text_substr( $xscell->textidx, $xscell->textoffs + $offs, 1 );
-         return Cell( ord $text, undef, $xscell->pen );
-      }
-      when( CHAR ) {
-         return Cell( $xscell->codepoint, undef, $xscell->pen );
-      }
-      when( ERASE ) {
-         return Cell( 0, undef, $xscell->pen );
-      }
-      when( LINE ) {
-         my $bits = $xscell->linemask;
-         my $mask = LineMask(
-            ( $bits & NORTH ) >> NORTH_SHIFT,
-            ( $bits & SOUTH ) >> SOUTH_SHIFT,
-            ( $bits & EAST  ) >> EAST_SHIFT,
-            ( $bits & WEST  ) >> WEST_SHIFT,
-         );
-         return Cell( 0, $mask, $xscell->pen );
-      }
-      # No CONT
+   if( !length $text ) {
+      # ERASE
+      return Cell( 0, undef, $pen );
+   }
+   if( !defined $north ) {
+      # TEXT or CHAR
+      return Cell( ord $text, undef, $pen );
+   }
+   else {
+      # LINE
+      return Cell( 0, LineMask( $north, $south, $east, $west ), $pen );
    }
 }
 
@@ -650,84 +601,219 @@ buffer will be cleared and reset back to initial state.
 sub flush_to_window
 {
    my $self = shift;
-   my ( $win ) = @_;
-   $self->_flush( win => $win );
-}
-
-sub flush_to_term
-{
-   my $self = shift;
-   my ( $term ) = @_;
-   $self->_flush( term => $term );
-}
-
-sub _flush
-{
-   my $self = shift;
-   my ( $type, $target ) = @_;
+   my ( $target ) = @_;
 
    foreach my $line ( 0 .. $self->lines-1 ) {
       my $phycol;
 
       for ( my $col = 0; $col < $self->cols ; ) {
-         my $cell = $self->_xs_getcell( $line, $col );
+         my ( $len, $text, $pen ) = $self->_xs_get_span( $line, $col );
 
-         $col += $cell->len, next if $cell->state == SKIP;
+         $col += $len, next if !defined $text; # SKIP
 
          if( !defined $phycol or $phycol < $col ) {
             $target->goto( $line, $col );
          }
          $phycol = $col;
 
-         given( $cell->state ) {
-            when( TEXT ) {
-               $target->print( $self->_xs_get_text_substr( $cell->textidx, $cell->textoffs, $cell->len ), $cell->pen );
-               $phycol += $cell->len;
-            }
-            when( ERASE ) {
-               # No need to set moveend=true to erasech unless we actually
-               # have more content;
-               my $moveend = $col + $cell->len < $self->cols &&
-                             $self->_xs_getcell( $line, $col + $cell->len )->state != SKIP;
+         if( length $text ) {
+            # TEXT, LINE, CHAR
+            $target->print( $text, $pen );
+            $phycol += $len;
+         }
+         else {
+            # ERASE
+            # No need to set moveend=true to erasech unless we actually
+            # have more content;
+            my $moveend = $col + $len < $self->cols &&
+                          defined +( $self->_xs_get_span( $line, $col + $len ) )[1];
 
-               $target->erasech( $cell->len, $moveend || undef, $cell->pen );
-               $phycol += $cell->len;
-               undef $phycol unless $moveend;
-            }
-            when( LINE ) {
-               # This is more efficient and works better with unit testing in
-               # the Perl case but in the C version this is easier just done a
-               # cell at a time
-               my $pen = $cell->pen;
-               my $chars = "";
-               do {
-                  $chars .= $cell->linechar;
-                  $col++;
-                  $phycol += $cell->len;
-               } while( $col < $self->cols and
-                        $cell = $self->_xs_getcell( $line, $col ) and
-                        $cell->state == LINE and
-                        $cell->pen->equiv( $pen ) );
-
-               $target->print( $chars, $pen );
-
-               next;
-            }
-            when( CHAR ) {
-               $target->print( chr $cell->codepoint, $cell->pen );
-               $phycol += $cell->len;
-            }
-            default {
-               die "TODO: cell in state ". $cell->state;
-            }
+            $target->erasech( $len, $moveend || undef, $pen );
+            $phycol += $len;
+            undef $phycol unless $moveend;
          }
 
-         $col += $cell->len;
+         $col += $len;
       }
    }
 
    $self->reset;
 }
+
+=head2 $rb->flush_to_term( $term )
+
+Renders the stored content to the given L<Tickit::Term>. After this, the
+buffer will be cleared and reset back to initial state.
+
+=cut
+
+## Tickit::Debug wrapping support
+use Tickit::Debug;
+
+if( Tickit::Debug::DEBUG ) {
+   local *around = sub {
+      my ( $method, $code ) = @_;
+
+      my $orig = __PACKAGE__->can( $method ) or croak __PACKAGE__." cannot ->$method";
+
+      no strict 'refs';
+      no warnings 'redefine';
+      *$method = sub { $code->( $orig, @_ ) };
+   };
+
+   my $INDENT = "";
+   *lg = sub {
+      Tickit::Debug->log( $_[0], "${INDENT}$_[1]", @_[2..$#_] );
+   };
+
+   # Bs == stack
+   around( save => sub {
+      my $orig = shift;
+      lg( Bs => "+-Save" );
+      $INDENT = "|  $INDENT";
+      $orig->( @_ );
+   });
+   around( savepen => sub {
+      my $orig = shift;
+      lg( Bs => "+-Savepen" );
+      $INDENT = "|  $INDENT";
+      $orig->( @_ );
+   });
+   around( restore => sub {
+      my $orig = shift;
+      $INDENT =~ s/^\|  //;
+      lg( Bs => "+-Restore" );
+      $orig->( @_ );
+   });
+   around( reset => sub {
+      my $orig = shift;
+      $INDENT = "";
+      $orig->( @_ );
+   });
+
+   # Bd == drawing operations
+   around( clear => sub {
+      my $orig = shift;
+      lg( Bd => "Clear" );
+      $orig->( @_ );
+   });
+
+   around( skip => sub {
+      my $orig = shift;
+      my ( $rb, $len ) = @_;
+      lg( Bd => "Skip (%d..%d,%d) +%d", sub { $rb->col, $rb->col + $len, $rb->line, $len } );
+      $orig->( @_ );
+   });
+   around( skip_at => sub {
+      my $orig = shift;
+      my ( $rb, $line, $col, $len ) = @_;
+      lg( Bd => "Skip (%d..%d,%d)", sub { $line, $col, $col + $len, $line } );
+      $orig->( @_ );
+   });
+   around( skip_to => sub {
+      my $orig = shift;
+      my ( $rb, $col ) = @_;
+      lg( Bd => "Skip (%d..%d,%d) +%d", sub { $rb->col, $col, $rb->line, $col - $rb->col } ) if $col > $rb->col;
+      $orig->( @_ );
+   });
+
+   around( erase => sub {
+      my $orig = shift;
+      my ( $rb, $len ) = @_;
+      lg( Bd => "Erase (%d..%d,%d) +%d", sub { $rb->col, $rb->col + $len, $rb->line, $len } );
+      $orig->( @_ );
+   });
+   around( erase_at => sub {
+      my $orig = shift;
+      my ( $rb, $line, $col, $len ) = @_;
+      lg( Bd => "Erase (%d..%d,%d)", sub { $col, $col + $len, $line } );
+      $orig->( @_ );
+   });
+   around( erase_to => sub {
+      my $orig = shift;
+      my ( $rb, $col ) = @_;
+      lg( Bd => "Erase (%d..%d,%d) +%d", sub { $rb->col, $col, $rb->line, $col - $rb->col } ) if $col > $rb->col;
+      $orig->( @_ );
+   });
+   around( eraserect => sub {
+      my $orig = shift;
+      my ( $rb, $rect ) = @_;
+      lg( Bd => "Erase (%d,%d)..(%d,%d)", sub { $rect->left, $rect->top, $rect->right, $rect->bottom } );
+      $orig->( @_ );
+   });
+
+   around( text => sub {
+      my $orig = shift;
+      my ( $rb ) = @_;
+      my $col = $rb->col;
+      my $len = $orig->( @_ );
+      lg( Bd => "Text (%d..%d,%d) +%d", sub { $col, $col + $len, $rb->line, $len } );
+      return $len;
+   });
+   around( text_at => sub {
+      my $orig = shift;
+      my ( $rb, $line, $col ) = @_;
+      my $len = $orig->( @_ );
+      lg( Bd => "Text (%d..%d,%d)", sub { $col, $col + $len, $line } );
+      return $len;
+   });
+
+   around( char => sub {
+      my $orig = shift;
+      my ( $rb ) = @_;
+      lg( Bd => "Char (%d..%d,%d) +%d", sub { $rb->col, $rb->col + 1, $rb->line, 1 } );
+      $orig->( @_ );
+   });
+   around( char_at => sub {
+      my $orig = shift;
+      my ( $rb, $line, $col ) = @_;
+      lg( Bd => "Char (%d..%d,%d)", sub { $col, $col + 1, $line } );
+      $orig->( @_ );
+   });
+
+   around( hline_at => sub {
+      my $orig = shift;
+      my ( $rb, $line, $startcol, $endcol ) = @_;
+      lg( Bd => "HLine (%d..%d,%d)", $startcol, $endcol, $line );
+      $orig->( @_ );
+   });
+   around( vline_at => sub {
+      my $orig = shift;
+      my ( $rb, $startline, $endline, $col ) = @_;
+      lg( Bd => "VLine (%d,%d..%d)", $col, $startline, $endline );
+      $orig->( @_ );
+   });
+
+   # Bf == flush
+   around( flush_to_term => sub {
+      my $orig = shift;
+      $INDENT = "";
+      lg( Bf => "Flush" );
+      $orig->( @_ );
+   });
+
+   # Bt == transformations (translate, clip, mask)
+   around( translate => sub {
+      my $orig = shift;
+      my ( $rb, $downward, $rightward ) = @_;
+      lg( Bt => "Translate (+%d,+%d)", $rightward, $downward );
+      $orig->( @_ );
+   });
+   around( clip => sub {
+      my $orig = shift;
+      my ( $rb, $rect ) = @_;
+      lg( Bd => "Clip (%d,%d)..(%d,%d)", sub { $rect->left, $rect->top, $rect->right, $rect->bottom } );
+      $orig->( @_ );
+   });
+   around( mask => sub {
+      my $orig = shift;
+      my ( $rb, $rect ) = @_;
+      lg( Bd => "Mask (%d,%d)..(%d,%d)", sub { $rect->left, $rect->top, $rect->right, $rect->bottom } );
+      $orig->( @_ );
+   });
+}
+
+undef *around; # delete it as a method
 
 =head1 AUTHOR
 

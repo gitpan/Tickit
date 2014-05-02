@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Carp;
 
@@ -539,7 +539,8 @@ sub is_cursorpos
 
    my $tb = Test::Builder->new;
 
-   my ( $at_line, $at_col ) = $term->get_position;
+   my $at_line = $term->line;
+   my $at_col  = $term->col;
 
    my $ok = $tb->ok( $line == $at_line && $col == $at_col, $name );
 

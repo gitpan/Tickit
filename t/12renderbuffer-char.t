@@ -19,7 +19,7 @@ my $rb = Tickit::RenderBuffer->new(
 
 my $pen = Tickit::Pen->new;
 
-# Characters
+# Absolute characters
 {
    $rb->char_at( 5, 5, 0x41, $pen );
    $rb->char_at( 5, 6, 0x42, $pen );
@@ -47,6 +47,31 @@ my $pen = Tickit::Pen->new;
                  SETPEN(fg=>6), PRINT("E"),
                  SETPEN(fg=>6), PRINT("F") ],
               'RenderBuffer renders char_at' );
+
+   # cheating
+   $rb->setpen( undef );
+}
+
+# VC characters
+{
+   $rb->goto( 0, 5 );
+
+   # Direct pen
+   $rb->char( 0x47, Tickit::Pen->new( fg => 5 ) );
+
+   # Stored pen
+   $rb->setpen( Tickit::Pen->new( bg => 6 ) );
+   $rb->char( 0x48 );
+
+   # Combined pens
+   $rb->char( 0x49, Tickit::Pen->new( fg => 5 ) );
+
+   $rb->flush_to_term( $term );
+   is_termlog( [ GOTO(0,5),
+                 SETPEN(fg=>5), PRINT("G"),
+                 SETPEN(bg=>6), PRINT("H"),
+                 SETPEN(fg=>5,bg=>6), PRINT("I") ],
+               'RenderBuffer renders char at VC' );
 
    # cheating
    $rb->setpen( undef );

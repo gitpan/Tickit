@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -36,8 +36,8 @@ This class acts as an abstract base class for on-screen widget objects. It
 provides the lower-level machinery required by most or all widget types.
 
 Objects cannot be directly constructed in this class. Instead, a subclass of
-this class which provides a suitable implementation of the C<render> and other
-provided methods is derived. Instances in that class are then constructed.
+this class which provides a suitable implementation of the C<render_to_rb> and
+other provided methods is derived. Instances in that class are then constructed.
 
 See the C<EXAMPLES> section below.
 
@@ -117,12 +117,9 @@ sub new
          croak "$class cannot ->$method - do you subclass and implement it?";
    }
 
-   # Require override ->render or a ->render_to_rb
+   # Require override ->render_to_rb
    if( $class->can( "render_to_rb" ) ) {
       # OK
-   }
-   elsif( $class->can( "render" ) ) {
-      carp "Constructing a legacy ->render $class";
    }
    else {
       croak "$class cannot ->render_to_rb - do you subclass and implement it?";
@@ -501,9 +498,9 @@ the window.
 
 If a window is associated to the widget, that window's pen is set to the
 current widget pen. The widget is then drawn to the window by calling the
-C<render> method. If a window is removed (by setting C<undef>) then no cleanup
-of the window is performed; the new owner of the window is expected to do
-this.
+C<render_to_rb> method. If a window is removed (by setting C<undef>) then no
+cleanup of the window is performed; the new owner of the window is expected to
+do this.
 
 This method may invoke the C<window_gained> and C<window_lost> methods.
 
@@ -551,29 +548,14 @@ sub window_gained
       $self->redraw if !$self->parent;
    } );
 
-   if( $self->can( "render_to_rb" ) ) {
-      $window->set_on_expose( with_rb => sub {
-         my ( $win, $rb, $rect ) = @_;
-         $win->is_visible or return;
+   $window->set_on_expose( with_rb => sub {
+      my ( $win, $rb, $rect ) = @_;
+      $win->is_visible or return;
 
-         $rb->setpen( $self->pen );
+      $rb->setpen( $self->pen );
 
-         $self->render_to_rb( $rb, $rect );
-      });
-   }
-   else {
-      # Legacy rendering to Window
-      $window->set_on_expose( sub {
-         my ( $win, $rect ) = @_;
-         $self->render(
-            rect => $rect,
-            top   => $rect->top,
-            left  => $rect->left,
-            lines => $rect->lines,
-            cols  => $rect->cols,
-         );
-      } );
-   }
+      $self->render_to_rb( $rb, $rect );
+   });
 
    $window->set_on_focus( sub {
       $self->_on_win_focus( @_ );

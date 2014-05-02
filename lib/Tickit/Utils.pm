@@ -8,7 +8,7 @@ package Tickit::Utils;
 use strict;
 use warnings;
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Carp;
 
@@ -53,13 +53,10 @@ updates the counters in C<$pos> by counting the string, and returns the number
 of bytes consumed. If C<$limit> is given, then it will count no further than
 any of the limits given.
 
-=head2 $bytes = string_countmore( $str, $pos, $limit, $start )
+=head2 $bytes = string_countmore( $str, $pos, $limit )
 
 Similar to C<string_count> but will not zero the counters before it begins.
-Counters in C<$pos> will still be incremented. If C<$start> is provided it
-gives the byte offset within C<$str> to begin counting from. This is more
-efficient than applying C<substr> on the input string to create the starting
-point.
+Counters in C<$pos> will still be incremented.
 
 =head2 $cols = textwidth( $str )
 

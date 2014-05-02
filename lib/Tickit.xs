@@ -11,6 +11,7 @@
 
 #include <tickit.h>
 #include <tickit-termdrv.h>
+#include <tickit-mockterm.h>
 
 #include "linechars.inc"
 
@@ -96,6 +97,10 @@ struct GenericEventData
   CV *code;
   SV *data;
 };
+
+/***************
+ * Tickit::Pen *
+ ***************/
 
 /* We need to keep our own pen observer list rather than use libtickit's event
  * binds, because we need to be able to remove them by observer reference
@@ -220,6 +225,10 @@ static void pen_event_fn(TickitPen *pen, TickitEventType ev, TickitEvent *args, 
   }
 }
 
+/****************
+ * Tickit::Rect *
+ ****************/
+
 typedef TickitRect *Tickit__Rect;
 
 /* Really cheating and treading on Perl's namespace but hopefully it will be OK */
@@ -232,7 +241,21 @@ static SV *newSVrect(TickitRect *rect)
 }
 #define mPUSHrect(rect) PUSHs(sv_2mortal(newSVrect(rect)))
 
+/*******************
+ * Tickit::RectSet *
+ *******************/
+
 typedef TickitRectSet *Tickit__RectSet;
+
+/************************
+ * Tickit::RenderBuffer *
+ ************************/
+
+typedef TickitRenderBuffer *Tickit__RenderBuffer;
+
+/****************
+ * Tickit::Term *
+ ****************/
 
 typedef struct Tickit__Term {
   TickitTerm *tt;
@@ -372,796 +395,9 @@ static SV *newSVterm(TickitTerm *tt, char *package)
   return ret;
 }
 
-/* must match .pm file */
-enum TickitRenderBufferCellState {
-  SKIP  = 0,
-  TEXT  = 1,
-  ERASE = 2,
-  CONT  = 3,
-  LINE  = 4,
-  CHAR  = 5,
-};
-
-enum {
-  CAP_START = 0x01,
-  CAP_END   = 0x02,
-};
-
-enum {
-  NORTH_SHIFT = 0,
-  EAST_SHIFT  = 2,
-  SOUTH_SHIFT = 4,
-  WEST_SHIFT  = 6,
-};
-
-typedef struct {
-  enum TickitRenderBufferCellState state;
-  int len; // or "startcol" for state == CONT
-  int maskdepth; // -1 if not masked
-  TickitPen *pen; // state -> {TEXT, ERASE, LINE, CHAR}
-  union {
-    struct { int idx; int offs; } text; // state == TEXT
-    struct { int mask;          } line; // state == LINE
-    struct { int codepoint;     } chr;  // state == CHAR
-  } v;
-} TickitRenderBufferCell;
-
-typedef struct TickitRenderBufferStack TickitRenderBufferStack;
-struct TickitRenderBufferStack {
-  TickitRenderBufferStack *prev;
-
-  int vc_line, vc_col;
-  int xlate_line, xlate_col;
-  TickitRect clip;
-  TickitPen *pen;
-  unsigned int pen_only : 1;
-};
-
-typedef struct {
-  int lines, cols; // Size
-  TickitRenderBufferCell **cells;
-
-  unsigned int vc_pos_set : 1;
-  int vc_line, vc_col;
-  int xlate_line, xlate_col;
-  TickitRect clip;
-  TickitPen *pen;
-
-  int depth;
-  TickitRenderBufferStack *stack;
-
-  char **texts;
-  size_t n_texts;    // number actually valid
-  size_t size_texts; // size of allocated buffer
-} TickitRenderBuffer, *Tickit__RenderBuffer;
-
-static void _tickit_rb_free_stack(TickitRenderBufferStack *stack)
-{
-  while(stack) {
-    TickitRenderBufferStack *prev = stack->prev;
-    if(stack->pen)
-      tickit_pen_destroy(stack->pen);
-    Safefree(stack);
-
-    stack = prev;
-  }
-}
-
-static void _tickit_rb_free_texts(TickitRenderBuffer *rb)
-{
-  int i;
-  for(i = 0; i < rb->n_texts; i++)
-    Safefree(rb->texts[i]);
-
-  // Prevent the buffer growing too big
-  if(rb->size_texts > 4 && rb->size_texts > rb->n_texts * 2) {
-    rb->size_texts /= 2;
-    Renew(rb->texts, rb->size_texts, char *);
-  }
-
-  rb->n_texts = 0;
-}
-
-static int _tickit_rb_xlate_and_clip(TickitRenderBuffer *rb, int *line, int *col, int *len, int *startcol)
-{
-  *line += rb->xlate_line;
-  *col  += rb->xlate_col;
-
-  const TickitRect *clip = &rb->clip;
-
-  if(!clip->lines)
-    return 0;
-
-  if(*line < clip->top ||
-      *line >= tickit_rect_bottom(clip) ||
-      *col  >= tickit_rect_right(clip))
-    return 0;
-
-  if(startcol)
-    *startcol = 0;
-
-  if(*col < clip->left) {
-    *len      -= clip->left - *col;
-    if(startcol)
-      *startcol += clip->left - *col;
-    *col = clip->left;
-  }
-  if(*len <= 0)
-    return 0;
-
-  if(*len > tickit_rect_right(clip) - *col)
-    *len = tickit_rect_right(clip) - *col;
-
-  return 1;
-}
-
-static void _tickit_rb_cont_cell(TickitRenderBufferCell *cell, int startcol)
-{
-  switch(cell->state) {
-    case TEXT:
-    case ERASE:
-    case LINE:
-    case CHAR:
-      if(!cell->pen)
-        croak("Expected cell in state %d to have a pen but it does not", cell->state);
-      tickit_pen_destroy(cell->pen);
-      break;
-  }
-
-  cell->state     = CONT;
-  cell->maskdepth = -1;
-  cell->len       = startcol;
-  cell->pen       = NULL;
-}
-
-static TickitRenderBufferCell *_tickit_rb_make_span(TickitRenderBuffer *rb, int line, int col, int len)
-{
-  int end = col + len;
-  TickitRenderBufferCell **cells = rb->cells;
-
-  if(cells[line][col].maskdepth > -1)
-    croak("TODO: cannot _make_span on a masked cell");
-
-  // If the following cell is a CONT, it needs to become a new start
-  if(end < rb->cols && cells[line][end].state == CONT) {
-    int spanstart = cells[line][end].len;
-    TickitRenderBufferCell *spancell = &cells[line][spanstart];
-    int spanend = spanstart + spancell->len;
-    int afterlen = spanend - end;
-    TickitRenderBufferCell *endcell = &cells[line][end];
-
-    switch(spancell->state) {
-      case SKIP:
-        endcell->state = SKIP;
-        endcell->len   = afterlen;
-        break;
-      case TEXT:
-        endcell->state       = TEXT;
-        endcell->len         = afterlen;
-        endcell->pen         = tickit_pen_clone(spancell->pen);
-        endcell->v.text.idx  = spancell->v.text.idx;
-        endcell->v.text.offs = spancell->v.text.offs + end - spanstart;
-        break;
-      case ERASE:
-        endcell->state = ERASE;
-        endcell->len   = afterlen;
-        endcell->pen   = tickit_pen_clone(spancell->pen);
-        break;
-      default:
-        croak("TODO: split _make_span after in state %d", spancell->state);
-        return NULL; /* unreached */
-    }
-
-    // We know these are already CONT cells
-    int c;
-    for(c = end + 1; c < spanend; c++)
-      cells[line][c].len = end;
-  }
-
-  // If the initial cell is a CONT, shorten its start
-  if(cells[line][col].state == CONT) {
-    int beforestart = cells[line][col].len;
-    TickitRenderBufferCell *spancell = &cells[line][beforestart];
-    int beforelen = col - beforestart;
-
-    switch(spancell->state) {
-      case SKIP:
-      case TEXT:
-      case ERASE:
-        spancell->len = beforelen;
-        break;
-      default:
-        croak("TODO: split _make_span before in state %d", spancell->state);
-        return NULL; /* unreached */
-    }
-  }
-
-  // cont_cell() also frees any pens in the range
-  int c;
-  for(c = col; c < end; c++)
-    _tickit_rb_cont_cell(&cells[line][c], col);
-
-  cells[line][col].len = len;
-
-  return &cells[line][col];
-}
-
-static TickitPen *_tickit_rb_merge_pen(TickitRenderBuffer *rb, TickitPen *direct_pen)
-{
-  TickitPen *pen = tickit_pen_new();
-
-  // TODO: When libtickit itself can refcount pens, we can make this more
-  //   efficient in non-merge cases
-
-  if(rb->pen)
-    tickit_pen_copy(pen, rb->pen, 1);
-
-  if(direct_pen)
-    tickit_pen_copy(pen, direct_pen, 1);
-
-  return pen;
-}
-
-static void tickit_renderbuffer_erase_at(TickitRenderBuffer *rb, int line, int col, int len, TickitPen *pen);
-
-static TickitRenderBuffer *tickit_renderbuffer_new(int lines, int cols)
-{
-  TickitRenderBuffer *rb;
-  int line, col;
-
-  Newx(rb, 1, TickitRenderBuffer);
-
-  rb->lines = lines;
-  rb->cols  = cols;
-
-  Newx(rb->cells, rb->lines, TickitRenderBufferCell *);
-  for(line = 0; line < rb->lines; line++) {
-    Newx(rb->cells[line], rb->cols, TickitRenderBufferCell);
-
-    rb->cells[line][0].state     = SKIP;
-    rb->cells[line][0].maskdepth = -1;
-    rb->cells[line][0].len       = rb->cols;
-    rb->cells[line][0].pen       = NULL;
-
-    for(col = 1; col < rb->cols; col++) {
-      rb->cells[line][col].state     = CONT;
-      rb->cells[line][col].maskdepth = -1;
-      rb->cells[line][col].len       = 0;
-    }
-  }
-
-  rb->vc_pos_set = 0;
-
-  rb->xlate_line = 0;
-  rb->xlate_col  = 0;
-
-  tickit_rect_init_sized(&rb->clip, 0, 0, rb->lines, rb->cols);
-
-  rb->pen = NULL;
-
-  rb->stack = NULL;
-  rb->depth = 0;
-
-  rb->n_texts = 0;
-  rb->size_texts = 4;
-  Newx(rb->texts, rb->size_texts, char *);
-
-  return rb;
-}
-
-static void tickit_renderbuffer_free(TickitRenderBuffer *rb)
-{
-  SV *cellsv;
-  int line, col;
-
-  for(line = 0; line < rb->lines; line++) {
-    for(col = 0; col < rb->cols; col++) {
-      TickitRenderBufferCell *cell = &rb->cells[line][col];
-      switch(cell->state) {
-        case TEXT:
-        case ERASE:
-        case LINE:
-        case CHAR:
-          tickit_pen_destroy(cell->pen);
-          break;
-      }
-    }
-    Safefree(rb->cells[line]);
-  }
-
-  Safefree(rb->cells);
-  rb->cells = NULL;
-
-  if(rb->pen)
-    tickit_pen_destroy(rb->pen);
-
-  if(rb->stack)
-    _tickit_rb_free_stack(rb->stack);
-
-  _tickit_rb_free_texts(rb);
-  Safefree(rb->texts);
-
-  Safefree(rb);
-}
-
-static void tickit_renderbuffer_translate(TickitRenderBuffer *rb, int downward, int rightward)
-{
-  rb->xlate_line += downward;
-  rb->xlate_col  += rightward;
-}
-
-static void tickit_renderbuffer_clip(TickitRenderBuffer *rb, TickitRect *rect)
-{
-  TickitRect other;
-
-  other = *rect;
-  other.top  += rb->xlate_line;
-  other.left += rb->xlate_col;
-
-  if(!tickit_rect_intersect(&rb->clip, &rb->clip, &other))
-    rb->clip.lines = 0;
-}
-
-static void tickit_renderbuffer_mask(TickitRenderBuffer *rb, TickitRect *mask)
-{
-  TickitRect hole;
-  int line, col;
-
-  hole = *mask;
-  hole.top  += rb->xlate_line;
-  hole.left += rb->xlate_col;
-
-  if(hole.top < 0) {
-    hole.lines += hole.top;
-    hole.top = 0;
-  }
-  if(hole.left < 0) {
-    hole.cols += hole.left;
-    hole.left = 0;
-  }
-
-  for(line = hole.top; line < hole.top + hole.lines && line < rb->lines; line++) {
-    for(col = hole.left; col < hole.left + hole.cols && col < rb->cols; col++) {
-      TickitRenderBufferCell *cell = &rb->cells[line][col];
-      if(cell->maskdepth == -1)
-        cell->maskdepth = rb->depth;
-    }
-  }
-}
-
-static void tickit_renderbuffer_goto(TickitRenderBuffer *rb, int line, int col)
-{
-  rb->vc_pos_set = 1;
-  rb->vc_line = line;
-  rb->vc_col  = col;
-}
-
-static void tickit_renderbuffer_ungoto(TickitRenderBuffer *rb)
-{
-  rb->vc_pos_set = 0;
-}
-
-static void tickit_renderbuffer_setpen(TickitRenderBuffer *rb, TickitPen *pen)
-{
-  TickitPen *prevpen = NULL;
-
-  if(rb->stack && rb->stack->pen)
-    prevpen = rb->stack->pen;
-
-  if(!pen && !prevpen) {
-    if(rb->pen)
-      tickit_pen_destroy(rb->pen);
-    rb->pen = NULL;
-  }
-  else {
-    if(!rb->pen)
-      rb->pen = tickit_pen_new();
-    else
-      tickit_pen_clear(rb->pen);
-
-    if(pen)
-      tickit_pen_copy(rb->pen, pen, 1);
-    if(prevpen)
-      tickit_pen_copy(rb->pen, prevpen, 0);
-  }
-}
-
-static void tickit_renderbuffer_reset(TickitRenderBuffer *rb)
-{
-  int line, col;
-
-  for(line = 0; line < rb->lines; line++) {
-    // cont_cell also frees pen
-    for(col = 0; col < rb->cols; col++)
-      _tickit_rb_cont_cell(&rb->cells[line][col], 0);
-
-    rb->cells[line][0].state     = SKIP;
-    rb->cells[line][0].maskdepth = -1;
-    rb->cells[line][0].len       = rb->cols;
-  }
-
-  rb->vc_pos_set = 0;
-
-  rb->xlate_line = 0;
-  rb->xlate_col  = 0;
-
-  tickit_rect_init_sized(&rb->clip, 0, 0, rb->lines, rb->cols);
-
-  if(rb->pen) {
-    tickit_pen_destroy(rb->pen);
-    rb->pen = NULL;
-  }
-
-  if(rb->stack) {
-    _tickit_rb_free_stack(rb->stack);
-    rb->stack = NULL;
-    rb->depth = 0;
-  }
-
-  _tickit_rb_free_texts(rb);
-}
-
-static void tickit_renderbuffer_clear(TickitRenderBuffer *rb, TickitPen *pen)
-{
-  int line;
-
-  for(line = 0; line < rb->lines; line++)
-    tickit_renderbuffer_erase_at(rb, line, 0, rb->cols, pen);
-}
-
-static void tickit_renderbuffer_save(TickitRenderBuffer *rb)
-{
-  TickitRenderBufferStack *stack;
-
-  Newx(stack, 1, struct TickitRenderBufferStack);
-  stack->vc_line    = rb->vc_line;
-  stack->vc_col     = rb->vc_col;
-  stack->xlate_line = rb->xlate_line;
-  stack->xlate_col  = rb->xlate_col;
-  stack->clip       = rb->clip;
-  stack->pen        = rb->pen ? tickit_pen_clone(rb->pen) : NULL;
-  stack->pen_only   = 0;
-
-  stack->prev = rb->stack;
-  rb->stack = stack;
-  rb->depth++;
-}
-
-static void tickit_renderbuffer_savepen(TickitRenderBuffer *rb)
-{
-  TickitRenderBufferStack *stack;
-
-  Newx(stack, 1, struct TickitRenderBufferStack);
-  stack->pen      = rb->pen ? tickit_pen_clone(rb->pen) : NULL;
-  stack->pen_only = 1;
-
-  stack->prev = rb->stack;
-  rb->stack = stack;
-  rb->depth++;
-}
-
-static void tickit_renderbuffer_restore(TickitRenderBuffer *rb)
-{
-  TickitRenderBufferStack *stack;
-
-  if(!rb->stack)
-    return;
-
-  stack = rb->stack;
-  rb->stack = stack->prev;
-
-  if(!stack->pen_only) {
-    rb->vc_line    = stack->vc_line;
-    rb->vc_col     = stack->vc_col;
-    rb->xlate_line = stack->xlate_line;
-    rb->xlate_col  = stack->xlate_col;
-    rb->clip       = stack->clip;
-  }
-
-  if(rb->pen)
-    tickit_pen_destroy(rb->pen);
-  rb->pen = stack->pen;
-  // We've now definitely taken ownership of the old stack frame's pen, so
-  //   it doesn't need destroying now
-
-  rb->depth--;
-  {
-    // TODO: this could be done more efficiently by remembering the edges of masking
-    int line, col;
-    for(line = 0; line < rb->lines; line++)
-      for(col = 0; col < rb->cols; col++)
-        if(rb->cells[line][col].maskdepth > rb->depth)
-          rb->cells[line][col].maskdepth = -1;
-  }
-
-  Safefree(stack);
-}
-
-static void tickit_renderbuffer_skip_at(TickitRenderBuffer *rb, int line, int col, int len)
-{
-  TickitRenderBufferCell *cell;
-
-  if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
-    return;
-
-  if(line < 0 || line >= rb->lines)
-    croak("$line out of range");
-  if(col < 0)
-    croak("$col out of range");
-  if(len < 1)
-    croak("$len out of range");
-  if(col + len > rb->cols)
-    croak("$col+$len out of range");
-
-  cell = _tickit_rb_make_span(rb, line, col, len);
-  cell->state = SKIP;
-}
-
-static void tickit_renderbuffer_skip(TickitRenderBuffer *rb, int len)
-{
-  if(!rb->vc_pos_set)
-    croak("Cannot ->skip without a virtual cursor position");
-
-  tickit_renderbuffer_skip_at(rb, rb->vc_line, rb->vc_col, len);
-  rb->vc_col += len;
-}
-
-static void tickit_renderbuffer_skip_to(TickitRenderBuffer *rb, int col)
-{
-  if(!rb->vc_pos_set)
-    croak("Cannot ->skip_to without a virtual cursor position");
-
-  if(rb->vc_col < col)
-    tickit_renderbuffer_skip_at(rb, rb->vc_line, rb->vc_col, col - rb->vc_col);
-
-  rb->vc_col = col;
-}
-
-static int tickit_renderbuffer_text_at(TickitRenderBuffer *rb, int line, int col, char *text, TickitPen *pen)
-{
-  TickitRenderBufferCell *cell;
-  TickitRenderBufferCell *linecells;
-  TickitStringPos endpos;
-  int ret;
-  int len;
-  int startcol;
-
-  tickit_string_count(text, &endpos, NULL);
-  ret = len = endpos.columns;
-
-  if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, &startcol))
-    return ret;
-
-  if(line < 0 || line >= rb->lines)
-    croak("$line out of range");
-  if(col < 0)
-    croak("$col out of range");
-  if(len < 1)
-    croak("$len out of range");
-  if(col + len > rb->cols)
-    croak("$col+$len out of range");
-
-  if(rb->n_texts == rb->size_texts) {
-    rb->size_texts *= 2;
-    Renew(rb->texts, rb->size_texts, char *);
-  }
-
-  rb->texts[rb->n_texts] = savepv(text);
-
-  linecells = rb->cells[line];
-
-  while(len) {
-    while(len && linecells[col].maskdepth > -1) {
-      col++;
-      len--;
-      startcol++;
-    }
-    if(!len)
-      break;
-
-    int spanlen = 0;
-    while(len && linecells[col + spanlen].maskdepth == -1) {
-      spanlen++;
-      len--;
-    }
-    if(!spanlen)
-      break;
-
-    cell = _tickit_rb_make_span(rb, line, col, spanlen);
-    cell->state       = TEXT;
-    cell->pen         = _tickit_rb_merge_pen(rb, pen);
-    cell->v.text.idx  = rb->n_texts;
-    cell->v.text.offs = startcol;
-
-    col      += spanlen;
-    startcol += spanlen;
-  }
-
-  rb->n_texts++;
-
-  return ret;
-}
-
-static int tickit_renderbuffer_text(TickitRenderBuffer *rb, char *text, TickitPen *pen)
-{
-  int len;
-
-  if(!rb->vc_pos_set)
-    croak("Cannot ->text without a virtual cursor position");
-
-  len = tickit_renderbuffer_text_at(rb, rb->vc_line, rb->vc_col, text, pen);
-  rb->vc_col += len;
-
-  return len;
-}
-
-static void tickit_renderbuffer_erase_at(TickitRenderBuffer *rb, int line, int col, int len, TickitPen *pen)
-{
-  TickitRenderBufferCell *cell;
-  TickitRenderBufferCell *linecells;
-
-  if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
-    return;
-
-  if(line < 0 || line >= rb->lines)
-    croak("$line out of range");
-  if(col < 0)
-    croak("$col out of range");
-  if(len < 1)
-    croak("$len out of range");
-  if(col + len > rb->cols)
-    croak("$col+$len out of range");
-
-  linecells = rb->cells[line];
-
-  while(len) {
-    while(len && linecells[col].maskdepth > -1) {
-      col++;
-      len--;
-    }
-    if(!len)
-      break;
-
-    int spanlen = 0;
-    while(len && linecells[col + spanlen].maskdepth == -1) {
-      spanlen++;
-      len--;
-    }
-    if(!spanlen)
-      break;
-
-    cell = _tickit_rb_make_span(rb, line, col, spanlen);
-    cell->state = ERASE;
-    cell->pen   = _tickit_rb_merge_pen(rb, pen);
-
-    col += spanlen;
-  }
-}
-
-static void tickit_renderbuffer_erase(TickitRenderBuffer *rb, int len, TickitPen *pen)
-{
-  if(!rb->vc_pos_set)
-    croak("Cannot ->erase without a virtual cursor position");
-
-  tickit_renderbuffer_erase_at(rb, rb->vc_line, rb->vc_col, len, pen);
-  rb->vc_col += len;
-}
-
-static void tickit_renderbuffer_erase_to(TickitRenderBuffer *rb, int col, TickitPen *pen)
-{
-  if(!rb->vc_pos_set)
-    croak("Cannot ->erase_to without a virtual cursor position");
-
-  if(rb->vc_col < col)
-    tickit_renderbuffer_erase_at(rb, rb->vc_line, rb->vc_col, col - rb->vc_col, pen);
-
-  rb->vc_col = col;
-}
-
-static void tickit_renderbuffer_eraserect(TickitRenderBuffer *rb, TickitRect *rect, TickitPen *pen)
-{
-  int line;
-
-  for(line = rect->top; line < tickit_rect_bottom(rect); line++)
-    tickit_renderbuffer_erase_at(rb, line, rect->left, rect->cols, pen);
-}
-
-static void tickit_renderbuffer_char_at(TickitRenderBuffer *rb, int line, int col, long codepoint, TickitPen *pen)
-{
-  TickitRenderBufferCell *cell;
-  int len = 1;
-
-  if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
-    return;
-
-  if(line < 0 || line >= rb->lines)
-    croak("$line out of range");
-  if(col < 0)
-    croak("$col out of range");
-  if(len < 1)
-    croak("$len out of range");
-  if(col + len > rb->cols)
-    croak("$col+$len out of range");
-
-  if(rb->cells[line][col].maskdepth > -1)
-    return;
-
-  cell = _tickit_rb_make_span(rb, line, col, len);
-  cell->state           = CHAR;
-  cell->pen             = _tickit_rb_merge_pen(rb, pen);
-  cell->v.chr.codepoint = codepoint;
-}
-
-static void _tickit_rb_linecell(TickitRenderBuffer *rb, int line, int col, int bits, TickitPen *pen)
-{
-  TickitRenderBufferCell *cell;
-  int len = 1;
-
-  if(!_tickit_rb_xlate_and_clip(rb, &line, &col, &len, NULL))
-    return;
-
-  if(line < 0 || line >= rb->lines)
-    croak("$line out of range");
-  if(col < 0)
-    croak("$col out of range");
-  if(len < 1)
-    croak("$len out of range");
-  if(col + len > rb->cols)
-    croak("$col+$len out of range");
-
-  if(rb->cells[line][col].maskdepth > -1)
-    return;
-
-  TickitPen *cellpen = _tickit_rb_merge_pen(rb, pen);
-
-  cell = &rb->cells[line][col];
-  if(cell->state != LINE) {
-    _tickit_rb_make_span(rb, line, col, len);
-    cell->state       = LINE;
-    cell->len         = 1;
-    cell->pen         = cellpen;
-    cell->v.line.mask = 0;
-  }
-  else if(!tickit_pen_equiv(cell->pen, cellpen)) {
-    warn("Pen collision for line cell (%d,%d)", line, col);
-    tickit_pen_destroy(cell->pen);
-    cell->pen   = cellpen;
-  }
-  else
-    tickit_pen_destroy(cellpen);
-
-  cell->v.line.mask |= bits;
-}
-
-static void tickit_renderbuffer_hline_at(TickitRenderBuffer *rb, int line, int startcol, int endcol,
-    int style, TickitPen *pen, int caps)
-{
-  int east = style << EAST_SHIFT;
-  int west = style << WEST_SHIFT;
-  int col;
-
-  pen = _tickit_rb_merge_pen(rb, pen);
-
-  _tickit_rb_linecell(rb, line, startcol, east | (caps & CAP_START ? west : 0), pen);
-  for(col = startcol + 1; col <= endcol - 1; col++)
-    _tickit_rb_linecell(rb, line, col, east | west, pen);
-  _tickit_rb_linecell(rb, line, endcol, (caps & CAP_END ? east : 0) | west, pen);
-}
-
-static void tickit_renderbuffer_vline_at(TickitRenderBuffer *rb, int startline, int endline, int col,
-    int style, TickitPen *pen, int caps)
-{
-  int north = style << NORTH_SHIFT;
-  int south = style << SOUTH_SHIFT;
-  int line;
-
-  pen = _tickit_rb_merge_pen(rb, pen);
-
-  _tickit_rb_linecell(rb, startline, col, south | (caps & CAP_START ? north : 0), pen);
-  for(line = startline + 1; line <= endline - 1; line++)
-    _tickit_rb_linecell(rb, line, col, south | north, pen);
-  _tickit_rb_linecell(rb, endline, col, (caps & CAP_END ? south : 0) | north, pen);
-}
+/*********************
+ * Tickit::StringPos *
+ *********************/
 
 typedef TickitStringPos *Tickit__StringPos;
 
@@ -1212,298 +448,6 @@ static void setup_constants(void)
   DO_CONSTANT(TICKIT_MOD_ALT)
   DO_CONSTANT(TICKIT_MOD_CTRL)
 }
-
-/**************************
- * Tickit::Test::MockTerm *
- **************************/
-
-typedef struct
-{
-  TickitTermDriver super;
-  SV *self;
-
-  AV         *methodlog;
-  AV         *cells;
-  TickitPen  *pen;
-  int         line;
-  int         col;
-  int         changed;
-  int         cursorvis;
-  int         cursorshape;
-} MockTermDriver;
-
-static SV *mockterm_push_pen_attrs_to(MockTermDriver *mtd, AV *cell)
-{
-  HV *penhv = newHV();
-  TickitPenAttr attr;
-
-  for(attr = 0; attr < TICKIT_N_PEN_ATTRS; attr++) {
-    const char *attrname = tickit_pen_attrname(attr);
-    int value;
-    switch(tickit_pen_attrtype(attr)) {
-      case TICKIT_PENTYPE_BOOL:
-        if(tickit_pen_get_bool_attr(mtd->pen, attr) == 0)
-          continue;
-        av_push(cell, newSVpv(attrname, 0));
-        av_push(cell, newSViv(1));
-        break;
-      case TICKIT_PENTYPE_INT:
-        if((value = tickit_pen_get_int_attr(mtd->pen, attr)) == -1)
-          continue;
-        av_push(cell, newSVpv(attrname, 0));
-        av_push(cell, newSViv(value));
-        break;
-      case TICKIT_PENTYPE_COLOUR:
-        if((value = tickit_pen_get_colour_attr(mtd->pen, attr)) == -1)
-          continue;
-        av_push(cell, newSVpv(attrname, 0));
-        av_push(cell, newSViv(value));
-        break;
-    }
-  }
-
-  return newRV_noinc((SV *)penhv);
-}
-
-static void mockterm_destroy(TickitTermDriver *ttd)
-{
-  MockTermDriver *mtd = (MockTermDriver *)ttd;
-
-  SvREFCNT_dec(mtd->self);
-  SvREFCNT_dec(mtd->methodlog);
-  SvREFCNT_dec(mtd->cells);
-  tickit_pen_destroy(mtd->pen);
-
-  Safefree(mtd);
-}
-
-static void mockterm_clear_cells(MockTermDriver *mtd, int line, int startcol, int stopcol)
-{
-  SV *linecells_ref;
-  AV *linecells;
-  int col;
-
-  /* This code is also used to initialise brand new cells in the structure, so
-   * it should be careful to vivify them correctly
-   */
-
-  linecells_ref = *av_fetch(mtd->cells, line, 1);
-  if(!SvOK(linecells_ref))
-    sv_setsv(linecells_ref, newRV_noinc((SV *)newAV()));
-  linecells = (AV *)SvRV(linecells_ref);
-
-  for(col = startcol; col < stopcol; col++) {
-    SV *cell_ref;
-    AV *cell;
-
-    cell_ref = *av_fetch(linecells, col, 1);
-    if(!SvOK(cell_ref))
-      sv_setsv(cell_ref, newRV_noinc((SV *)newAV()));
-
-    cell = (AV *)SvRV(cell_ref);
-
-    av_clear(cell);
-    sv_setpvn(*av_fetch(cell, 0, 1), " ", 1);
-    mockterm_push_pen_attrs_to(mtd, cell);
-  }
-}
-
-static void mockterm_print(TickitTermDriver *ttd, const char *str, size_t len)
-{
-  MockTermDriver *mtd = (MockTermDriver *)ttd;
-  AV *entry = newAV();
-  AV *linecells;
-  SV *pen;
-  TickitStringPos pos, limit;
-
-  av_push(entry, newSVpv("print", 0));
-  av_push(entry, newSVpvn_utf8(str, len, 1));
-
-  av_push(mtd->methodlog, newRV_noinc((SV *)entry));
-
-  tickit_stringpos_zero(&pos);
-  pos.columns = mtd->col;
-
-  linecells = (AV *)SvRV(*av_fetch(mtd->cells, mtd->line, 1));
-
-  tickit_stringpos_limit_columns(&limit, pos.columns);
-
-  while(pos.bytes < len) {
-    TickitStringPos start = pos;
-    AV *cell;
-
-    limit.columns++;
-    tickit_string_countmore(str + start.bytes, &pos, &limit);
-
-    if(pos.columns == start.columns)
-      continue;
-
-    cell = (AV *)SvRV(*av_fetch(linecells, start.columns, 1));
-
-    av_clear(cell);
-    sv_setpvn(*av_fetch(cell, 0, 1), str + start.bytes, pos.bytes - start.bytes);
-    SvUTF8_on(*av_fetch(cell, 0, 0));
-    mockterm_push_pen_attrs_to(mtd, cell);
-
-    // Empty out the other cells for doublewidth
-    for(start.columns++; start.columns < pos.columns; start.columns++) {
-      cell = (AV *)SvRV(*av_fetch(linecells, start.columns, 1));
-
-      av_clear(cell);
-      sv_setpvn(*av_fetch(cell, 0, 1), "", 0);
-      mockterm_push_pen_attrs_to(mtd, cell);
-    }
-  }
-
-  mtd->col = pos.columns;
-
-  mtd->changed = 1;
-}
-
-static int mockterm_goto_abs(TickitTermDriver *ttd, int line, int col)
-{
-  MockTermDriver *mtd = (MockTermDriver *)ttd;
-  AV *entry = newAV();
-
-  av_push(entry, newSVpv("goto", 0));
-  av_push(entry, newSViv(line));
-  av_push(entry, newSViv(col));
-
-  av_push(mtd->methodlog, newRV_noinc((SV *)entry));
-
-  mtd->line = line;
-  mtd->col  = col;
-
-  mtd->changed = 1;
-}
-
-static void mockterm_move_rel(TickitTermDriver *ttd, int downward, int rightward)
-{
-  fprintf(stderr, "TODO: emul move(%+d,%+d)\n", downward, rightward);
-}
-
-static int mockterm_scrollrect(TickitTermDriver *ttd, const TickitRect *rect, int downward, int rightward)
-{
-  fprintf(stderr, "TODO: emul scrollrect([%d,%d]..[%d,%d],%+d,%+d)\n",
-    rect->top, rect->left, tickit_rect_bottom(rect), tickit_rect_right(rect), downward, rightward);
-  return 0;
-}
-
-static void mockterm_erasech(TickitTermDriver *ttd, int count, int moveend)
-{
-  MockTermDriver *mtd = (MockTermDriver *)ttd;
-  AV *entry = newAV();
-
-  av_push(entry, newSVpv("erasech", 0));
-  av_push(entry, newSViv(count));
-  av_push(entry, newSViv(moveend == 1 ? 1 : 0));
-
-  av_push(mtd->methodlog, newRV_noinc((SV *)entry));
-
-  mockterm_clear_cells(mtd, mtd->line, mtd->col, mtd->col + count);
-
-  if(moveend)
-    mtd->col += count;
-
-  mtd->changed = 1;
-}
-
-static void mockterm_clear(TickitTermDriver *ttd)
-{
-  MockTermDriver *mtd = (MockTermDriver *)ttd;
-  AV *entry = newAV();
-  int line;
-
-  int lines, cols;
-  tickit_term_get_size(ttd->tt, &lines, &cols);
-
-  av_push(entry, newSVpv("clear", 0));
-
-  av_push(mtd->methodlog, newRV_noinc((SV *)entry));
-
-  for(line = 0; line < lines; line++)
-    mockterm_clear_cells(mtd, line, 0, cols);
-
-  mtd->changed = 1;
-}
-
-static void mockterm_chpen(TickitTermDriver *ttd, const TickitPen *delta, const TickitPen *final)
-{
-  MockTermDriver *mtd = (MockTermDriver *)ttd;
-  AV *entry = newAV();
-  TickitPenAttr attr;
-  HV *penattrs = newHV();
-
-  tickit_pen_clear(mtd->pen);
-  tickit_pen_copy(mtd->pen, final, 1);
-
-  for(attr = 0; attr < TICKIT_N_PEN_ATTRS; attr++) {
-    const char *attrname = tickit_pen_attrname(attr);
-    int value;
-    if(!tickit_pen_nondefault_attr(final, attr))
-      continue;
-
-    switch(tickit_pen_attrtype(attr)) {
-    case TICKIT_PENTYPE_BOOL:
-      value = tickit_pen_get_bool_attr(final, attr); break;
-    case TICKIT_PENTYPE_INT:
-      value = tickit_pen_get_int_attr(final, attr); break;
-    case TICKIT_PENTYPE_COLOUR:
-      value = tickit_pen_get_colour_attr(final, attr); break;
-    }
-
-    sv_setiv(*hv_fetch(penattrs, attrname, strlen(attrname), 1), value);
-  }
-
-  av_push(entry, newSVpv("setpen", 0));
-  av_push(entry, newRV_noinc((SV *)penattrs));
-
-  av_push(mtd->methodlog, newRV_noinc((SV *)entry));
-}
-
-static int mockterm_getctl_int(TickitTermDriver *ttd, TickitTermCtl ctl, int *value)
-{
-  switch(ctl) {
-    case TICKIT_TERMCTL_COLORS:
-      *value = 256;
-      return 1;
-    default:
-      return 0;
-  }
-}
-
-static int mockterm_setctl_int(TickitTermDriver *ttd, TickitTermCtl ctl, int value)
-{
-  MockTermDriver *mtd = (MockTermDriver *)ttd;
-
-  switch(ctl) {
-    case TICKIT_TERMCTL_CURSORVIS:
-      mtd->cursorvis = !!value; break;
-    case TICKIT_TERMCTL_CURSORSHAPE:
-      mtd->cursorshape = value; break;
-    case TICKIT_TERMCTL_ALTSCREEN:
-    case TICKIT_TERMCTL_MOUSE:
-      break;
-    default:
-      fprintf(stderr, "Tickit::Test::MockTerm ignoring setctl_int %d\n", ctl);
-      return 0;
-  }
-
-  return 1;
-}
-
-static TickitTermDriverVTable mockterm_vtable = {
-  .destroy    = mockterm_destroy,
-  .print      = mockterm_print,
-  .goto_abs   = mockterm_goto_abs,
-  .move_rel   = mockterm_move_rel,
-  .scrollrect = mockterm_scrollrect,
-  .erasech    = mockterm_erasech,
-  .clear      = mockterm_clear,
-  .chpen      = mockterm_chpen,
-  .getctl_int = mockterm_getctl_int,
-  .setctl_int = mockterm_setctl_int,
-};
 
 MODULE = Tickit             PACKAGE = Tickit::Pen
 
@@ -1969,27 +913,21 @@ void
 DESTROY(self)
   Tickit::RenderBuffer self
   CODE:
-    tickit_renderbuffer_free(self);
+    tickit_renderbuffer_destroy(self);
 
 int
 lines(self)
   Tickit::RenderBuffer self
-  INIT:
-    TickitRenderBuffer *rb;
   CODE:
-    rb = self;
-    RETVAL = rb->lines;
+    tickit_renderbuffer_get_size(self, &RETVAL, NULL);
   OUTPUT:
     RETVAL
 
 int
 cols(self)
   Tickit::RenderBuffer self
-  INIT:
-    TickitRenderBuffer *rb;
   CODE:
-    rb = self;
-    RETVAL = rb->cols;
+    tickit_renderbuffer_get_size(self, NULL, &RETVAL);
   OUTPUT:
     RETVAL
 
@@ -2000,8 +938,11 @@ line(self)
     TickitRenderBuffer *rb;
   CODE:
     rb = self;
-    if(rb->vc_pos_set)
-      RETVAL = newSViv(rb->vc_line);
+    if(tickit_renderbuffer_has_cursorpos(rb)) {
+      int line;
+      tickit_renderbuffer_get_cursorpos(rb, &line, NULL);
+      RETVAL = newSViv(line);
+    }
     else
       RETVAL = &PL_sv_undef;
   OUTPUT:
@@ -2014,8 +955,11 @@ col(self)
     TickitRenderBuffer *rb;
   CODE:
     rb = self;
-    if(rb->vc_pos_set)
-      RETVAL = newSViv(rb->vc_col);
+    if(tickit_renderbuffer_has_cursorpos(rb)) {
+      int col;
+      tickit_renderbuffer_get_cursorpos(rb, NULL, &col);
+      RETVAL = newSViv(col);
+    }
     else
       RETVAL = &PL_sv_undef;
   OUTPUT:
@@ -2094,54 +1038,83 @@ restore(self)
   CODE:
     tickit_renderbuffer_restore(self);
 
-SV *
-_xs_getcell(self,line,col)
+void
+_xs_get_cell(self,line,col)
   Tickit::RenderBuffer self
   int line
   int col
   INIT:
     TickitRenderBuffer *rb;
-  CODE:
+    STRLEN len;
+    SV *text;
+    TickitRenderBufferLineMask mask;
+  PPCODE:
     rb = self;
+    if(!tickit_renderbuffer_get_cell_active(rb, line, col)) {
+      XPUSHs(&PL_sv_undef);
+      XPUSHs(&PL_sv_undef);
+      XSRETURN(2);
+    }
 
-    if(line < 0 || line >= rb->lines)
-      croak("$line out of range");
-    if(col < 0 || col >= rb->cols)
-      croak("$col out of range");
+    len = tickit_renderbuffer_get_cell_text(rb, line, col, NULL, 0);
+    text = newSV(len + 1);
+    tickit_renderbuffer_get_cell_text(rb, line, col, SvPVX(text), len + 1);
+    SvPOK_on(text); SvUTF8_on(text); SvCUR_set(text, len);
+    XPUSHs(sv_2mortal(text));
 
-    RETVAL = newSV(0);
-    sv_setref_iv(RETVAL, "Tickit::RenderBuffer::_XSCell", (IV)(&rb->cells[line][col]));
-  OUTPUT:
-    RETVAL
+    mPUSHs(newSVpen(tickit_pen_clone(tickit_renderbuffer_get_cell_pen(rb, line, col)), NULL));
 
-SV *
-_xs_get_text_substr(self,textidx,start,len)
+    mask = tickit_renderbuffer_get_cell_linemask(rb, line, col);
+    if(!mask.north && !mask.south && !mask.east && !mask.west)
+      XSRETURN(2);
+
+    mPUSHi(mask.north);
+    mPUSHi(mask.south);
+    mPUSHi(mask.east);
+    mPUSHi(mask.west);
+    XSRETURN(6);
+
+void
+_xs_get_span(self,line,col)
   Tickit::RenderBuffer self
-  int textidx
-  int start
-  int len
+  int line
+  int col
   INIT:
     TickitRenderBuffer *rb;
-    char *text;
-    TickitStringPos startpos, endpos, limit;
-  CODE:
+    int lines, cols;
+    struct TickitRenderBufferSpanInfo info = { 0 };
+    SV *text;
+  PPCODE:
     rb = self;
+    tickit_renderbuffer_get_size(rb, &lines, &cols);
 
-    if(textidx < 0 || textidx >= rb->n_texts)
-      XSRETURN_UNDEF;
+    if(line < 0 || line >= lines)
+      croak("$line out of range");
+    if(col < 0 || col >= cols)
+      croak("$col out of range");
 
-    text = rb->texts[textidx];
+    // Request once without any buffers, to get the text length
+    if(tickit_renderbuffer_get_span(rb, line, col, &info, NULL, 0) < 0)
+      XSRETURN(0);
 
-    tickit_stringpos_limit_columns(&limit, start);
-    tickit_string_count(text, &startpos, &limit);
+    mPUSHi(info.n_columns);
 
-    tickit_stringpos_limit_columns(&limit, start + len);
-    endpos = startpos;
-    tickit_string_countmore(text, &endpos, &limit);
+    if(!info.is_active) {
+      mPUSHs(&PL_sv_undef);
+      mPUSHs(&PL_sv_undef);
+      XSRETURN(3);
+    }
 
-    RETVAL = newSVpvn_utf8(text + startpos.bytes, endpos.bytes - startpos.bytes, 1);
-  OUTPUT:
-    RETVAL
+    text = newSV(info.len + 1);
+    info.pen  = tickit_pen_new();
+
+    tickit_renderbuffer_get_span(rb, line, col, &info, SvPVX(text), info.len + 1);
+
+    SvPOK_on(text); SvUTF8_on(text); SvCUR_set(text, info.len);
+
+    mPUSHs(text);
+    mPUSHs(newSVpen(info.pen, NULL));
+    XSRETURN(3);
 
 void
 skip_at(self,line,col,len)
@@ -2157,6 +1130,9 @@ skip(self,len)
   Tickit::RenderBuffer self
   int len
   CODE:
+    if(!tickit_renderbuffer_has_cursorpos(self))
+      croak("Cannot ->skip without a virtual cursor position");
+
     tickit_renderbuffer_skip(self, len);
 
 void
@@ -2164,6 +1140,9 @@ skip_to(self,col)
   Tickit::RenderBuffer self
   int col
   CODE:
+    if(!tickit_renderbuffer_has_cursorpos(self))
+      croak("Cannot ->skip_to without a virtual cursor position");
+
     tickit_renderbuffer_skip_to(self, col);
 
 int
@@ -2184,6 +1163,9 @@ text(self,text,pen=NULL)
   SV *text
   Tickit::Pen pen
   CODE:
+    if(!tickit_renderbuffer_has_cursorpos(self))
+      croak("Cannot ->text without a virtual cursor position");
+
     RETVAL = tickit_renderbuffer_text(self, SvPVutf8_nolen(text), pen ? pen->pen : NULL);
   OUTPUT:
     RETVAL
@@ -2204,6 +1186,9 @@ erase(self,len,pen=NULL)
   int len
   Tickit::Pen pen
   CODE:
+    if(!tickit_renderbuffer_has_cursorpos(self))
+      croak("Cannot ->erase without a virtual cursor position");
+
     tickit_renderbuffer_erase(self, len, pen ? pen->pen : NULL);
 
 void
@@ -2212,6 +1197,9 @@ erase_to(self,col,pen=NULL)
   int col
   Tickit::Pen pen
   CODE:
+    if(!tickit_renderbuffer_has_cursorpos(self))
+      croak("Cannot ->erase_to without a virtual cursor position");
+
     tickit_renderbuffer_erase_to(self, col, pen ? pen->pen : NULL);
 
 void
@@ -2231,6 +1219,14 @@ char_at(self,line,col,codepoint,pen=NULL)
   Tickit::Pen pen
   CODE:
     tickit_renderbuffer_char_at(self, line, col, codepoint, pen ? pen->pen : NULL);
+
+void
+char(self,codepoint,pen=NULL)
+  Tickit::RenderBuffer self
+  int codepoint
+  Tickit::Pen pen
+  CODE:
+    tickit_renderbuffer_char(self, codepoint, pen ? pen->pen : NULL);
 
 void
 hline_at(self,line,startcol,endcol,style,pen=NULL,caps=0)
@@ -2258,127 +1254,12 @@ vline_at(self,startline,endline,col,style,pen=NULL,caps=0)
     tickit_renderbuffer_vline_at(self, startline, endline, col, style,
       pen ? pen->pen : NULL, caps);
 
-MODULE = Tickit             PACKAGE = Tickit::RenderBuffer::_XSCell
-
-int
-state(self)
-  SV *self
-  INIT:
-    TickitRenderBufferCell *cell;
+void
+flush_to_term(self,term)
+  Tickit::RenderBuffer self
+  Tickit::Term term
   CODE:
-    cell = (void *)SvIV(SvRV(self));
-    RETVAL = cell->state;
-  OUTPUT:
-    RETVAL
-
-int
-len(self)
-  SV *self
-  INIT:
-    TickitRenderBufferCell *cell;
-  CODE:
-    cell = (void *)SvIV(SvRV(self));
-    if(cell->state == CONT)
-      croak("Cannot call ->len on a CONT cell");
-    RETVAL = cell->len;
-  OUTPUT:
-    RETVAL
-
-int
-startcol(self)
-  SV *self
-  INIT:
-    TickitRenderBufferCell *cell;
-  CODE:
-    cell = (void *)SvIV(SvRV(self));
-    if(cell->state != CONT)
-      croak("Cannot call ->startcol on a non-CONT cell");
-    RETVAL = cell->len;
-  OUTPUT:
-    RETVAL
-
-SV *
-pen(self)
-  SV *self
-  INIT:
-    TickitRenderBufferCell *cell;
-  CODE:
-    cell = (void *)SvIV(SvRV(self));
-    // TODO: check state
-    RETVAL = newSVpen(tickit_pen_clone(cell->pen), NULL);
-  OUTPUT:
-    RETVAL
-
-int
-textidx(self)
-  SV *self
-  INIT:
-    TickitRenderBufferCell *cell;
-  CODE:
-    cell = (void *)SvIV(SvRV(self));
-    if(cell->state != TEXT)
-      croak("Cannot call ->textidx on a non-TEXT cell");
-    RETVAL = cell->v.text.idx;
-  OUTPUT:
-    RETVAL
-
-int
-textoffs(self)
-  SV *self
-  INIT:
-    TickitRenderBufferCell *cell;
-  CODE:
-    cell = (void *)SvIV(SvRV(self));
-    if(cell->state != TEXT)
-      croak("Cannot call ->textoffs on a non-TEXT cell");
-    RETVAL = cell->v.text.offs;
-  OUTPUT:
-    RETVAL
-
-int
-linemask(self)
-  SV *self
-  INIT:
-    TickitRenderBufferCell *cell;
-  CODE:
-    cell = (void *)SvIV(SvRV(self));
-    if(cell->state != LINE)
-      croak("Cannot call ->linemask on a non-LINE cell");
-    RETVAL = cell->v.line.mask;
-  OUTPUT:
-    RETVAL
-
-SV *
-linechar(self)
-  SV *self
-  INIT:
-    TickitRenderBufferCell *cell;
-    char utf8[UTF8_MAXBYTES + 1];
-    char *end;
-  CODE:
-    cell = (void *)SvIV(SvRV(self));
-    if(cell->state != LINE)
-      croak("Cannot call ->linechar on a non-LINE cell");
-    utf8[0] = 0;
-    end = uvchr_to_utf8(utf8, _tickit_rb_linemask_to_char[cell->v.line.mask]);
-    RETVAL = newSV(0);
-    sv_setpvn(RETVAL, utf8, end - utf8);
-    SvUTF8_on(RETVAL);
-  OUTPUT:
-    RETVAL
-
-int
-codepoint(self)
-  SV *self
-  INIT:
-    TickitRenderBufferCell *cell;
-  CODE:
-    cell = (void *)SvIV(SvRV(self));
-    if(cell->state != CHAR)
-      croak("Cannot call ->codepoint on a non-CHAR cell");
-    RETVAL = cell->v.chr.codepoint;
-  OUTPUT:
-    RETVAL
+    tickit_renderbuffer_flush_to_term(self, term->tt);
 
 MODULE = Tickit             PACKAGE = Tickit::StringPos
 
@@ -2897,68 +1778,146 @@ _new_mocking(package,lines,cols)
   int   lines
   int   cols
   INIT:
-    Tickit__Term self;
-    TickitTerm   *tt;
-    MockTermDriver *mtd;
+    TickitMockTerm *mt;
   CODE:
-    Newx(mtd, 1, MockTermDriver);
-    mtd->super.vtable = &mockterm_vtable;
-
-    mtd->methodlog = newAV();
-    mtd->cells     = newAV();
-
-    mtd->pen       = tickit_pen_new();
-
-    mtd->line        = -1;
-    mtd->col         = -1;
-    mtd->changed     = 0;
-    mtd->cursorvis   = 0;
-    mtd->cursorshape = 0;
-
-    tt = tickit_term_new_for_driver(&mtd->super);
-    if(!tt)
+    mt = tickit_mockterm_new(lines, cols);
+    if(!mt)
       XSRETURN_UNDEF;
 
-    tickit_term_set_size(tt, lines, cols);
-
-    RETVAL = newSVterm(tt, "Tickit::Test::MockTerm");
-
-    mtd->self = newSVsv(RETVAL);
-    sv_rvweaken(mtd->self); // avoid another
-  OUTPUT:
-    RETVAL
-
-SV *
-methodlog(self)
-  Tickit::Term self
-  ALIAS:
-    methodlog = 0
-    cells     = 1
-  INIT:
-    MockTermDriver *mtd;
-    SV *rv;
-  CODE:
-    mtd = (MockTermDriver *)tickit_term_get_driver(self->tt);
-    switch(ix) {
-      case 0: rv = (SV *)mtd->methodlog; break;
-      case 1: rv = (SV *)mtd->cells;     break;
-    }
-
-    RETVAL = newRV(rv);
+    RETVAL = newSVterm((TickitTerm *)mt, "Tickit::Test::MockTerm");
   OUTPUT:
     RETVAL
 
 void
-_clearcells(self,line,startcol,count)
+get_methodlog(self)
+  Tickit::Term self
+  INIT:
+    TickitMockTerm *mt;
+    int loglen;
+    int i;
+  PPCODE:
+    mt = (TickitMockTerm *)self->tt;
+
+    EXTEND(SP, (loglen = tickit_mockterm_loglen(mt)));
+    for(i = 0; i < loglen; i++) {
+      TickitMockTermLogEntry *entry = tickit_mockterm_peeklog(mt, i);
+      AV *ret = newAV();
+      switch(entry->type) {
+      case LOG_GOTO:
+        av_push(ret, newSVpv("goto", 0));
+        av_push(ret, newSViv(entry->val1)); // line
+        av_push(ret, newSViv(entry->val2)); // col
+        break;
+      case LOG_PRINT:
+        av_push(ret, newSVpv("print", 0));
+        av_push(ret, newSVpvn_utf8(entry->str, entry->val1, 1));
+        break;
+      case LOG_ERASECH:
+        av_push(ret, newSVpv("erasech", 0));
+        av_push(ret, newSViv(entry->val1)); // count
+        av_push(ret, newSViv(entry->val2 == 1 ? 1 : 0)); // moveend
+        break;
+      case LOG_CLEAR:
+        av_push(ret, newSVpv("clear", 0));
+        break;
+      case LOG_SCROLLRECT:
+        av_push(ret, newSVpv("scrollrect", 0));
+        av_push(ret, newSViv(entry->rect.top));
+        av_push(ret, newSViv(entry->rect.left));
+        av_push(ret, newSViv(entry->rect.lines));
+        av_push(ret, newSViv(entry->rect.cols));
+        av_push(ret, newSViv(entry->val1)); // downward
+        av_push(ret, newSViv(entry->val2)); // rightward
+        break;
+      case LOG_SETPEN:
+        {
+          HV *penattrs = newHV();
+          TickitPenAttr attr;
+
+          for(attr = 0; attr < TICKIT_N_PEN_ATTRS; attr++) {
+            const char *attrname = tickit_pen_attrname(attr);
+            int value;
+            if(!tickit_pen_nondefault_attr(entry->pen, attr))
+              continue;
+
+            switch(tickit_pen_attrtype(attr)) {
+            case TICKIT_PENTYPE_BOOL:
+              value = tickit_pen_get_bool_attr(entry->pen, attr); break;
+            case TICKIT_PENTYPE_INT:
+              value = tickit_pen_get_int_attr(entry->pen, attr); break;
+            case TICKIT_PENTYPE_COLOUR:
+              value = tickit_pen_get_colour_attr(entry->pen, attr); break;
+            }
+
+            sv_setiv(*hv_fetch(penattrs, attrname, strlen(attrname), 1), value);
+          }
+
+          av_push(ret, newSVpv("setpen", 0));
+          av_push(ret, newRV_noinc((SV *)penattrs));
+        }
+        break;
+      }
+      mPUSHs(newRV_noinc((SV *)ret));
+    }
+
+    tickit_mockterm_clearlog(mt);
+
+    XSRETURN(i);
+
+SV *
+get_display_text(self,line,col,width)
   Tickit::Term self
   int line
-  int startcol
-  int count
+  int col
+  int width
   INIT:
-    MockTermDriver *mtd;
+    STRLEN len;
   CODE:
-    mtd = (MockTermDriver *)tickit_term_get_driver(self->tt);
-    mockterm_clear_cells(mtd, line, startcol, startcol + count);
+    len = tickit_mockterm_get_display_text((TickitMockTerm *)self->tt, NULL, 0, line, col, width);
+
+    RETVAL = newSV(len+1);
+
+    tickit_mockterm_get_display_text((TickitMockTerm *)self->tt, SvPVX(RETVAL), len, line, col, width);
+
+    SvPOK_on(RETVAL);
+    SvUTF8_on(RETVAL);
+    SvCUR_set(RETVAL, len);
+  OUTPUT:
+    RETVAL
+
+SV *
+get_display_pen(self,line,col)
+  Tickit::Term self
+  int line
+  int col
+  INIT:
+    TickitPen *pen;
+    HV *penattrs;
+    TickitPenAttr attr;
+  CODE:
+    pen = tickit_mockterm_get_display_pen((TickitMockTerm *)self->tt, line, col);
+
+    penattrs = newHV();
+    for(attr = 0; attr < TICKIT_N_PEN_ATTRS; attr++) {
+      const char *attrname;
+      if(!tickit_pen_nondefault_attr(pen, attr))
+        continue;
+
+      attrname = tickit_pen_attrname(attr);
+      hv_store(penattrs, attrname, strlen(attrname), pen_get_attr(pen, attr), 0);
+    }
+
+    RETVAL = newRV_noinc((SV *)penattrs);
+  OUTPUT:
+    RETVAL
+
+void
+resize(self,newlines,newcols)
+  Tickit::Term self
+  int newlines
+  int newcols
+  CODE:
+    tickit_mockterm_resize((TickitMockTerm *)self->tt, newlines, newcols);
 
 int
 line(self)
@@ -2966,40 +1925,20 @@ line(self)
   ALIAS:
     line        = 0
     col         = 1
-    is_changed  = 2
-    cursorvis   = 3
-    cursorshape = 4
+    cursorvis   = 2
+    cursorshape = 3
   INIT:
-    MockTermDriver *mtd;
+    TickitMockTerm *mt;
   CODE:
-    mtd = (MockTermDriver *)tickit_term_get_driver(self->tt);
+    mt = (TickitMockTerm *)self->tt;
     switch(ix) {
-      case 0: RETVAL = mtd->line;        break;
-      case 1: RETVAL = mtd->col;         break;
-      case 2: RETVAL = mtd->changed;     break;
-      case 3: RETVAL = mtd->cursorvis;   break;
-      case 4: RETVAL = mtd->cursorshape; break;
+      case 0: tickit_mockterm_get_position(mt, &RETVAL, NULL); break;
+      case 1: tickit_mockterm_get_position(mt, NULL, &RETVAL); break;
+      case 2: tickit_term_getctl_int(self->tt, TICKIT_TERMCTL_CURSORVIS, &RETVAL); break;
+      case 3: tickit_term_getctl_int(self->tt, TICKIT_TERMCTL_CURSORSHAPE, &RETVAL); break;
     }
   OUTPUT:
     RETVAL
-
-void
-_set_line(self,new)
-  Tickit::Term self
-  int          new
-  ALIAS:
-    _set_line    = 0
-    _set_col     = 1
-    _set_changed = 2
-  INIT:
-    MockTermDriver *mtd;
-  CODE:
-    mtd = (MockTermDriver *)tickit_term_get_driver(self->tt);
-    switch(ix) {
-      case 0: mtd->line    = new; break;
-      case 1: mtd->col     = new; break;
-      case 2: mtd->changed = new; break;
-    }
 
 MODULE = Tickit             PACKAGE = Tickit::Utils
 
@@ -3008,31 +1947,38 @@ string_count(str,pos,limit=NULL)
     SV *str
     Tickit::StringPos pos
     Tickit::StringPos limit
+  INIT:
+    char *s;
+    STRLEN len;
   CODE:
     if(!SvUTF8(str)) {
       str = sv_mortalcopy(str);
       sv_utf8_upgrade(str);
     }
 
-    RETVAL = tickit_string_count(SvPVX(str), pos, limit);
+    s = SvPVutf8(str, len);
+    RETVAL = tickit_string_ncount(s, len, pos, limit);
     if(RETVAL == -1)
       XSRETURN_UNDEF;
   OUTPUT:
     RETVAL
 
 size_t
-string_countmore(str,pos,limit=NULL,start=0)
+string_countmore(str,pos,limit=NULL)
     SV *str
     Tickit::StringPos pos
     Tickit::StringPos limit
-    size_t start
+  INIT:
+    char *s;
+    STRLEN len;
   CODE:
     if(!SvUTF8(str)) {
       str = sv_mortalcopy(str);
       sv_utf8_upgrade(str);
     }
 
-    RETVAL = tickit_string_countmore(SvPVX(str) + start, pos, limit);
+    s = SvPVutf8(str, len);
+    RETVAL = tickit_string_ncountmore(s, len, pos, limit);
     if(RETVAL == -1)
       XSRETURN_UNDEF;
   OUTPUT:
@@ -3043,7 +1989,7 @@ int textwidth(str)
   INIT:
     STRLEN len;
     const char *s;
-    TickitStringPos pos, limit;
+    TickitStringPos pos, limit = INIT_TICKIT_STRINGPOS_LIMIT_NONE;
 
   CODE:
     RETVAL = 0;
@@ -3053,10 +1999,8 @@ int textwidth(str)
       sv_utf8_upgrade(str);
     }
 
-    s = SvPV_const(str, len);
-
-    tickit_stringpos_limit_bytes(&limit, len);
-    if(tickit_string_count(s, &pos, &limit) == -1)
+    s = SvPVutf8(str, len);
+    if(tickit_string_ncount(s, len, &pos, &limit) == -1)
       XSRETURN_UNDEF;
 
     RETVAL = pos.columns;
@@ -3079,7 +2023,7 @@ void chars2cols(str,...)
       sv_utf8_upgrade(str);
     }
 
-    s = SvPV_const(str, len);
+    s = SvPVutf8(str, len);
 
     EXTEND(SP, items - 1);
 
@@ -3092,7 +2036,7 @@ void chars2cols(str,...)
         croak("chars2cols requires a monotonically-increasing list of character numbers; %d is not greater than %d\n",
           limit.codepoints, pos.codepoints);
 
-      bytes = tickit_string_countmore(s, &pos, &limit);
+      bytes = tickit_string_ncountmore(s, len, &pos, &limit);
       if(bytes == -1)
         XSRETURN_UNDEF;
 
@@ -3100,8 +2044,6 @@ void chars2cols(str,...)
 
       if(GIMME_V != G_ARRAY)
         XSRETURN(1);
-
-      s += bytes;
     }
 
     XSRETURN(items - 1);
@@ -3121,7 +2063,7 @@ void cols2chars(str,...)
       sv_utf8_upgrade(str);
     }
 
-    s = SvPV_const(str, len);
+    s = SvPVutf8(str, len);
 
     EXTEND(SP, items - 1);
 
@@ -3134,7 +2076,7 @@ void cols2chars(str,...)
         croak("cols2chars requires a monotonically-increasing list of column numbers; %d is not greater than %d\n",
           limit.columns, pos.columns);
 
-      bytes = tickit_string_countmore(s, &pos, &limit);
+      bytes = tickit_string_ncountmore(s, len, &pos, &limit);
       if(bytes == -1)
         XSRETURN_UNDEF;
 
@@ -3142,8 +2084,6 @@ void cols2chars(str,...)
 
       if(GIMME_V != G_ARRAY)
         XSRETURN(1);
-
-      s += bytes;
     }
 
     XSRETURN(items - 1);

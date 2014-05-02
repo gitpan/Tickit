@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Carp;
 
@@ -722,8 +722,7 @@ sub set_on_key
       shift;
    }
    else {
-      carp "Deprecated use of Window->set_on_key without ev" if defined $_[0];
-      $self->{on_key_with_ev} = 0;
+      croak "Use of Window->set_on_key without ev" if defined $_[0];
    }
 
    ( $self->{on_key} ) = @_;
@@ -853,8 +852,7 @@ sub set_on_mouse
       shift;
    }
    else {
-      carp "Deprecated use of Window->set_on_mouse without ev" if defined $_[0];
-      $self->{on_mouse_with_ev} = 0;
+      croak "Use of Window->set_on_mouse without ev" if defined $_[0];
    }
 
    ( $self->{on_mouse} ) = @_;
@@ -937,8 +935,7 @@ sub set_on_expose
       shift;
    }
    else {
-      carp "Deprecated use of Window->set_on_expose without rb" if defined $_[0];
-      $self->{expose_with_rb} = 0;
+      croak "Use of Window->set_on_expose without rb" if defined $_[0];
    }
 
    ( $self->{on_expose} ) = @_;
@@ -1264,23 +1261,9 @@ sub getpenattr
    return $self->{pen}->getattr( $attr );
 }
 
-=head2 %attrs = $win->getpenattrs
-
-Retrieve the current pen settings for the window.
-
-This method is now deprecated and should not be used; instead use
-
- $win->pen->getattrs
-
-=cut
-
 sub getpenattrs
 {
-   my $self = shift;
-
-   carp "Use of \$win->getpenattrs is deprecated; see ->pen->getattrs instead";
-
-   return $self->{pen}->getattrs;
+   croak "\$win->getpenattrs should not be used; see ->pen->getattrs instead";
 }
 
 =head2 $pen = $win->get_effective_pen
@@ -1336,9 +1319,7 @@ This method is now deprecated and should not be used; instead use
 
 sub get_effective_penattrs
 {
-   my $self = shift;
-   carp "Use of \$win->get_effective_penattrs is deprecated; see ->get_effective_pen->getattrs instead";
-   return $self->get_effective_pen->getattrs;
+   croak "\$win->get_effective_penattrs should not be used; see ->get_effective_pen->getattrs instead";
 }
 
 sub _get_span_visibility
@@ -1500,13 +1481,13 @@ sub print
       my ( $vis, $cols ) = $self->_get_span_visibility( $line, $self->{output_column} + $pos->columns );
 
       if( !$vis and !defined $cols ) {
-         string_countmore( $text, $pos, undef, $pos->bytes );
+         string_countmore( $text, $pos );
          last;
       }
 
       my $prev_cp  = $pos->codepoints;
       my $prev_col = $pos->columns;
-      defined string_countmore( $text, $pos, Tickit::StringPos->limit_columns( $cols + $pos->columns ), $pos->bytes ) or
+      defined string_countmore( $text, $pos, Tickit::StringPos->limit_columns( $cols + $pos->columns ) ) or
          croak "Encountered non-Unicode text in ->print; bailing out";
 
       # TODO: This would be more efficient in bytes, but 'use bytes' breaks
@@ -2189,8 +2170,7 @@ sub mod_is_shift { shift->mod & Tickit::Term::MOD_SHIFT }
 # expects to find the event type name there
 use overload
    '""' => sub {
-      carp "Deprecated use of '\$ev' to mean ->type";
-      shift->type },
+      croak "Deprecated use of '\$ev' to mean ->type"; },
    fallback => 1;
 
 =head1 AUTHOR

@@ -20,6 +20,7 @@ examples/hello-world.pl
 examples/HelloWorldWidget-1.pm
 examples/HelloWorldWidget-2.pm
 examples/testonewidget.pl
+include/tickit-mockterm.h
 include/tickit-termdrv.h
 include/tickit.h
 lib/linechars.inc
@@ -59,9 +60,12 @@ META.yml
 README
 src/hooklists.c
 src/hooklists.h
+src/linechars.inc
+src/mockterm.c
 src/pen.c
 src/rect.c
 src/rectset.c
+src/renderbuffer.c
 src/string.c
 src/term.c
 src/termdriver-ti.c
@@ -109,7 +113,5 @@ t/52widget-hbox.t
 t/52widget-vbox.t
 t/80tickit.t
 t/81tickit-input.t
-t/90legacy-window-expose.t
-t/91legacy-widget-render.t
 t/99pod.t
 typemap
