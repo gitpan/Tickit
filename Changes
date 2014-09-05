@@ -1,5 +1,16 @@
 Revision history for Changes
 
+0.47    2014/09/05 23:22:29
+        [CHANGES]
+         * Moved Tickit::Widget::HBox/VBox to the Tickit-Widgets dist
+         * Remove Tickit::WidgetRole::Penable
+         * Support the new 'blink' Pen attribute
+
+        [BUGFIXES]
+         * Bundled libtickit bugfixes:
+            + Improved handling of some missing terminfo attributes
+            + Respect renderbuffer offset and limits in get_* functions
+
 0.46    2014/05/02 20:16:37
         [CHANGES]
          * Move RenderBuffer and MockTerm entirely into libtickit C library

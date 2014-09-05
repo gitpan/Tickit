@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2012-2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2012-2014 -- leonerd@leonerd.org.uk
 
 package Tickit::Widget::Box;
 
@@ -14,7 +14,7 @@ use Tickit::RenderBuffer;
 
 use Tickit::Utils qw( bound );
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use constant WIDGET_PEN_FROM_STYLE => 1;
 
@@ -183,26 +183,25 @@ foreach my $dir (qw( lines cols )) {
    foreach my $lim (qw( max min )) {
       my $name = "child_${dir}_${lim}";
 
-      %subs = ( %subs,
-         $name => sub {
-            my $self = shift;
-            my $value = $self->{$name};
-            if( !defined $value ) {
-               return undef;
-            }
-            elsif( $value =~ m/^(.+)%$/ ) {
-               return int( $1 * $self->window->$dir / 100 );
-            }
-            else {
-               return $value;
-            }
-         },
-         "set_$name" => sub {
-            my $self = shift;
-            ( $self->{$name} ) = @_;
-            $self->resized;
-         },
-      );
+      $subs{$name} = sub {
+         my $self = shift;
+         my $value = $self->{$name};
+         if( !defined $value ) {
+            return undef;
+         }
+         elsif( $value =~ m/^(.+)%$/ ) {
+            return int( $1 * $self->window->$dir / 100 );
+         }
+         else {
+            return $value;
+         }
+      };
+
+      $subs{"set_$name"} = sub {
+         my $self = shift;
+         ( $self->{$name} ) = @_;
+         $self->resized;
+      };
    }
 
    my $set_min = "set_child_${dir}_min";

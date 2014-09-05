@@ -1,20 +1,20 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011-2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2014 -- leonerd@leonerd.org.uk
 
 package Tickit::Pen;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Carp;
 
-our @ALL_ATTRS = qw( fg bg b u i rv strike af );
+our @ALL_ATTRS = qw( fg bg b u i rv strike af blink );
 
-our @BOOL_ATTRS = qw( b u i rv strike );
+our @BOOL_ATTRS = qw( b u i rv strike blink );
 our @INT_ATTRS  = qw( fg bg af );
 
 # Load the XS code
@@ -73,7 +73,9 @@ pen object will not check this as it cannot be reliably detected in all cases.
 
 =item strike => BOOL
 
-Bold, underline, italics, reverse video, strikethrough.
+=item blink => BOOL
+
+Bold, underline, italics, reverse video, strikethrough, blink.
 
 =item af => INT
 
@@ -329,14 +331,14 @@ use overload '==' => sub { refaddr($_[0]) == refaddr($_[1]) };
 package Tickit::Pen::Immutable;
 use base qw( Tickit::Pen );
 use constant mutable => 0;
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 sub as_immutable { return $_[0] }
 
 package Tickit::Pen::Mutable;
 use base qw( Tickit::Pen );
 use constant mutable => 1;
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 # Adds further methods in XS
 

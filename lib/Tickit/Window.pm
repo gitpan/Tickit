@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Carp;
 
@@ -26,6 +26,9 @@ use Tickit::Debug;
 
 use constant WEAKEN_CHILDREN => $ENV{TICKIT_CHILD_WINDOWS_WEAKEN} // 1;
 use constant CHILD_WINDOWS_LATER => $ENV{TICKIT_CHILD_WINDOWS_LATER} // 1;
+unless( CHILD_WINDOWS_LATER ) {
+   warn "Tickit::Window running with CHILD_WINDOWS_LATER disabled\n";
+}
 
 =head1 NAME
 
@@ -92,7 +95,7 @@ using a L<Tickit> C<later> block. As this behaviour is relatively new, it may
 result in bugs in legacy code that isn't expecting it. For now, it can be
 disabled by setting the environment variable C<TICKIT_CHILD_WINDOWS_LATER> to
 a false value; though this is now deprecated, and will be removed in a later
-version.
+version. It will now warn on startup to remind you it is disabled.
 
  $ TICKIT_CHILD_WINDOWS_LATER=0 perl my-program.pl
 

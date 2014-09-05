@@ -22,7 +22,5 @@ use_ok( 'Tickit::ContainerWidget' );
 use_ok( 'Tickit::Widget::Static' );
 
 use_ok( 'Tickit::Widget::Box' );
-use_ok( 'Tickit::Widget::HBox' );
-use_ok( 'Tickit::Widget::VBox' );
 
 done_testing;

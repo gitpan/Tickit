@@ -8,13 +8,11 @@ examples/demo-dragndrop.pl
 examples/demo-expose.pl
 examples/demo-float.pl
 examples/demo-focus.pl
-examples/demo-hbox.pl
 examples/demo-input.pl
 examples/demo-lines.pl
 examples/demo-pen.pl
 examples/demo-showkey.pl
 examples/demo-timer.pl
-examples/demo-vbox.pl
 examples/demo-xterm256.pl
 examples/hello-world.pl
 examples/HelloWorldWidget-1.pm
@@ -44,13 +42,9 @@ lib/Tickit/Test/MockTerm.pm
 lib/Tickit/Utils.pm
 lib/Tickit/Widget.pm
 lib/Tickit/Widget/Box.pm
-lib/Tickit/Widget/HBox.pm
-lib/Tickit/Widget/LinearBox.pm
 lib/Tickit/Widget/Static.pm
-lib/Tickit/Widget/VBox.pm
 lib/Tickit/WidgetRole.pm
 lib/Tickit/WidgetRole/Alignable.pm
-lib/Tickit/WidgetRole/Penable.pm
 lib/Tickit/Window.pm
 LICENSE
 Makefile.PL
@@ -109,8 +103,6 @@ t/36widget-input.t
 t/37widget-container-focus.t
 t/50widget-static.t
 t/51widget-box.t
-t/52widget-hbox.t
-t/52widget-vbox.t
 t/80tickit.t
 t/81tickit-input.t
 t/99pod.t

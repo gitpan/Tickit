@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -37,9 +37,16 @@ provides the lower-level machinery required by most or all widget types.
 
 Objects cannot be directly constructed in this class. Instead, a subclass of
 this class which provides a suitable implementation of the C<render_to_rb> and
-other provided methods is derived. Instances in that class are then constructed.
+other provided methods is derived. Instances in that class are then
+constructed.
 
 See the C<EXAMPLES> section below.
+
+The core F<Tickit> distribution only contains a couple of simple widget
+classes. Many more widget types are available on CPAN. Almost certainly for
+any widget-based program you will want to at least install the
+L<Tickit::Widgets> distribution, which provides many of the basic UI types of
+widget.
 
 =head1 STYLE
 
@@ -317,8 +324,9 @@ widget's direct-applied style. This has the overall effect of unifying the
 widget pen with the default style pen, and additionally allowing further
 customisation for state changes or style classes.
 
-It is likely that this behaviour will become the default in some future
-version with the eventual aim to remove the idea of a widget pen entirely.
+This behaviour will become the default in a future version with the eventual
+aim to remove the idea of a widget pen entirely. If a widget is constructed
+with this false it will eventually yield a warning.
 
  use constant WIDGET_PEN_FROM_STYLE => 1;
 
