@@ -10,7 +10,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use Carp;
 use Scalar::Util qw( refaddr );
@@ -62,7 +62,7 @@ C<Tickit::RenderBuffer> - efficiently render text and line-drawing
 
 Z<>
 
- $win->set_on_expose( with_rb => sub {
+ $win->set_on_expose( sub {
     my ( $win, $rb, $rect ) = @_;
 
     $rb->eraserect( $rect );
@@ -598,10 +598,16 @@ buffer will be cleared and reset back to initial state.
 
 =cut
 
+my $warned_flush_to_window;
+
 sub flush_to_window
 {
    my $self = shift;
    my ( $target ) = @_;
+
+   $warned_flush_to_window or
+      $warned_flush_to_window++, warnings::warnif
+         deprecated => "Tickit::RenderBuffer->flush_to_window is deprecated";
 
    foreach my $line ( 0 .. $self->lines-1 ) {
       my $phycol;

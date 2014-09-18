@@ -37,13 +37,13 @@ is( $got_Ctrl_A, 1, 'got Ctrl-A after ->tick' );
 my $rootwin = $tickit->rootwin;
 
 my @key_events;
-$rootwin->set_on_key( with_ev => sub {
+$rootwin->set_on_key( sub {
    my ( $self, $ev ) = @_;
    push @key_events, [ $ev->type => $ev->str ];
 } );
 
 my @mouse_events;
-$rootwin->set_on_mouse( with_ev => sub {
+$rootwin->set_on_mouse( sub {
    my ( $self, $ev ) = @_;
    push @mouse_events, [ $ev->type => $ev->button, $ev->line, $ev->col ];
 } );

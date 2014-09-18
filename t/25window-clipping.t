@@ -7,6 +7,15 @@ use Test::More;
 
 use Tickit::Test;
 
+# This test invokes lots of Window direct drawing methods, which are now
+# deprecated. This will cause lots of warnings. We'll just silence them here
+my $old_WARN = $SIG{__WARN__};
+$SIG{__WARN__} = sub {
+   local $SIG{__WARN__} = $old_WARN;
+
+   warn @_ unless $_[0] =~ m/Tickit::Window direct drawing methods are deprecated/;
+};
+
 my $rootwin = mk_window;
 
 my $pos;

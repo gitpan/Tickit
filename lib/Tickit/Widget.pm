@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -556,7 +556,7 @@ sub window_gained
       $self->redraw if !$self->parent;
    } );
 
-   $window->set_on_expose( with_rb => sub {
+   $window->set_on_expose( sub {
       my ( $win, $rb, $rect ) = @_;
       $win->is_visible or return;
 
@@ -570,7 +570,7 @@ sub window_gained
    } ) if $self->can( "_widget_style_type" );
 
    if( $self->can( "on_key" ) or $self->KEYPRESSES_FROM_STYLE ) {
-      $window->set_on_key( with_ev => sub {
+      $window->set_on_key( sub {
          shift;
          my ( $ev ) = @_;
 
@@ -593,7 +593,7 @@ sub window_gained
       } );
    }
 
-   $window->set_on_mouse( with_ev => sub {
+   $window->set_on_mouse( sub {
       shift;
       my ( $ev ) = @_;
       $self->take_focus if $self->CAN_FOCUS and $ev->button == 1 and $ev->type eq "press";

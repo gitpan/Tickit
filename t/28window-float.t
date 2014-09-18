@@ -11,8 +11,6 @@ use Tickit::Test;
 
 my $root = mk_window;
 
-my $pos;
-
 my $rootfloat = $root->make_float( 10, 10, 5, 30 );
 flush_tickit;
 
@@ -33,8 +31,18 @@ is_deeply( [ $rootfloat->_get_span_visibility( 0, 0 ) ],
 is_deeply( [ $rootfloat->_get_span_visibility( 0, 20 ) ],
            [ 1, 10 ], '$rootfloat 0,20 is visible for 10 columns' );
 
-$root->goto( 10, 0 );
-$pos = $root->print( "X" x 80 );
+$root->set_on_expose( sub {
+   my ( $win, $rb, $rect ) = @_;
+
+   foreach my $line ( $rect->linerange ) {
+      $rb->text_at( $line, $rect->left, "X" x $rect->cols );
+   }
+});
+
+$root->expose( Tickit::Rect->new(
+   top => 10, lines => 1, left => 0, cols => 80,
+) );
+flush_tickit;
 
 is_termlog( [ GOTO(10,0),
               SETPEN,
@@ -48,13 +56,16 @@ is_display( [ BLANKLINES(10),
               [TEXT("X"x10), BLANK(30), TEXT("X"x40)] ],
             'Display for print under floating window' );
 
-is( $pos->columns, 80, '$pos->columns is 80 for print under floating window' );
-
 {
    my $win = $root->make_sub( 10, 20, 1, 50 );
 
-   $win->goto( 0, 0 );
-   $pos = $win->print( "Y" x 50 );
+   $win->set_on_expose( sub {
+      my ( undef, $rb, $rect ) = @_;
+      $rb->text_at( 0, 0, "Y" x 50 );
+   });
+
+   $win->expose;
+   flush_tickit;
 
    is_termlog( [ GOTO(10,40),
                  SETPEN,
@@ -64,8 +75,6 @@ is( $pos->columns, 80, '$pos->columns is 80 for print under floating window' );
    is_display( [ BLANKLINES(10),
                  [TEXT("X"x10), BLANK(30), TEXT("Y"x30), TEXT("X"x10)] ],
                'Display for print sibling under floating window' );
-
-   is( $pos->columns, 50, '$pos->columns is 50 for print sibling under floating window' );
 
    my $popupwin = $win->make_popup( 2, 2, 10, 10 );
    flush_tickit;
@@ -78,7 +87,7 @@ is( $pos->columns, 80, '$pos->columns is 80 for print under floating window' );
    is( $popupwin->abs_left, 22, '$popupwin->abs_left' );
 
    my @key_events;
-   $popupwin->set_on_key( with_ev => sub {
+   $popupwin->set_on_key( sub {
       my ( $win, $ev ) = @_;
       push @key_events, [ $ev->type => $ev->str ];
       return 1;
@@ -87,7 +96,7 @@ is( $pos->columns, 80, '$pos->columns is 80 for print under floating window' );
    presskey( text => "G" );
 
    my @mouse_events;
-   $popupwin->set_on_mouse( with_ev => sub {
+   $popupwin->set_on_mouse( sub {
       my ( $win, $ev ) = @_;
       push @mouse_events, [ $ev->type => $ev->button, $ev->line, $ev->col ];
       return 1;
@@ -101,8 +110,12 @@ is( $pos->columns, 80, '$pos->columns is 80 for print under floating window' );
    $win->close;
 }
 
-$rootfloat->goto( 0, 0 );
-$rootfloat->print( "|-- Yipee --|" );
+$rootfloat->set_on_expose( sub {
+   my ( undef, $rb, $rect ) = @_;
+   $rb->text_at( 0, 0, "|-- Yipee --|" );
+});
+$rootfloat->expose;
+flush_tickit;
 
 is_termlog( [ GOTO(10,10),
               SETPEN,
@@ -114,8 +127,13 @@ is_display( [ BLANKLINES(10),
             'Display for print to floating window' );
 
 my $subwin = $rootfloat->make_sub( 0, 4, 1, 6 );
-$subwin->goto( 0, 0 );
-$pos = $subwin->print( "Byenow" );
+
+$subwin->set_on_expose( sub {
+   my ( undef, $rb, $rect ) = @_;
+   $rb->text_at( 0, 0, "Byenow" );
+});
+$subwin->expose;
+flush_tickit;
 
 is_termlog( [ GOTO(10,14),
               SETPEN,
@@ -126,21 +144,21 @@ is_display( [ BLANKLINES(10),
               [TEXT("X"x10), TEXT("|-- Byenow--|"), BLANK(17), TEXT("Y"x30), TEXT("X"x10)] ],
             'Display for print to child of floating window' );
 
-is( $pos->columns, 6, '$pos->columns is 6 for print to child of floating window' );
-
 $rootfloat->hide;
 flush_tickit;
+drain_termlog;
 
 is_deeply( [ $root->_get_span_visibility( 10, 0 ) ],
            [ 1, 80 ], '$root 10,0 visible for 80 columns after $rootfloat->hide' );
 
 $rootfloat->show;
 flush_tickit;
+drain_termlog;
 
 # Scrolling with float obscurations
 {
    my @exposed_rects;
-   $root->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
+   $root->set_on_expose( sub { push @exposed_rects, $_[2] } );
 
    $root->scroll( 3, 0 );
    flush_tickit;

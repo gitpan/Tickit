@@ -23,7 +23,7 @@ my $rootwin = mk_window;
 my $win = $rootwin->make_sub( 5, 0, 10, 80 );
 
 my @exposed_rects;
-$win->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
+$win->set_on_expose( sub { push @exposed_rects, $_[2] } );
 
 # scroll down
 {
@@ -137,6 +137,43 @@ $win->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
               [ Tickit::Rect->new( top => 2, left => 0, lines => 3, cols => 80 ) ],
               'Exposed area after ->scrollrect further than area' );
 
+   undef @exposed_rects;
+}
+
+# Child to obscure part of it
+{
+   my $child = $win->make_sub( 0, 0, 3, 10 );
+   flush_tickit;
+
+   $win->scroll( 0, 4 );
+   flush_tickit;
+
+   is_termlog( [ SETPEN,
+                 SCROLLRECT(5,10,3,70, 0,4),
+                 SCROLLRECT(8, 0,7,80, 0,4) ],
+               'Termlog after scroll with obscuring child' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 0, left => 76, lines => 10, cols => 4 ) ],
+              'Exposed area after scroll with obscuring child' );
+
+   $child->hide;
+   flush_tickit;
+   undef @exposed_rects;
+
+   $win->scroll( 0, 4 );
+   flush_tickit;
+
+   is_termlog( [ SETPEN,
+                 SCROLLRECT(5,0,10,80, 0,4) ],
+               'Termlog after scroll with hidden obscuring child' );
+
+   is_deeply( \@exposed_rects,
+              [ Tickit::Rect->new( top => 0, left => 76, lines => 10, cols => 4 ) ],
+              'Exposed area after scroll with hidden obscuring child' );
+
+   $child->close;
+   flush_tickit;
    undef @exposed_rects;
 }
 

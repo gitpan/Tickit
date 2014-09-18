@@ -8,7 +8,7 @@ package Tickit::Test;
 use strict;
 use warnings;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use Carp;
 
@@ -20,6 +20,7 @@ our @EXPORT = qw(
    mk_term_and_window
    flush_tickit
    drain_termlog
+   clear_term
 
    resize_term
 
@@ -195,6 +196,19 @@ Useful to clear up non-tested events before running a test.
 sub drain_termlog
 {
    $term->get_methodlog;
+}
+
+=head2 clear_term
+
+Clears the entire content form the mock terminal. Useful at the end of a
+section of tests before starting another one. Don't forget to C<drain_termlog>
+afterwards.
+
+=cut
+
+sub clear_term
+{
+   $term->clear
 }
 
 =head2 resize_term( $lines, $cols )

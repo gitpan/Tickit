@@ -12,7 +12,7 @@ my ( $term, $rootwin ) = mk_term_and_window;
 my $win = $rootwin->make_sub( 3, 10, 4, 20 );
 
 my $root_exposed;
-$rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
+$rootwin->set_on_expose( sub { $root_exposed++ } );
 
 # New RB+rect callback
 {
@@ -21,7 +21,7 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
    my $exposed_rb;
    my @exposed_rects;
    my $expose_cb;
-   $win->set_on_expose( with_rb => sub {
+   $win->set_on_expose( sub {
       ( undef, $exposed_rb, my $rect ) = @_;
       push @exposed_rects, $rect;
       $win_exposed++;
@@ -177,12 +177,12 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
                'Termlog after Window expose twice' );
 
    $win->set_on_expose( undef );
-   $win->clear;
+   clear_term;
    flush_tickit;
 }
 
 {
-   $win->set_on_expose( with_rb => sub {
+   $win->set_on_expose( sub {
       my ( undef, $rb ) = @_;
       $rb->text_at( 0,  0, "Parent" );
       $rb->text_at( 0, 14, "Parent" );
@@ -191,7 +191,7 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
    $win->expose( Tickit::Rect->new( top => 0, left => 0, lines => 1, cols => 20 ) );
 
    my $subwin = $win->make_sub( 0, 7, 1, 7 );
-   $subwin->set_on_expose( with_rb => sub {
+   $subwin->set_on_expose( sub {
       my ( undef, $rb ) = @_;
       $rb->text_at( 0, 0, "Child" );
    });
@@ -204,14 +204,18 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
 
    $win->set_on_expose( undef );
    $subwin->close;
-   $win->clear;
+   flush_tickit;
+
+   clear_term;
+   flush_tickit;
+   drain_termlog;
 }
 
 {
    my $subwin = $rootwin->make_sub( 2, 2, 20, 50 );
 
    my $exposed = 0;
-   $subwin->set_on_expose( with_rb => sub { $exposed++ } );
+   $subwin->set_on_expose( sub { $exposed++ } );
 
    for ( 1 .. 100 ) {
       $subwin->expose( Tickit::Rect->new( top => 1, left => 1, lines => 3, cols => 20 ) );
@@ -221,6 +225,35 @@ $rootwin->set_on_expose( with_rb => sub { $root_exposed++ } );
    is( $exposed, 100, '$exposed 100 times' );
 
    $subwin->close;
+}
+
+# parent + child ordering
+{
+   $win->set_on_expose( sub {
+      my ( undef, $rb, $rect ) = @_;
+      $rb->text_at( $_, $rect->left, "X" x $rect->cols ) for $rect->linerange;
+   });
+
+   my $subwin = $win->make_sub( 0, 5, 1, 10 );
+   # No on_expose
+
+   $win->expose( Tickit::Rect->new( top => 0, left => 0, lines => 1, cols => 80 ) );
+   flush_tickit;
+
+   is_termlog( [ GOTO(3,10),
+                 SETPEN(),
+                 PRINT("XXXXX"),
+                 GOTO(3,25),
+                 SETPEN(),
+                 PRINT("XXXXX") ],
+               'Termlog after expose parent with visible child' );
+
+   is_display( [ BLANKLINES(3),
+                 [BLANK(10), TEXT("XXXXX"), BLANK(10), TEXT("XXXXX")] ],
+               'Display after expose parent with visible child' );
+
+   $subwin->close;
+   flush_tickit;
 }
 
 $win->close; undef $win;
@@ -234,17 +267,17 @@ drain_termlog;
    my $win_C = $rootwin->make_sub( 0, 0, 4, 80 );
    flush_tickit;
 
-   $win_A->set_on_expose( with_rb => sub {
+   $win_A->set_on_expose( sub {
       my ( $win, $rb ) = @_;
       $rb->text_at( 0, 0, "Window A" );
    });
 
-   $win_B->set_on_expose( with_rb => sub {
+   $win_B->set_on_expose( sub {
       my ( $win, $rb ) = @_;
       $rb->text_at( 0, 0, "Window B" );
    });
 
-   $win_C->set_on_expose( with_rb => sub {
+   $win_C->set_on_expose( sub {
       my ( $win, $rb ) = @_;
       $rb->text_at( 0, 0, "Window C" );
    });

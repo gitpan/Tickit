@@ -1,14 +1,14 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2011-2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2011-2014 -- leonerd@leonerd.org.uk
 
 package Tickit::Utils;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use Carp;
 
@@ -289,7 +289,7 @@ sub distribute
       foreach my $b ( @buckets ) {
          my $amount;
 
-         if( $b->{base} ) {
+         if( defined $b->{base} ) {
             $amount = $b->{base} * $allocatable / $base_total;
 
             $err += $amount - int($amount);
@@ -297,7 +297,7 @@ sub distribute
 
             $amount = int($amount);
          }
-         elsif( $b->{fixed} ) {
+         elsif( defined $b->{fixed} ) {
             $amount = $b->{fixed};
          }
 

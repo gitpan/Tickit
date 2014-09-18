@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use Carp;
 
@@ -43,7 +43,7 @@ C<Tickit::Window> - a window for drawing operations
 
  my $rootwin = $tickit->rootwin;
 
- $rootwin->set_on_expose( with_rb => sub {
+ $rootwin->set_on_expose( sub {
     my ( $win, $rb, $rect ) = @_;
 
     $rb->clear;
@@ -673,6 +673,8 @@ sub set_on_geom_changed
    ( $self->{on_geom_changed} ) = @_;
 }
 
+=head2 $win->set_on_key( $on_key )
+
 =head2 $win->set_on_key( with_ev => $on_key )
 
 Set the callback to invoke whenever a key is pressed while this window, or one
@@ -705,14 +707,7 @@ that really make sense; for example to capture the C<PageUp> and C<PageDown>
 keys in a scrolling list, or a numbered function key that performs some
 special action.
 
-=head2 $win->set_on_key( $on_key )
-
-A backward-compatibility wrapper which passes the event details as positional
-arguments rather than as a structure.
-
- $handled = $on_key->( $win, $type, $str, $mod )
-
-This form is now deprecated, and will be removed in a later version.
+The C<with_ev>-prefixed form is accepted for backward compatibility.
 
 =cut
 
@@ -721,11 +716,7 @@ sub set_on_key
    my $self = shift;
 
    if( @_ > 1 and $_[0] eq "with_ev" ) {
-      $self->{on_key_with_ev} = 1;
       shift;
-   }
-   else {
-      croak "Use of Window->set_on_key without ev" if defined $_[0];
    }
 
    ( $self->{on_key} ) = @_;
@@ -741,7 +732,7 @@ sub _handle_key
    $self->_reap_dead_children;
    my $children = $self->{child_windows};
    if( $children and @$children and $children->[0]->{steal_input} ) {
-      $children->[0]->_handle_key( $args ) and return;
+      $children->[0]->_handle_key( $args ) and return 1;
    }
 
    my $focused_child = $self->{focused_child};
@@ -751,10 +742,7 @@ sub _handle_key
    }
 
    if( my $on_key = $self->{on_key} ) {
-      my @args = ( $self, Tickit::Window::Event->new( %$args ) );
-      push @args, @{$args}{qw( str mod )} unless $self->{on_key_with_ev};
-
-      $on_key->( @args ) and return 1;
+      $on_key->( $self, Tickit::Window::Event->new( %$args ) ) and return 1;
    }
 
    if( $children ) {
@@ -762,12 +750,14 @@ sub _handle_key
          next unless $child; # weakrefs; may be undef
          next if $focused_child and $child == $focused_child;
 
-         $child->_handle_key( $args );
+         $child->_handle_key( $args ) and return 1;
       }
    }
 
    return 0;
 }
+
+=head2 $win->set_on_mouse( $on_mouse )
 
 =head2 $win->set_on_mouse( with_ev => $on_mouse )
 
@@ -835,14 +825,7 @@ C<drag_stop> event even if the mouse moves outside that window. No other
 window will receive a C<drag_outside> or C<drag_stop> event than the one that
 started the operation.
 
-=head2 $win->set_on_mouse( $on_mouse )
-
-A backward-compatibility wrapper which passes the event detials as positional
-arguments rather than as a structure.
-
- $handled = $on_mouse->( $win, $type, $button, $line, $col, $mod )
-
-This form is now deprecated, and will be removed in a later version.
+The C<with_ev>-prefixed form is accepted for backward compatibility.
 
 =cut
 
@@ -851,11 +834,7 @@ sub set_on_mouse
    my $self = shift;
 
    if( @_ > 1 and $_[0] eq "with_ev" ) {
-      $self->{on_mouse_with_ev} = 1;
       shift;
-   }
-   else {
-      croak "Use of Window->set_on_mouse without ev" if defined $_[0];
    }
 
    ( $self->{on_mouse} ) = @_;
@@ -895,14 +874,13 @@ sub _handle_mouse
    }
 
    if( my $on_mouse = $self->{on_mouse} ) {
-      my @args = ( $self, Tickit::Window::Event->new( %$args ) );
-      push @args, @{$args}{qw( button line col mod )} unless $self->{on_mouse_with_ev};
-
-      $on_mouse->( @args ) and return $self;
+      $on_mouse->( $self, Tickit::Window::Event->new( %$args ) ) and return $self;
    }
 
    return 0;
 }
+
+=head2 $win->set_on_expose( $on_expose )
 
 =head2 $win->set_on_expose( with_rb => $on_expose )
 
@@ -917,15 +895,10 @@ The buffer's origin will be that of the window, and its clipping region will
 already be set to the expose rect. This will automatically be flushed to the
 window when the callback returns.
 
-=head2 $win->set_on_expose( $on_expose )
+The C<with_rb>-prefixed form is accepted for backward compatibility.
 
-Legacy form that is passes only the rect and not a render buffer to the
-callback. Callbacks in this form will have to call the direct window drawing
-methods themselves.
-
- $on_expose->( $win, $rect )
-
-This form is now deprecated, and will be removed in a later version.
+If any child windows overlap the region, these will be exposed first, before
+the containing window.
 
 =cut
 
@@ -934,11 +907,7 @@ sub set_on_expose
    my $self = shift;
 
    if( @_ > 1 and $_[0] eq "with_rb" ) {
-      $self->{expose_with_rb} = 1;
       shift;
-   }
-   else {
-      croak "Use of Window->set_on_expose without rb" if defined $_[0];
    }
 
    ( $self->{on_expose} ) = @_;
@@ -955,21 +924,6 @@ sub _do_expose
    Tickit::Debug->log( Wx => "${INDENT}Expose %s %s", $self->sprintf, $rect->sprintf ) if DEBUG;
    local $INDENT = "| $INDENT";
 
-   if( my $on_expose = $self->{on_expose} ) {
-      $rb->save;
-
-      local $self->{exposure_rb} = $rb;
-
-      if( $self->{expose_with_rb} ) {
-         $on_expose->( $self, $rb, $rect );
-      }
-      else {
-         $on_expose->( $self, $rect );
-      }
-
-      $rb->restore;
-   }
-
    foreach my $win ( $self->subwindows ) {
       next unless $win->is_visible;
 
@@ -984,6 +938,16 @@ sub _do_expose
       }
 
       $rb->mask( $win->rect );
+   }
+
+   if( my $on_expose = $self->{on_expose} ) {
+      $rb->save;
+
+      local $self->{exposure_rb} = $rb;
+
+      $on_expose->( $self, $rb, $rect );
+
+      $rb->restore;
    }
 }
 
@@ -1264,11 +1228,6 @@ sub getpenattr
    return $self->{pen}->getattr( $attr );
 }
 
-sub getpenattrs
-{
-   croak "\$win->getpenattrs should not be used; see ->pen->getattrs instead";
-}
-
 =head2 $pen = $win->get_effective_pen
 
 Returns a new L<Tickit::Pen> containing the effective pen attributes for the
@@ -1307,22 +1266,6 @@ sub get_effective_penattr
    }
 
    return undef;
-}
-
-=head2 %attrs = $win->get_effective_penattrs
-
-Retrieve the effective pen settings for the window. This will be the settings
-of the window and all its parents down to the root window, merged together.
-
-This method is now deprecated and should not be used; instead use
-
- $win->get_effective_pen->getattrs
-
-=cut
-
-sub get_effective_penattrs
-{
-   croak "\$win->get_effective_penattrs should not be used; see ->get_effective_pen->getattrs instead";
 }
 
 sub _get_span_visibility
@@ -1399,10 +1342,16 @@ event.
 
 =cut
 
+my $warned_direct_draw;
+
 sub goto
 {
    my $win = shift;
    my ( $line, $col ) = @_;
+
+   $warned_direct_draw or
+      $warned_direct_draw++, warnings::warnif
+         deprecated => "Tickit::Window direct drawing methods are deprecated";
 
    if( my $rb = $win->{exposure_rb} ) {
       $rb->goto( $line, $col );
@@ -1455,6 +1404,10 @@ sub print
 {
    my $self = shift;
    my $text = shift;
+
+   $warned_direct_draw or
+      $warned_direct_draw++, warnings::warnif
+         deprecated => "Tickit::Window direct drawing methods are deprecated";
 
    my $pen = ( @_ == 1 ) ? shift->as_mutable : Tickit::Pen::Mutable->new( @_ );
 
@@ -1552,6 +1505,10 @@ sub erasech
    my $self = shift;
    my $count = shift;
    my $moveend = shift;
+
+   $warned_direct_draw or
+      $warned_direct_draw++, warnings::warnif
+         deprecated => "Tickit::Window direct drawing methods are deprecated";
 
    my $pen = ( @_ == 1 ) ? shift->as_mutable : Tickit::Pen::Mutable->new( @_ );
 
@@ -1814,6 +1771,7 @@ sub scrollrect
    $visible->add( $rect );
 
    foreach my $child ( $self->subwindows ) {
+      next unless $child->is_visible;
       $visible->subtract( $child->rect );
    }
 
@@ -2015,10 +1973,11 @@ sub restore
       $win = $win->{focused_child};
    }
 
-   if( $win and $win->is_visible and $win->is_focused and $win->{cursor_visible} ) {
+   if( $win and $win->is_focused and $win->{cursor_visible} and
+       ( $win->_get_span_visibility( $win->{cursor_line}, $win->{cursor_col} ) )[0] ) {
       my $cursorshape = $win->{cursor_shape} // Tickit::Term::TERM_CURSORSHAPE_BLOCK;
       $term->setctl_int( cursorvis => 1 );
-      $win->goto( $win->{cursor_line}, $win->{cursor_col} );
+      $win->term->goto( $win->{cursor_line} + $win->abs_top, $win->{cursor_col} + $win->abs_left );
       $win->term->setctl_int( cursorshape => $cursorshape );
    }
    else {
@@ -2167,14 +2126,6 @@ modifiers is set.
 sub mod_is_alt   { shift->mod & Tickit::Term::MOD_ALT }
 sub mod_is_ctrl  { shift->mod & Tickit::Term::MOD_CTRL }
 sub mod_is_shift { shift->mod & Tickit::Term::MOD_SHIFT }
-
-# This horrible overload is just short-term for back-compat so we can pass
-# the event structure itself as the first method argument, to code that still
-# expects to find the event type name there
-use overload
-   '""' => sub {
-      croak "Deprecated use of '\$ev' to mean ->type"; },
-   fallback => 1;
 
 =head1 AUTHOR
 

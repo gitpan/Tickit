@@ -1,5 +1,22 @@
 Revision history for Changes
 
+0.48    2014/09/18 20:55:38
+        [CHANGES]
+         * Perform 0.48 removal deprecations
+         * Added Tickit::Test::clear_term
+         * Print deprecation warnings from Tickit::Window direct draw methods
+
+        [BUGFIXES]
+         * Test for presence of T:W:HBox at BEGIN time during unit test, to
+           avoid error
+         * Fix for Tickit::Utils::distribute() with fixed=0 when in
+           overallocation mode
+         * Ensure that child window on_expose handler is run before containing
+           parent, to ensure RB holes are set correctly for underprint
+         * Hidden child windows should not count during $win->scroll*
+         * Ensure child window key handler propagation doesn't continue after
+           a key event has been handled
+
 0.47    2014/09/05 23:22:29
         [CHANGES]
          * Moved Tickit::Widget::HBox/VBox to the Tickit-Widgets dist

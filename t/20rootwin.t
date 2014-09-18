@@ -105,7 +105,7 @@ identical( $win->term, $term, '$win->term returns $term' );
 # Scrolling region exposure
 {
    my @exposed_rects;
-   $win->set_on_expose( with_rb => sub { push @exposed_rects, $_[2] } );
+   $win->set_on_expose( sub { push @exposed_rects, $_[2] } );
 
    $win->scroll( 1, 0 );
    flush_tickit;

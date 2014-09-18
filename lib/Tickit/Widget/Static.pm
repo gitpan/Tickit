@@ -14,7 +14,7 @@ use Tickit::RenderBuffer;
 use Tickit::WidgetRole::Alignable name => 'align',  dir => 'h';
 use Tickit::WidgetRole::Alignable name => 'valign', dir => 'v';
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use List::Util qw( max );
 use Tickit::Utils qw( textwidth substrwidth );

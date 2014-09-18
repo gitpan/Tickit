@@ -16,7 +16,7 @@ my $colour_offset = 0;
 my $rootwin = $tickit->rootwin;
 
 my $win = $rootwin->make_sub( 5, 5, $rootwin->lines - 10, $rootwin->cols - 10 );
-$win->set_on_expose( with_rb => sub {
+$win->set_on_expose( sub {
    my ( $self, $rb, $rect ) = @_;
 
    foreach my $line ( $rect->linerange ) {
@@ -28,7 +28,7 @@ $win->set_on_expose( with_rb => sub {
 } );
 
 # Logic to erase the borders
-$rootwin->set_on_expose( with_rb => sub {
+$rootwin->set_on_expose( sub {
    my ( $self, $rb, $rect ) = @_;
 
    foreach my $line ( $rect->top .. 4 ) {
@@ -59,7 +59,7 @@ $loop->add( IO::Async::Timer::Periodic->new(
 
 my $popup_win;
 
-$rootwin->set_on_mouse( with_ev => sub {
+$rootwin->set_on_mouse( sub {
    my ( $self, $ev ) = @_;
    return unless $ev->type eq "press";
 
@@ -69,7 +69,7 @@ $rootwin->set_on_mouse( with_ev => sub {
       $popup_win = $rootwin->make_float( $ev->line, $ev->col, 3, 21 );
       $popup_win->pen->chattr( bg => 4 );
 
-      $popup_win->set_on_expose( with_rb => sub {
+      $popup_win->set_on_expose( sub {
          my ( $self, $rb, $rect ) = @_;
          $rb->text_at( 0, 0, "+-------------------+" );
          $rb->text_at( 1, 0, "| Popup Window Here |" );

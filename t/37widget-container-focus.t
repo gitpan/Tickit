@@ -12,8 +12,10 @@ use Tickit::Test;
 # Since we need real Windows in the widgets, it's easier just to use an HBox
 # as a container. However, since HBox is no longer in core, we'll have to skip
 # this test if it isn't available
-eval { require Tickit::Widget::HBox } or
-   plan skip_all => "Tickit::Widget::HBox is not available";
+BEGIN {
+   eval { require Tickit::Widget::HBox } or
+      plan skip_all => "Tickit::Widget::HBox is not available";
+}
 
 my ( $term, $win ) = mk_term_and_window;
 

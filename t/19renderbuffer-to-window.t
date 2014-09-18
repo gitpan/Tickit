@@ -47,11 +47,15 @@ my $win = bless [], "TestWindow";
 
 # Initially empty
 {
+   my $warned;
+   local $SIG{__WARN__} = sub { $warned++ };
+
    $rb->flush_to_window( $win );
 
    is_deeply( \@methods,
               [],
               'Empty RenderBuffer renders nothing to window' );
+   ok( $warned, '->flush_to_window caused a warning' );
 }
 
 # Absolute spans

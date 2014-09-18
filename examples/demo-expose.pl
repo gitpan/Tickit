@@ -27,7 +27,7 @@ foreach ( 1 .. 9 ) {
 my $rootwin = $tickit->rootwin;
 
 my @start;
-$rootwin->set_on_mouse( with_ev => sub {
+$rootwin->set_on_mouse( sub {
    my ( $self, $ev ) = @_;
    @start = ( $ev->line, $ev->col ) and return if $ev->type eq "press";
    return unless $ev->type eq "release";
@@ -48,17 +48,17 @@ $rootwin->set_on_mouse( with_ev => sub {
 
 my $win = $rootwin->make_sub( 5, 10, 15, 60 );
 $win->pen->chattr( fg => 1 );
-$win->set_on_expose( with_rb => \&fillwin );
+$win->set_on_expose( \&fillwin );
 
 my @subwins;
 
 push @subwins, $win->make_sub( 0, 0, 4, 4 );
 $subwins[-1]->pen->chattr( fg => 2 );
-$subwins[-1]->set_on_expose( with_rb => \&fillwin );
+$subwins[-1]->set_on_expose( \&fillwin );
 
 push @subwins, $win->make_sub( 6, 40, 2, 15 );
 $subwins[-1]->pen->chattr( fg => 3 );
-$subwins[-1]->set_on_expose( with_rb => \&fillwin );
+$subwins[-1]->set_on_expose( \&fillwin );
 
 $tickit->later( sub {
       $rootwin->expose;

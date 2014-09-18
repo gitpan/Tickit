@@ -8,7 +8,7 @@ package Tickit::Term;
 use strict;
 use warnings;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use Carp;
 
@@ -414,21 +414,6 @@ Sets the terminal window icon text, title, or both.
 =back
 
 =cut
-
-sub mode_altscreen
-{
-   croak "\$term->mode_altscreen should not be used; see ->setctl_int instead";
-}
-
-sub mode_cursorvis
-{
-   croak "\$term->mode_cursorvis should not be used; see ->setctl_int instead";
-}
-
-sub mode_mouse
-{
-   carp "\$term->mode_mouse should not be used; see ->setctl_int instead";
-}
 
 =head2 $term->input_push_bytes( $bytes )
 
