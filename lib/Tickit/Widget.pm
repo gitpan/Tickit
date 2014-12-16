@@ -8,7 +8,7 @@ package Tickit::Widget;
 use strict;
 use warnings;
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Carp;
 use Scalar::Util qw( weaken );
@@ -114,6 +114,8 @@ values.
 
 =cut
 
+my %warned_no_pen_for_class;
+
 sub new
 {
    my $class = shift;
@@ -138,6 +140,10 @@ sub new
 
    if( $class->WIDGET_PEN_FROM_STYLE ) {
       $args{$_} and $args{style}{$_} = delete $args{$_} for @Tickit::Pen::ALL_ATTRS;
+   }
+   else {
+      $warned_no_pen_for_class{$class}++ or
+         carp "Disabling WIDGET_PEN_FROM_STYLE is now deprecated for $class";
    }
 
    if( my $style = delete $args{style} ) {
@@ -326,7 +332,7 @@ customisation for state changes or style classes.
 
 This behaviour will become the default in a future version with the eventual
 aim to remove the idea of a widget pen entirely. If a widget is constructed
-with this false it will eventually yield a warning.
+with this false it will yield a warning.
 
  use constant WIDGET_PEN_FROM_STYLE => 1;
 

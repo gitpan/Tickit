@@ -34,10 +34,7 @@ BEGIN {
    style_redraw_keys qw( marker );
 }
 
-# Normally this would be a package constant, but we'll make it a method so we
-# can easily adjust it for testing
-my $WIDGET_PEN_FROM_STYLE;
-sub WIDGET_PEN_FROM_STYLE { $WIDGET_PEN_FROM_STYLE }
+use constant WIDGET_PEN_FROM_STYLE => 1;
 
 sub cols  { 1 }
 sub lines { 1 }
@@ -212,22 +209,12 @@ EOF
 
 # WIDGET_PEN_FROM_STYLE
 {
-   $WIDGET_PEN_FROM_STYLE = 0;
-   my $nonpen_widget = StyledWidget->new(
-      af => 1,
-      style => { af => 2 },
-   );
-
-   is( $nonpen_widget->pen->getattr( "af" ), 1, 'widget pen attr for WIDGET_PEN_FROM_STYLE=0' );
-   is( $nonpen_widget->get_style_pen->getattr( "af" ), 2, 'style pen attr for WIDGET_PEN_FROM_STYLE=0' );
-
-   $WIDGET_PEN_FROM_STYLE = 1;
    my $pen_widget = StyledWidget->new(
       style => { af => 3 },
    );
 
-   is( $pen_widget->pen->getattr( "af" ), 3, 'widget pen attr for WIDGET_PEN_FROM_STYLE=1' );
-   is( $pen_widget->get_style_pen->getattr( "af" ), 3, 'style pen attr for WIDGET_PEN_FROM_STYLE=1' );
+   is( $pen_widget->pen->getattr( "af" ), 3, 'widget pen attr' );
+   is( $pen_widget->get_style_pen->getattr( "af" ), 3, 'style pen attr' );
 
    $pen_widget->set_style( bg => 2 );
 
@@ -238,12 +225,12 @@ EOF
       af => 4,
    );
 
-   is( $pen_widget->pen->getattr( "af" ), 4, 'widget pen attr for WIDGET_PEN_FROM_STYLE=1 from args' );
-   is( $pen_widget->get_style_pen->getattr( "af" ), 4, 'style pen attr for WIDGET_PEN_FROM_STYLE=1 from args' );
+   is( $pen_widget->pen->getattr( "af" ), 4, 'widget pen attr from args' );
+   is( $pen_widget->get_style_pen->getattr( "af" ), 4, 'style pen attr from args' );
 
    like( exception { $pen_widget->set_pen( Tickit::Pen->new ) },
          qr/^StyledWidget uses Tickit::Style for its widget pen; ->set_pen cannot be used at /,
-         'Attempting to ->set_pen on WIDGET_PEN_FROM_STYLE=1 raises exception' );
+         'Attempting to ->set_pen on raises exception' );
 }
 
 # style_reshape_keys

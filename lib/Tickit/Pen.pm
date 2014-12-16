@@ -8,7 +8,7 @@ package Tickit::Pen;
 use strict;
 use warnings;
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Carp;
 
@@ -38,8 +38,11 @@ hash.
 A mutable pen is an instance of C<Tickit::Pen::Mutable>. Its attributes may be
 set by the constructor, and can be changed at any time. As well as supporting
 the same query methods as immutable pens, more methods are provided to change
-or remove them. Mutable pens also support the concept of observers; other
-objects that will be informed when pen attributes are changed.
+or remove them. Mutable pens also currently support the concept of observers;
+other objects that will be informed when pen attributes are changed. However,
+these were only added to support an earlier version of what eventually became
+L<Tickit::Style>, and are no longer required. They will be removed in a later
+version.
 
 While mutable pens may initially seem more useful, they can complicate logic
 due to their shared referential nature. If the same mutable pen is shared
@@ -331,14 +334,14 @@ use overload '==' => sub { refaddr($_[0]) == refaddr($_[1]) };
 package Tickit::Pen::Immutable;
 use base qw( Tickit::Pen );
 use constant mutable => 0;
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 sub as_immutable { return $_[0] }
 
 package Tickit::Pen::Mutable;
 use base qw( Tickit::Pen );
 use constant mutable => 1;
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 # Adds further methods in XS
 

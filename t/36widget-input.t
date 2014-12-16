@@ -47,6 +47,8 @@ package TestWidget;
 use base qw( Tickit::Widget );
 use Tickit::Style;
 
+use constant WIDGET_PEN_FROM_STYLE => 1;
+
 use constant CAN_FOCUS => 1;
 
 sub lines  { 1 }

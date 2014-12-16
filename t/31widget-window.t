@@ -46,15 +46,6 @@ flush_tickit;
 is_display( [ [TEXT("Hello",fg=>2), BLANK(75,fg=>2)] ],
             'Display with correct pen after pen->chattr' );
 
-$widget->set_pen( Tickit::Pen->new( fg => 4 ) );
-
-identical( $widget->window->pen, $widget->pen, '$widget->window shares pen after ->set_pen' );
-
-flush_tickit;
-
-is_display( [ [TEXT("Hello",fg=>4), BLANK(75,fg=>2)] ],
-            'Display with correct pen after ->chpen' );
-
 $widget->set_window( undef );
 
 identical( $lost_window, $win, '$widget->window_lost called' );
@@ -66,6 +57,7 @@ done_testing;
 package TestWidget;
 
 use base qw( Tickit::Widget );
+use constant WIDGET_PEN_FROM_STYLE => 1;
 
 sub render_to_rb
 {

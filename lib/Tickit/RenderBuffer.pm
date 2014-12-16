@@ -10,7 +10,7 @@ use warnings;
 use feature qw( switch );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Carp;
 use Scalar::Util qw( refaddr );

@@ -88,8 +88,6 @@ t/20rootwin.t
 t/21window.t
 t/22window-expose.t
 t/23window-scrolling.t
-t/24window-direct-draw.t
-t/25window-clipping.t
 t/26window-focus.t
 t/27window-input.t
 t/28window-float.t
@@ -105,5 +103,9 @@ t/50widget-static.t
 t/51widget-box.t
 t/80tickit.t
 t/81tickit-input.t
+t/90legacy-window-drawing.t
+t/91legacy-window-clipping.t
+t/92legacy-widget-setpen.t
+t/93legacy-widget-style.t
 t/99pod.t
 typemap

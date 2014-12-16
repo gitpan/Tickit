@@ -94,6 +94,7 @@ done_testing;
 package TestWidget;
 
 use base qw( Tickit::Widget );
+use constant WIDGET_PEN_FROM_STYLE => 1;
 
 sub lines { 1 }
 sub cols  { 5 }

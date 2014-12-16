@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010; # //
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Carp;
 
@@ -27,7 +27,7 @@ use Tickit::Debug;
 use constant WEAKEN_CHILDREN => $ENV{TICKIT_CHILD_WINDOWS_WEAKEN} // 1;
 use constant CHILD_WINDOWS_LATER => $ENV{TICKIT_CHILD_WINDOWS_LATER} // 1;
 unless( CHILD_WINDOWS_LATER ) {
-   warn "Tickit::Window running with CHILD_WINDOWS_LATER disabled\n";
+   die "Tickit::Window cannot run with CHILD_WINDOWS_LATER disabled\n";
 }
 
 =head1 NAME

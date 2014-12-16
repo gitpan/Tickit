@@ -12,7 +12,7 @@ use feature qw( switch );
 use base qw( Tickit::Widget );
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Carp;
 
@@ -69,6 +69,8 @@ Sets the child widget's parent, stores the options for the child, and calls
 the C<children_changed> method. The concrete implementation will have to
 implement storage of this child widget.
 
+Returns the container C<$widget> itself, for easy chaining.
+
 =cut
 
 sub add
@@ -81,12 +83,16 @@ sub add
    $self->{child_opts}{refaddr $child} = \%opts;
 
    $self->children_changed;
+
+   return $self;
 }
 
 =head2 $widget->remove( $child_or_index )
 
 Removes the child widget's parent, and calls the C<children_changed> method.
 The concrete implementation will have to remove this child from its storage.
+
+Returns the container C<$widget> itself, for easy chaining.
 
 =cut
 
@@ -102,6 +108,8 @@ sub remove
    delete $self->{child_opts}{refaddr $child};
 
    $self->children_changed;
+
+   return $self;
 }
 
 =head2 %opts = $widget->child_opts( $child )

@@ -95,6 +95,7 @@ done_testing;
 package TestWidget;
 
 use base qw( Tickit::Widget );
+use constant WIDGET_PEN_FROM_STYLE => 1;
 
 sub render_to_rb {}
 
@@ -104,6 +105,7 @@ sub cols  { $cols  }
 package TestContainer;
 
 use base qw( Tickit::ContainerWidget );
+use constant WIDGET_PEN_FROM_STYLE => 1;
 
 sub new
 {
